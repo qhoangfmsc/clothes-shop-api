@@ -1,7 +1,7 @@
-import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { BaseEntity } from '@common/base/base.entity';
-import { Cart } from './cart.entity';
+import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { Product } from '../product/product.entity';
+import { Cart } from './cart.entity';
 
 @Entity('cart_items')
 export class CartItem extends BaseEntity {
@@ -20,7 +20,11 @@ export class CartItem extends BaseEntity {
   @Column({ type: 'varchar', length: 100, default: '' })
   color: string;
 
-  @ManyToOne(() => Cart, (cart) => cart.items, { onDelete: 'CASCADE' })
+  @ManyToOne(
+    () => Cart,
+    (cart) => cart.items,
+    { onDelete: 'CASCADE' },
+  )
   @JoinColumn({ name: 'cart_id' })
   cart: Cart;
 

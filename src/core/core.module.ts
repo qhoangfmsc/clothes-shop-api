@@ -31,9 +31,7 @@ import { DataSource } from 'typeorm';
 export class CoreModule implements OnModuleInit {
   private readonly logger = new Logger(CoreModule.name);
 
-  constructor(
-    @InjectDataSource() private readonly dataSource: DataSource,
-  ) {}
+  constructor(@InjectDataSource() private readonly dataSource: DataSource) {}
 
   async onModuleInit() {
     await this.logDbStats();

@@ -1,6 +1,6 @@
+import { CurrentUser } from '@common/decorator/current-user.decorator';
 import { Controller, Delete, Get, Param, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { CurrentUser } from '@common/decorator/current-user.decorator';
 import { User } from '../user/user.entity';
 import { WishlistService } from './wishlist.service';
 

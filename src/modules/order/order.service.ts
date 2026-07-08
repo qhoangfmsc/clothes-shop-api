@@ -1,12 +1,12 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Order } from './order.entity';
-import { OrderItem } from './order-item.entity';
+import { Address } from '../address/address.entity';
 import { Cart } from '../cart/cart.entity';
 import { CartItem } from '../cart/cart-item.entity';
-import { Address } from '../address/address.entity';
 import { CreateOrderDto } from './dtos/order.dto';
+import { Order } from './order.entity';
+import { OrderItem } from './order-item.entity';
 
 const SHIPPING_FEES: Record<string, number> = {
   standard: 8,
@@ -75,10 +75,7 @@ export class OrderService {
 
     // Calculate
     const shippingMethod = dto.shippingMethod || 'standard';
-    const subtotal = cart.items.reduce(
-      (sum, item) => sum + Number(item.product?.price ?? 0) * item.quantity,
-      0,
-    );
+    const subtotal = cart.items.reduce((sum, item) => sum + Number(item.product?.price ?? 0) * item.quantity, 0);
     const shippingFee = subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : (SHIPPING_FEES[shippingMethod] ?? 8);
     const total = subtotal + shippingFee;
 

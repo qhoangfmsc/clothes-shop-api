@@ -1,7 +1,7 @@
-import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryColumn, BeforeInsert, Unique } from 'typeorm';
 import { customAlphabet } from 'nanoid';
-import { User } from '../user/user.entity';
+import { BeforeInsert, Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryColumn, Unique } from 'typeorm';
 import { Product } from '../product/product.entity';
+import { User } from '../user/user.entity';
 
 const nanoid16 = customAlphabet('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', 16);
 

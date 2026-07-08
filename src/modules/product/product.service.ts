@@ -10,13 +10,7 @@ export class ProductService {
     private readonly productRepo: Repository<Product>,
   ) {}
 
-  async findAll(query: {
-    category?: string;
-    subcategory?: string;
-    badge?: string;
-    sort?: string;
-    limit?: number;
-  }) {
+  async findAll(query: { category?: string; subcategory?: string; badge?: string; sort?: string; limit?: number }) {
     const qb = this.productRepo.createQueryBuilder('p').where('p.status = :status', { status: 'active' });
 
     if (query.category) {

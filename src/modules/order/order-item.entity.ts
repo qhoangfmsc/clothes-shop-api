@@ -1,7 +1,7 @@
-import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryColumn, BeforeInsert } from 'typeorm';
 import { customAlphabet } from 'nanoid';
-import { Order } from './order.entity';
+import { BeforeInsert, Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryColumn } from 'typeorm';
 import { Product } from '../product/product.entity';
+import { Order } from './order.entity';
 
 const nanoid16 = customAlphabet('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', 16);
 
@@ -37,7 +37,11 @@ export class OrderItem {
   @CreateDateColumn({ name: 'created_at', type: 'timestamp with time zone' })
   createdAt: Date;
 
-  @ManyToOne(() => Order, (order) => order.items, { onDelete: 'CASCADE' })
+  @ManyToOne(
+    () => Order,
+    (order) => order.items,
+    { onDelete: 'CASCADE' },
+  )
   @JoinColumn({ name: 'order_id' })
   order: Order;
 

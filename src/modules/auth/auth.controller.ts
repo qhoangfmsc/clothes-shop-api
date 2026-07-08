@@ -1,7 +1,7 @@
+import { CurrentUser } from '@common/decorator/current-user.decorator';
+import { Public } from '@common/decorator/public.decorator';
 import { Body, Controller, Get, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { Public } from '@common/decorator/public.decorator';
-import { CurrentUser } from '@common/decorator/current-user.decorator';
 import { User } from '../user/user.entity';
 import { AuthService } from './auth.service';
 import { GoogleLoginDto, RefreshTokenDto } from './dtos/auth.dto';

@@ -1,5 +1,5 @@
-import { Column, Entity, OneToMany } from 'typeorm';
 import { BaseEntity } from '@common/base/base.entity';
+import { Column, Entity, OneToMany } from 'typeorm';
 import { SubCategory } from './sub-category.entity';
 
 @Entity('categories')
@@ -13,6 +13,10 @@ export class Category extends BaseEntity {
   @Column({ type: 'text', default: '' })
   description: string;
 
-  @OneToMany(() => SubCategory, (sub) => sub.category, { eager: true, cascade: true })
+  @OneToMany(
+    () => SubCategory,
+    (sub) => sub.category,
+    { eager: true, cascade: true },
+  )
   subcategories: SubCategory[];
 }

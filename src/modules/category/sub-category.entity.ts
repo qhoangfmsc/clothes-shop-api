@@ -18,7 +18,11 @@ export class SubCategory {
   @Column({ type: 'int', default: 0 })
   count: number;
 
-  @ManyToOne(() => Category, (cat) => cat.subcategories, { onDelete: 'CASCADE' })
+  @ManyToOne(
+    () => Category,
+    (cat) => cat.subcategories,
+    { onDelete: 'CASCADE' },
+  )
   @JoinColumn({ name: 'category_id' })
   category: Category;
 }

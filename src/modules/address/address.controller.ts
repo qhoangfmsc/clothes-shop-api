@@ -1,6 +1,6 @@
+import { CurrentUser } from '@common/decorator/current-user.decorator';
 import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { CurrentUser } from '@common/decorator/current-user.decorator';
 import { User } from '../user/user.entity';
 import { AddressService } from './address.service';
 import { CreateAddressDto, UpdateAddressDto } from './dtos/address.dto';

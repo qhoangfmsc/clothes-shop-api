@@ -1,10 +1,10 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { ConfigService } from '@nestjs/config';
 import { User } from '../user/user.entity';
-import { GoogleAuthService } from './google-auth.service';
+import { GoogleAuthService, GoogleUserPayload } from './google-auth.service';
 
 interface JwtPayload {
   sub: string;
@@ -28,10 +28,10 @@ export class AuthService {
    */
   async googleLogin(credential: string) {
     // Detect credential type:
-    // - auth_code: typically short (e.g. "4/0A..."), contains "/" 
+    // - auth_code: typically short (e.g. "4/0A..."), contains "/"
     // - idToken: JWT format (3 dot-separated parts)
     // - access_token: starts with "ya29."
-    let googleUser;
+    let googleUser: GoogleUserPayload;
 
     const isJwt = credential.split('.').length === 3;
     const isAuthCode = credential.startsWith('4/') || (credential.length < 200 && !isJwt);

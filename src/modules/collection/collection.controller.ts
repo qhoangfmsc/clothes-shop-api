@@ -1,6 +1,6 @@
+import { Public } from '@common/decorator/public.decorator';
 import { Controller, Get, Query } from '@nestjs/common';
 import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
-import { Public } from '@common/decorator/public.decorator';
 import { CollectionService } from './collection.service';
 
 @ApiTags('Collections')
