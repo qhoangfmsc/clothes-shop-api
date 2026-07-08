@@ -36,12 +36,7 @@ async function bootstrap() {
   app.enableShutdownHooks();
 
   await setupSwagger(app);
-
-  const port = process.env.APP_PORT || 7001;
-  await app.listen(port, '0.0.0.0', () => {
-    console.log(`🛍️  Clothes Shop API listening on port ${port}`);
-    console.log(`📚 Swagger: http://localhost:${port}/api-docs`);
-  });
+  await app.listen(process.env.PORT || 7001);
 
   if (module.hot) {
     module.hot.accept();

@@ -8,6 +8,11 @@ export default new DataSource({
   username: process.env.POSTGRES_USERNAME || 'pguser',
   password: process.env.POSTGRES_PASSWORD || '',
   database: process.env.POSTGRES_DATABASE || 'clothes-shop',
+
+  ssl: {
+    rejectUnauthorized: false,
+  },
+
   entities: ['src/**/*.entity.ts'],
   migrations: ['src/migrations/*.ts'],
   migrationsTableName: 'typeorm_migrations',
