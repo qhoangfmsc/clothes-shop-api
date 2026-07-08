@@ -92,7 +92,6 @@ export class InitSchema1783478828861 implements MigrationInterface {
         "image"       VARCHAR(500) NOT NULL,
         "product_ids" JSONB        NOT NULL DEFAULT '[]',
         "season"      VARCHAR(100) NOT NULL DEFAULT '',
-        "bg_color"    VARCHAR(100) NOT NULL DEFAULT '',
         "created_at"  TIMESTAMPTZ  NOT NULL DEFAULT now(),
         "updated_at"  TIMESTAMPTZ  NOT NULL DEFAULT now(),
         CONSTRAINT "PK_collections"      PRIMARY KEY ("id"),

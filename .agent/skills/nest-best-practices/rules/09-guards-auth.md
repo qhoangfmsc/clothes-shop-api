@@ -1,116 +1,104 @@
-# Guards & Authentication
+# Guards & Authentication — Clothes Shop API
 
-## User Authentication — Vietnix Workplace SSO
+## Auth Strategy — Google OAuth + JWT
 
-Auth được xử lý bởi `@vnxdev/auth-nestjs` — đăng ký global trong `AuthModule`.
+Auth xử lý bằng `@nestjs/passport` + `@nestjs/jwt` + `google-auth-library`.
+
+### Flow
+
+1. FE: Google Sign-In → get `idToken`
+2. FE: `POST /api/auth/google` → send `{ idToken }`
+3. BE: Verify idToken → upsert user → return `{ accessToken, refreshToken, user }`
+4. FE: Subsequent requests → `Authorization: Bearer <accessToken>`
+
+## Global Guard — JwtAuthGuard
+
+Tất cả routes mặc định **require auth**. Đăng ký global qua `APP_GUARD` trong `MainModule`.
 
 ```typescript
-// src/core/auth/auth.module.ts
-import { AuthModule as VnxAuthModule } from '@vnxdev/auth-nestjs';
-
-@Module({
-  imports: [VnxAuthModule.register({ global: true })],
-})
-export class AuthModule {}
+// src/main.module.ts
+{
+  provide: APP_GUARD,
+  useClass: JwtAuthGuard,
+}
 ```
 
-Toàn bộ route được bảo vệ mặc định. Dùng `@Public()` để mở route không cần auth.
+## @Public() — Bỏ qua auth
+
+Dùng `@Public()` decorator cho route không cần auth (product listing, categories, etc.).
 
 ```typescript
-import { Public } from '@vnxdev/auth-nestjs';
+import { Public } from '@common/decorator/public.decorator';
 
 @Public()
-@Get('health')
-health() { return 'ok'; }
+@Controller('api/products')
+export class ProductController { ... }
 ```
 
-## User Info — `@CurrentUser()`
+## @CurrentUser() — Lấy user hiện tại
 
 ```typescript
-import { CurrentUser, type VnxTokenPayload } from '@vnxdev/auth-nestjs';
+import { CurrentUser } from '@common/decorator/current-user.decorator';
 
-@Get('profile')
-getProfile(@CurrentUser() user: VnxTokenPayload) {
-  return { id: user.sub, email: user.email };
+@Get('me')
+getMe(@CurrentUser() user: User) {
+  return { user };
 }
 ```
 
-`VnxTokenPayload` chứa: `sub`, `email`, `roles`, `permissions`.
+## Roles
 
-## Permission-Based Access — `@WorkplacePermissions()`
+2 roles đơn giản:
 
-```typescript
-import { WorkplacePermissions } from '@vnxdev/auth-nestjs';
-import { Permission } from 'src/core/auth/permissions.constant';
+| Role | Description |
+|------|-------------|
+| `user` | Default cho tất cả user đăng ký |
+| `admin` | Quản trị viên |
 
-@WorkplacePermissions(Permission.VIEW_SEO_CONTENT)
-@Get('articles')
-listArticles() { ... }
-```
+Hiện tại chưa có `RolesGuard` — khi cần admin-only endpoints thì tạo thêm.
 
-User cần có **ít nhất một** permission trong danh sách để truy cập.
+## Auth Endpoints
 
-## Permission IDs (từ Vietnix Workplace)
-
-```typescript
-export enum Permission {
-  // Viết bài tự động (SEO Content)
-  VIEW_SEO_CONTENT = 516,
-  MANAGE_SEO_CONTENT = 517,
-
-  // Seeding Facebook
-  VIEW_SEEDING = 518,
-  MANAGE_SEEDING = 519,
-
-  // Giám sát đối thủ
-  VIEW_COMPETITORS = 520,
-  MANAGE_COMPETITORS = 521,
-
-  // Analytics Insights (FB Ads, Pages, Google Ads, GA4)
-  VIEW_ANALYTICS = 522,
-  MANAGE_ANALYTICS = 523,
-}
-```
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| POST | `/api/auth/google` | Public | Google login |
+| GET | `/api/auth/me` | Bearer | Get current user |
+| POST | `/api/auth/refresh` | Public | Refresh access token |
 
 ## Quy ước sử dụng
 
-- **Modules CÓ permission**: SEO Content, Seeding, Competitors, Analytics — dùng `@WorkplacePermissions()`
-- **Modules KHÔNG có permission** (Discord, Affiliate, Image Gen, Upload): chỉ cần login (global guard tự xử lý)
-- **KHÔNG** dùng `@UseGuards()` cho AuthGuard — đã global
-- **KHÔNG** dùng `@Roles()`, `RolesGuard`, local `AuthGuard`, `PermissionsGuard` — đã xóa
-- Import `WorkplacePermissions`, `CurrentUser`, `Public` từ `@vnxdev/auth-nestjs`
-- Import `Permission` enum từ `src/core/auth/permissions.constant`
+- **KHÔNG** dùng `@UseGuards(AuthGuard('jwt'))` trực tiếp — đã global
+- **KHÔNG** import `@vnxdev/auth-nestjs` — project này dùng custom JWT
+- Dùng `@Public()` từ `@common/decorator/public.decorator`
+- Dùng `@CurrentUser()` từ `@common/decorator/current-user.decorator`
+- Import `User` entity khi cần type cho `@CurrentUser()`
 
-## Controller Pattern (có permission)
+## Controller Pattern (public route)
 
 ```typescript
-import { Controller, Get, Post } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { WorkplacePermissions } from '@vnxdev/auth-nestjs';
-import { Permission } from 'src/core/auth/permissions.constant';
+@ApiTags('Products')
+@Controller('api/products')
+@Public()
+export class ProductController { ... }
+```
 
-@ApiTags('SEO Content')
-@Controller('seo-content')
+## Controller Pattern (authenticated route)
+
+```typescript
+@ApiTags('Orders')
+@Controller('api/orders')
 @ApiBearerAuth()
-export class SeoContentController {
+export class OrderController {
   @Get()
-  @WorkplacePermissions(Permission.VIEW_SEO_CONTENT)
-  findAll() { ... }
-
-  @Post()
-  @WorkplacePermissions(Permission.MANAGE_SEO_CONTENT)
-  create() { ... }
+  findMyOrders(@CurrentUser() user: User) { ... }
 }
 ```
 
-## Controller Pattern (không cần permission)
+## Environment Variables
 
-```typescript
-@ApiTags('Upload')
-@Controller('upload')
-@ApiBearerAuth()
-export class UploadController {
-  @Post()
-  upload() { ... }  // Chỉ cần login, global guard tự xử lý
-}
+```env
+JWT_SECRET=<random-secret>
+JWT_EXPIRES_IN=1d
+JWT_REFRESH_EXPIRES_IN=30d
+GOOGLE_CLIENT_ID=<from-google-console>
 ```

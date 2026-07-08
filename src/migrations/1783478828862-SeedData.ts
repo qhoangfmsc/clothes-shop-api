@@ -143,19 +143,19 @@ export class SeedData1783478828862 implements MigrationInterface {
     // COLLECTIONS — product_ids reference nanoid16 product IDs
     // ═══════════════════════════════════════════════════════════
     const collections = [
-      { id: col[0], slug: 'summer-reverie', name: 'Summer Reverie', subtitle: 'A meditation on warm light', description: 'A meditation on warm light and effortless draping.', image: '/images/model-intro/model_intro_1.webp', pids: [p[0],p[3],p[8],p[11],p[19],p[25]], season: 'Summer 2026', bg: 'var(--color-rose-milk)' },
-      { id: col[1], slug: 'golden-craft', name: 'Golden Craft', subtitle: 'Artisan meets material', description: 'Every piece in this collection is a conversation between artisan and material.', image: '/images/model-intro/model_intro_7.webp', pids: [p[24],p[26],p[27],p[29],p[18],p[22]], season: 'Summer 2026', bg: 'var(--color-vanilla)' },
-      { id: col[2], slug: 'twilight-edit', name: 'Twilight Edit', subtitle: 'Between dusk and dawn', description: 'For the hours between dusk and dawn.', image: '/images/model-intro/model_intro_6.webp', pids: [p[10],p[12],p[5],p[1],p[17],p[31]], season: 'Summer 2026', bg: 'var(--color-lavender-cream)' },
-      { id: col[3], slug: 'silk-and-satin', name: 'Silk & Satin', subtitle: 'Tops Collection', description: 'The most luxurious fabrics, cut with precision and finished by hand.', image: '/images/model-intro/model_intro_2.webp', pids: [p[0],p[5],p[6],p[8],p[14]], season: 'Summer 2026', bg: 'var(--color-champagne-cream)' },
-      { id: col[4], slug: 'resort-bags', name: 'Resort Bags', subtitle: 'Crafted companions', description: 'A curated selection of bags designed for the resort lifestyle.', image: '/images/model-intro/model_intro_5.webp', pids: [p[16],p[17],p[19],p[21],p[23]], season: 'Summer 2026', bg: 'var(--color-cloud)' },
-      { id: col[5], slug: 'lace-and-grace', name: 'Lace & Grace', subtitle: 'Delicate details', description: 'Celebrating the art of lace — from Chantilly to crochet.', image: '/images/model-intro/model_intro_3.webp', pids: [p[12],p[3],p[6],p[28],p[25]], season: 'Summer 2026', bg: 'var(--color-sage-cream)' },
-      { id: col[6], slug: 'night-out', name: 'Night Out', subtitle: 'After dark essentials', description: 'Everything you need for a night that lingers.', image: '/images/model-intro/model_intro_4.webp', pids: [p[1],p[5],p[10],p[18],p[22],p[31]], season: 'Summer 2026', bg: 'var(--color-obsidian)' },
+      { id: col[0], slug: 'summer-reverie', name: 'Summer Reverie', subtitle: 'A meditation on warm light', description: 'A meditation on warm light and effortless draping.', image: '/images/model-intro/model_intro_1.webp', pids: [p[0],p[3],p[8],p[11],p[19],p[25]], season: 'Summer 2026' },
+      { id: col[1], slug: 'golden-craft', name: 'Golden Craft', subtitle: 'Artisan meets material', description: 'Every piece in this collection is a conversation between artisan and material.', image: '/images/model-intro/model_intro_7.webp', pids: [p[24],p[26],p[27],p[29],p[18],p[22]], season: 'Summer 2026' },
+      { id: col[2], slug: 'twilight-edit', name: 'Twilight Edit', subtitle: 'Between dusk and dawn', description: 'For the hours between dusk and dawn.', image: '/images/model-intro/model_intro_6.webp', pids: [p[10],p[12],p[5],p[1],p[17],p[31]], season: 'Summer 2026' },
+      { id: col[3], slug: 'silk-and-satin', name: 'Silk & Satin', subtitle: 'Tops Collection', description: 'The most luxurious fabrics, cut with precision and finished by hand.', image: '/images/model-intro/model_intro_2.webp', pids: [p[0],p[5],p[6],p[8],p[14]], season: 'Summer 2026' },
+      { id: col[4], slug: 'resort-bags', name: 'Resort Bags', subtitle: 'Crafted companions', description: 'A curated selection of bags designed for the resort lifestyle.', image: '/images/model-intro/model_intro_5.webp', pids: [p[16],p[17],p[19],p[21],p[23]], season: 'Summer 2026' },
+      { id: col[5], slug: 'lace-and-grace', name: 'Lace & Grace', subtitle: 'Delicate details', description: 'Celebrating the art of lace — from Chantilly to crochet.', image: '/images/model-intro/model_intro_3.webp', pids: [p[12],p[3],p[6],p[28],p[25]], season: 'Summer 2026' },
+      { id: col[6], slug: 'night-out', name: 'Night Out', subtitle: 'After dark essentials', description: 'Everything you need for a night that lingers.', image: '/images/model-intro/model_intro_4.webp', pids: [p[1],p[5],p[10],p[18],p[22],p[31]], season: 'Summer 2026' },
     ];
 
     for (const coll of collections) {
       await queryRunner.query(`
-        INSERT INTO "collections" ("id","slug","name","subtitle","description","image","product_ids","season","bg_color")
-        VALUES ('${coll.id}','${coll.slug}','${esc(coll.name)}','${coll.subtitle}','${esc(coll.description)}','${coll.image}','${JSON.stringify(coll.pids)}','${coll.season}','${coll.bg}')
+        INSERT INTO "collections" ("id","slug","name","subtitle","description","image","product_ids","season")
+        VALUES ('${coll.id}','${coll.slug}','${esc(coll.name)}','${coll.subtitle}','${esc(coll.description)}','${coll.image}','${JSON.stringify(coll.pids)}','${coll.season}')
         ON CONFLICT ("id") DO NOTHING
       `);
     }

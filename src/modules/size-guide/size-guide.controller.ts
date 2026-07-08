@@ -1,5 +1,6 @@
 import { Controller, Get, Param } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Public } from '@common/decorator/public.decorator';
 
 /**
  * Static size guide data — no DB needed for now.
@@ -85,6 +86,7 @@ const SIZE_GUIDES: Record<string, any> = {
 
 @ApiTags('Size Guides')
 @Controller('api/size-guides')
+@Public()
 export class SizeGuideController {
   @Get(':category')
   @ApiOperation({ summary: 'Get size guide by category' })

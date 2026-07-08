@@ -1,5 +1,6 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Public } from '@common/decorator/public.decorator';
 
 /**
  * Static shipping data — no DB needed for now.
@@ -53,6 +54,7 @@ const SHIPPING_DATA = {
 
 @ApiTags('Shipping')
 @Controller('api/shipping')
+@Public()
 export class ShippingController {
   @Get()
   @ApiOperation({ summary: 'Get shipping methods and return policy' })

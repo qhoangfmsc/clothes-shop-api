@@ -16,11 +16,14 @@ export class User extends BaseEntity {
   image: string | null;
 
   @Column({ type: 'varchar', length: 50, nullable: true })
-  provider: string | null; // 'google', 'email', etc.
+  provider: string | null;
 
   @Column({ type: 'varchar', length: 255, nullable: true, name: 'provider_id' })
-  providerId: string | null; // Google sub ID, etc.
+  providerId: string | null;
+
+  @Column({ type: 'varchar', length: 20, default: 'user' })
+  role: string; // 'user' | 'admin'
 
   @Column({ type: 'varchar', length: 20, default: 'active' })
-  status: string; // active, disabled
+  status: string; // 'active' | 'disabled'
 }

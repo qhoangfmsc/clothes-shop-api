@@ -23,7 +23,4 @@ export class Collection extends BaseEntity {
 
   @Column({ type: 'varchar', length: 100, default: '' })
   season: string;
-
-  @Column({ type: 'varchar', length: 100, default: '', name: 'bg_color' })
-  bgColor: string;
 }
