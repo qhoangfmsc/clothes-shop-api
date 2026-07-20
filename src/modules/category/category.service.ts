@@ -2,8 +2,9 @@ import { throwAppError } from '@common/exceptions/app.exception';
 import { ECategoryErrorCode } from '@common/exceptions/error-codes';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { FindOptionsOrder, FindOptionsWhere, ILike, Repository } from 'typeorm';
 import { Category } from './category.entity';
+import { AdminCategoryQueryDto } from './dtos/admin-category-query.dto';
 import { CreateCategoryDto, UpdateCategoryDto } from './dtos/category.dto';
 
 @Injectable()
@@ -62,6 +63,38 @@ export class CategoryService {
   // ADMIN METHODS
   // ============================================
 
+  async findAllAdmin(query: AdminCategoryQueryDto) {
+    const { search, sort, page = 1, limit = 25 } = query;
+
+    // Build where: search creates OR conditions
+    let where: FindOptionsWhere<Category> | FindOptionsWhere<Category>[] | undefined;
+    if (search) {
+      const like = ILike(`%${search}%`);
+      where = [
+        { slug: like },
+        { title: like },
+        { description: like },
+      ];
+    }
+
+    // Sort: "field" = DESC, "-field" = ASC
+    let order: FindOptionsOrder<Category> = { createdAt: 'DESC' };
+    if (sort) {
+      const isAsc = sort.startsWith('-');
+      const field = isAsc ? sort.slice(1) : sort;
+      order = { [field]: isAsc ? 'ASC' : 'DESC' };
+    }
+
+    const [data, total] = await this.categoryRepo.findAndCount({
+      where,
+      order,
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+
+    return { data, total, page, limit };
+  }
+
   async create(dto: CreateCategoryDto) {
     await this.ensureSlugUnique(dto.slug);
     if (dto.subcategories && dto.subcategories.length > 0) {
@@ -94,10 +127,14 @@ export class CategoryService {
     if (dto.subcategories && dto.subcategories.length > 0) {
       this.validateSubCategorySlugs(dto.subcategories);
     }
-    // Nếu có subcategories mới → cascade sẽ xoá sub cũ và tạo lại
+    // Nếu có subcategories mới → xoá sub cũ và tạo lại
     if (dto.subcategories !== undefined) {
+      // Phải xoá explicit vì TypeORM khi clear array + save sẽ SET category_id = NULL
+      // (vi phạm NOT NULL) thay vì DELETE row. onDelete: CASCADE chỉ áp dụng khi DELETE.
+      if (category.subcategories && category.subcategories.length > 0) {
+        await this.categoryRepo.manager.remove(category.subcategories);
+      }
       category.subcategories = [];
-      await this.categoryRepo.save(category);
     }
 
     Object.assign(category, dto);

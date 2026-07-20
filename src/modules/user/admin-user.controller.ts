@@ -2,8 +2,9 @@ import { CurrentUser } from '@common/decorator/current-user.decorator';
 import { Permissions } from '@common/decorator/permissions.decorator';
 import { Permission } from '@common/permissions/permissions.constant';
 import { Body, Controller, Get, Param, Patch, Query } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { User } from '../user/user.entity';
+import { AdminUserQueryDto } from './dtos/admin-user-query.dto';
 import { UpdateUserDto } from './dtos/user.dto';
 import { UserService } from './user.service';
 
@@ -14,19 +15,10 @@ export class AdminUserController {
   constructor(private readonly userService: UserService) {}
 
   @Get()
-  @ApiOperation({ summary: '[Admin] Danh sách người dùng' })
-  @ApiQuery({ name: 'role', required: false, description: 'Lọc theo role (user/admin)' })
-  @ApiQuery({ name: 'status', required: false, description: 'Lọc theo trạng thái (active/disabled)' })
-  @ApiQuery({ name: 'page', required: false, type: Number })
-  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiOperation({ summary: '[Admin] Danh sách người dùng (search, filter, sort, pagination)' })
   @Permissions(Permission.USER_ADMIN_VIEW)
-  findAll(@Query('role') role?: string, @Query('status') status?: string, @Query('page') page?: string, @Query('limit') limit?: string) {
-    return this.userService.findAll({
-      role,
-      status,
-      page: page ? parseInt(page, 10) : undefined,
-      limit: limit ? parseInt(limit, 10) : undefined,
-    });
+  findAll(@Query() query: AdminUserQueryDto) {
+    return this.userService.findAll(query);
   }
 
   @Get(':id')

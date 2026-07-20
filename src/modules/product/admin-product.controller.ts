@@ -1,7 +1,8 @@
 import { Permissions } from '@common/decorator/permissions.decorator';
 import { Permission } from '@common/permissions/permissions.constant';
-import { Body, Controller, Delete, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { AdminProductQueryDto } from './dtos/admin-product-query.dto';
 import { CreateProductDto, UpdateProductDto } from './dtos/product.dto';
 import { ProductService } from './product.service';
 
@@ -10,6 +11,13 @@ import { ProductService } from './product.service';
 @ApiBearerAuth()
 export class AdminProductController {
   constructor(private readonly productService: ProductService) {}
+
+  @Get()
+  @ApiOperation({ summary: '[Admin] Danh sách sản phẩm (search, filter, sort, pagination)' })
+  @Permissions(Permission.PRODUCT_CREATE)
+  findAll(@Query() query: AdminProductQueryDto) {
+    return this.productService.findAllAdmin(query);
+  }
 
   @Post()
   @ApiOperation({ summary: '[Admin] Tạo sản phẩm mới' })

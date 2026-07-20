@@ -6,6 +6,7 @@ import { DataSource, Repository } from 'typeorm';
 import { Address } from '../address/address.entity';
 import { Cart } from '../cart/cart.entity';
 import { CartItem } from '../cart/cart-item.entity';
+import { AdminOrderQueryDto } from './dtos/admin-order-query.dto';
 import { UpdateOrderStatusDto } from './dtos/admin-order.dto';
 import { CreateOrderDto } from './dtos/order.dto';
 import { Order } from './order.entity';
@@ -164,20 +165,36 @@ export class OrderService {
   // ADMIN METHODS
   // ============================================
 
-  async findAllAdmin(query?: { status?: string; page?: number; limit?: number }) {
-    const page = query?.page || 1;
-    const limit = query?.limit || 25;
+  async findAllAdmin(query: AdminOrderQueryDto) {
+    const { search, status, sort, page = 1, limit = 25 } = query;
 
-    const where: any = {};
-    if (query?.status) where.status = query.status;
+    const qb = this.orderRepo.createQueryBuilder('o').leftJoinAndSelect('o.items', 'items');
 
-    const [data, total] = await this.orderRepo.findAndCount({
-      where,
-      relations: ['items'],
-      order: { createdAt: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+    // Filter by status
+    if (status) {
+      qb.andWhere('o.status = :status', { status });
+    }
+
+    // Search: id, phone, fullName (phone & fullName nằm trong JSONB shipping_address)
+    if (search) {
+      qb.andWhere(
+        '(o.id ILIKE :search OR o.shipping_address->>\'phone\' ILIKE :search OR o.shipping_address->>\'fullName\' ILIKE :search)',
+        { search: `%${search}%` },
+      );
+    }
+
+    // Sort: "field" = DESC, "-field" = ASC
+    if (sort) {
+      const isAsc = sort.startsWith('-');
+      const field = isAsc ? sort.slice(1) : sort;
+      qb.orderBy(`o.${field}`, isAsc ? 'ASC' : 'DESC');
+    } else {
+      qb.orderBy('o.created_at', 'DESC');
+    }
+
+    qb.skip((page - 1) * limit).take(limit);
+
+    const [data, total] = await qb.getManyAndCount();
 
     return { data, total, page, limit };
   }

@@ -1,8 +1,9 @@
 import { Permissions } from '@common/decorator/permissions.decorator';
 import { Permission } from '@common/permissions/permissions.constant';
-import { Body, Controller, Delete, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CollectionService } from './collection.service';
+import { AdminCollectionQueryDto } from './dtos/admin-collection-query.dto';
 import { CreateCollectionDto, UpdateCollectionDto } from './dtos/collection.dto';
 
 @ApiTags('Admin — Collections')
@@ -10,6 +11,13 @@ import { CreateCollectionDto, UpdateCollectionDto } from './dtos/collection.dto'
 @ApiBearerAuth()
 export class AdminCollectionController {
   constructor(private readonly collectionService: CollectionService) {}
+
+  @Get()
+  @ApiOperation({ summary: '[Admin] Danh sách bộ sưu tập (search, filter, sort, pagination)' })
+  @Permissions(Permission.COLLECTION_CREATE)
+  findAll(@Query() query: AdminCollectionQueryDto) {
+    return this.collectionService.findAllAdmin(query);
+  }
 
   @Post()
   @ApiOperation({ summary: '[Admin] Tạo bộ sưu tập mới' })

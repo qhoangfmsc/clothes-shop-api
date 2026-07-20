@@ -2,9 +2,10 @@ import { throwAppError } from '@common/exceptions/app.exception';
 import { EProductErrorCode } from '@common/exceptions/error-codes';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { FindOptionsOrder, FindOptionsWhere, Not, Repository } from 'typeorm';
+import { FindOptionsOrder, FindOptionsWhere, ILike, Not, Repository } from 'typeorm';
 import { Category } from '../category/category.entity';
 import { SubCategory } from '../category/sub-category.entity';
+import { AdminProductQueryDto } from './dtos/admin-product-query.dto';
 import { CreateProductDto, UpdateProductDto } from './dtos/product.dto';
 import { Product } from './product.entity';
 
@@ -101,6 +102,57 @@ export class ProductService {
   // ============================================
   // ADMIN METHODS
   // ============================================
+
+  async findAllAdmin(query: AdminProductQueryDto) {
+    const { search, status, category, badge, sort, page = 1, limit = 25 } = query;
+
+    // Build base conditions (non-search filters)
+    const baseConditions: FindOptionsWhere<Product> = {};
+    if (status) baseConditions.status = status;
+    if (badge) baseConditions.badge = badge;
+
+    // Resolve category slug → ID
+    if (category) {
+      const cat = await this.categoryRepo.findOne({ where: { slug: category } });
+      if (cat) {
+        baseConditions.category = { id: cat.id };
+      } else {
+        return { data: [], total: 0, page, limit };
+      }
+    }
+
+    // Build where: search creates OR conditions, otherwise use baseConditions directly
+    let where: FindOptionsWhere<Product> | FindOptionsWhere<Product>[];
+    if (search) {
+      const like = ILike(`%${search}%`);
+      where = [
+        { name: like, ...baseConditions },
+        { slug: like, ...baseConditions },
+        { sku: like, ...baseConditions },
+        { description: like, ...baseConditions },
+      ];
+    } else {
+      where = baseConditions;
+    }
+
+    // Sort: "field" = DESC, "-field" = ASC
+    let order: FindOptionsOrder<Product> = { createdAt: 'DESC' };
+    if (sort) {
+      const isAsc = sort.startsWith('-');
+      const field = isAsc ? sort.slice(1) : sort;
+      order = { [field]: isAsc ? 'ASC' : 'DESC' };
+    }
+
+    const [data, total] = await this.productRepo.findAndCount({
+      where,
+      relations: ['category', 'subcategory'],
+      order,
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+
+    return { data, total, page, limit };
+  }
 
   async create(dto: CreateProductDto) {
     await this.ensureSlugUnique(dto.slug);

@@ -2,7 +2,8 @@ import { throwAppError } from '@common/exceptions/app.exception';
 import { EUserErrorCode } from '@common/exceptions/error-codes';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { FindOptionsOrder, FindOptionsWhere, ILike, Repository } from 'typeorm';
+import { AdminUserQueryDto } from './dtos/admin-user-query.dto';
 import { UpdateUserDto } from './dtos/user.dto';
 import { User } from './user.entity';
 
@@ -13,24 +14,39 @@ export class UserService {
     private readonly userRepo: Repository<User>,
   ) {}
 
-  async findAll(query?: { role?: string; status?: string; page?: number; limit?: number }) {
-    const qb = this.userRepo.createQueryBuilder('u');
+  async findAll(query: AdminUserQueryDto) {
+    const { search, role, status, sort, page = 1, limit = 25 } = query;
 
-    if (query?.role) {
-      qb.andWhere('u.role = :role', { role: query.role });
+    // Build where: search creates OR conditions, otherwise use base filters
+    let where: FindOptionsWhere<User> | FindOptionsWhere<User>[];
+    const baseConditions: FindOptionsWhere<User> = {};
+    if (role) baseConditions.role = role;
+    if (status) baseConditions.status = status;
+
+    if (search) {
+      const like = ILike(`%${search}%`);
+      where = [
+        { name: like, ...baseConditions },
+        { email: like, ...baseConditions },
+      ];
+    } else {
+      where = baseConditions;
     }
 
-    if (query?.status) {
-      qb.andWhere('u.status = :status', { status: query.status });
+    // Sort: "field" = DESC, "-field" = ASC
+    let order: FindOptionsOrder<User> = { createdAt: 'DESC' };
+    if (sort) {
+      const isAsc = sort.startsWith('-');
+      const field = isAsc ? sort.slice(1) : sort;
+      order = { [field]: isAsc ? 'ASC' : 'DESC' };
     }
 
-    qb.orderBy('u.created_at', 'DESC');
-
-    const page = query?.page || 1;
-    const limit = query?.limit || 25;
-    qb.skip((page - 1) * limit).take(limit);
-
-    const [data, total] = await qb.getManyAndCount();
+    const [data, total] = await this.userRepo.findAndCount({
+      where,
+      order,
+      skip: (page - 1) * limit,
+      take: limit,
+    });
 
     // Sanitize user output (không trả về password)
     const sanitized = data.map((user) => ({

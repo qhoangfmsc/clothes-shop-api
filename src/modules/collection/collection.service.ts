@@ -2,9 +2,10 @@ import { throwAppError } from '@common/exceptions/app.exception';
 import { ECollectionErrorCode } from '@common/exceptions/error-codes';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { FindOptionsOrder, FindOptionsWhere, ILike, In, Repository } from 'typeorm';
 import { Product } from '../product/product.entity';
 import { Collection } from './collection.entity';
+import { AdminCollectionQueryDto } from './dtos/admin-collection-query.dto';
 import { CreateCollectionDto, UpdateCollectionDto } from './dtos/collection.dto';
 
 @Injectable()
@@ -39,6 +40,44 @@ export class CollectionService {
   // ============================================
   // ADMIN METHODS
   // ============================================
+
+  async findAllAdmin(query: AdminCollectionQueryDto) {
+    const { search, season, sort, page = 1, limit = 25 } = query;
+
+    // Build base conditions
+    const baseConditions: FindOptionsWhere<Collection> = {};
+    if (season) baseConditions.season = season;
+
+    // Build where: search creates OR conditions
+    let where: FindOptionsWhere<Collection> | FindOptionsWhere<Collection>[];
+    if (search) {
+      const like = ILike(`%${search}%`);
+      where = [
+        { slug: like, ...baseConditions },
+        { name: like, ...baseConditions },
+      ];
+    } else {
+      where = baseConditions;
+    }
+
+    // Sort: "field" = DESC, "-field" = ASC
+    let order: FindOptionsOrder<Collection> = { createdAt: 'DESC' };
+    if (sort) {
+      const isAsc = sort.startsWith('-');
+      const field = isAsc ? sort.slice(1) : sort;
+      order = { [field]: isAsc ? 'ASC' : 'DESC' };
+    }
+
+    const [data, total] = await this.collectionRepo.findAndCount({
+      where,
+      relations: ['products'],
+      order,
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+
+    return { data, total, page, limit };
+  }
 
   async create(dto: CreateCollectionDto) {
     await this.ensureSlugUnique(dto.slug);
