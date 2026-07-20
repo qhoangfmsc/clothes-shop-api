@@ -189,7 +189,7 @@ export class OrderService {
       const field = isAsc ? sort.slice(1) : sort;
       qb.orderBy(`o.${field}`, isAsc ? 'ASC' : 'DESC');
     } else {
-      qb.orderBy('o.created_at', 'DESC');
+      qb.orderBy('o.createdAt', 'DESC');
     }
 
     qb.skip((page - 1) * limit).take(limit);
