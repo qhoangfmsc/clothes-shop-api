@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: clothes-shop-api
+    runtime: node
+    buildCommand: yarn install --frozen-lockfile && yarn build
+    startCommand: yarn start:prod

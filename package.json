@@ -6,9 +6,9 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
-    "build": "npx --yes @nestjs/cli build",
+    "build": "nest build",
     "format": "biome format --write ./src",
-    "dev": "npx --yes @nestjs/cli start --watch",
+    "dev": "nest start --watch",
     "start": "node dist/src/main.js",
     "start:prod": "yarn typeorm migration:run -d data-source.ts && node dist/src/main.js",
     "lint": "biome check ./src",
