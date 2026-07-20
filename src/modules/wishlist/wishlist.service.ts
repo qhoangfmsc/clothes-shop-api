@@ -1,6 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { Product } from '../product/product.entity';
 import { Wishlist } from './wishlist.entity';
 
 @Injectable()
@@ -8,6 +9,8 @@ export class WishlistService {
   constructor(
     @InjectRepository(Wishlist)
     private readonly wishlistRepo: Repository<Wishlist>,
+    @InjectRepository(Product)
+    private readonly productRepo: Repository<Product>,
   ) {}
 
   async findAll(userId: string) {
@@ -20,6 +23,10 @@ export class WishlistService {
   }
 
   async add(userId: string, productId: string) {
+    // Validate product exists
+    const product = await this.productRepo.findOne({ where: { id: productId } });
+    if (!product) throw new NotFoundException('Product not found');
+
     const existing = await this.wishlistRepo.findOne({ where: { userId, productId } });
     if (existing) return { data: existing, created: false };
 

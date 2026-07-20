@@ -1,5 +1,6 @@
 import { BaseEntity } from '@common/base/base.entity';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
+import { Product } from '../product/product.entity';
 import { User } from '../user/user.entity';
 
 @Entity('reviews')
@@ -34,4 +35,8 @@ export class Review extends BaseEntity {
   @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'user_id' })
   user: User | null;
+
+  @ManyToOne(() => Product, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'product_id' })
+  product: Product;
 }

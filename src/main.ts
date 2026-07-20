@@ -1,24 +1,15 @@
-import { ConsoleLogger, ValidationPipe } from '@nestjs/common';
+import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { json, urlencoded } from 'express';
+import helmet from 'helmet';
 import { AllExceptionFilter } from './common/filter/exception.filter';
+import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
 import { setupSwagger } from './core/swagger/swagger.config';
 import { MainModule } from './main.module';
 
-class FilteredLogger extends ConsoleLogger {
-  private readonly filteredContexts = ['InstanceLoader', 'RouterExplorer', 'RoutesResolver'];
-
-  log(message: unknown, context?: string): void {
-    if (context && this.filteredContexts.includes(context)) {
-      return;
-    }
-    super.log(message, context);
-  }
-}
-
 async function bootstrap() {
   const app = await NestFactory.create(MainModule, {
-    logger: new FilteredLogger(),
+    logger: ['log', 'error', 'warn', 'debug', 'verbose'],
     cors: {
       origin: process.env.CORS_ORIGINS?.split(',') || ['http://localhost:3000'],
       credentials: true,
@@ -27,22 +18,27 @@ async function bootstrap() {
     },
   });
 
+  // Security
+  app.use(helmet());
+  app.use(new RequestIdMiddleware().use);
+
   app.use(json({ limit: '5mb' }));
   app.use(urlencoded({ extended: true, limit: '5mb' }));
 
-  app.useGlobalPipes(new ValidationPipe({ transform: true }));
+  // Strict validation: strip unknown fields, reject them
+  app.useGlobalPipes(
+    new ValidationPipe({
+      transform: true,
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    }),
+  );
   app.useGlobalFilters(new AllExceptionFilter());
 
   app.enableShutdownHooks();
 
   await setupSwagger(app);
   await app.listen(process.env.PORT || 7001);
-
-  if (module.hot) {
-    module.hot.accept();
-    module.hot.dispose(() => app.close());
-  }
 }
 
-declare const module: any;
 void bootstrap();

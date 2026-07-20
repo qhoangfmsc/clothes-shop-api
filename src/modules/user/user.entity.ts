@@ -24,6 +24,9 @@ export class User extends BaseEntity {
   @Column({ type: 'varchar', length: 20, default: 'user' })
   role: string; // 'user' | 'admin'
 
+  @Column({ type: 'jsonb', default: [] })
+  permissions: number[];
+
   @Column({ type: 'varchar', length: 20, default: 'active' })
   status: string; // 'active' | 'disabled'
 }

@@ -1,3 +1,4 @@
+import { DEFAULT_USER_PERMISSIONS } from '@common/permissions/permissions.constant';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
@@ -55,6 +56,7 @@ export class AuthService {
         provider: 'google',
         providerId: googleUser.sub,
         role: 'user',
+        permissions: DEFAULT_USER_PERMISSIONS,
         status: 'active',
       });
       user = await this.userRepo.save(user);
@@ -136,6 +138,7 @@ export class AuthService {
       name: user.name,
       image: user.image,
       role: user.role,
+      permissions: user.permissions,
       status: user.status,
       createdAt: user.createdAt,
     };

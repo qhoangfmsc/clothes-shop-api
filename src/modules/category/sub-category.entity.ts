@@ -1,11 +1,10 @@
-import { Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { BaseEntity } from '@common/base/base.entity';
+import { Column, Entity, JoinColumn, ManyToOne, Unique } from 'typeorm';
 import { Category } from './category.entity';
 
 @Entity('subcategories')
-export class SubCategory {
-  @PrimaryGeneratedColumn('increment')
-  id: number;
-
+@Unique('UQ_subcategories_category_slug', ['category', 'slug'])
+export class SubCategory extends BaseEntity {
   @Column({ type: 'varchar', length: 255 })
   slug: string;
 

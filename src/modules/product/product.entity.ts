@@ -1,5 +1,7 @@
 import { BaseEntity } from '@common/base/base.entity';
-import { BeforeInsert, Column, Entity } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
+import { Category } from '../category/category.entity';
+import { SubCategory } from '../category/sub-category.entity';
 
 @Entity('products')
 export class Product extends BaseEntity {
@@ -21,11 +23,13 @@ export class Product extends BaseEntity {
   @Column({ type: 'jsonb', default: [] })
   images: string[];
 
-  @Column({ type: 'varchar', length: 100 })
-  category: string;
+  @ManyToOne(() => Category, { onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'category_id' })
+  category: Category;
 
-  @Column({ type: 'varchar', length: 100 })
-  subcategory: string;
+  @ManyToOne(() => SubCategory, { onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'subcategory_id' })
+  subcategory: SubCategory;
 
   @Column({ type: 'varchar', length: 50, nullable: true })
   badge: string | null;
@@ -50,15 +54,4 @@ export class Product extends BaseEntity {
 
   @Column({ type: 'jsonb', default: [] })
   tags: string[];
-
-  /**
-   * Auto-generate SKU from category + subcategory + slug
-   * Runs before insert if SKU is not already set
-   */
-  @BeforeInsert()
-  generateSku() {
-    if (!this.sku && this.category && this.subcategory && this.slug) {
-      this.sku = `${this.category}-${this.subcategory}-${this.slug}`;
-    }
-  }
 }

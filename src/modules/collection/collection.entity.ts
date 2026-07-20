@@ -1,5 +1,6 @@
 import { BaseEntity } from '@common/base/base.entity';
-import { Column, Entity } from 'typeorm';
+import { Column, Entity, JoinTable, ManyToMany } from 'typeorm';
+import { Product } from '../product/product.entity';
 
 @Entity('collections')
 export class Collection extends BaseEntity {
@@ -18,8 +19,13 @@ export class Collection extends BaseEntity {
   @Column({ type: 'varchar', length: 500 })
   image: string;
 
-  @Column({ type: 'jsonb', default: [], name: 'product_ids' })
-  productIds: string[];
+  @ManyToMany(() => Product)
+  @JoinTable({
+    name: 'collection_products',
+    joinColumn: { name: 'collection_id', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'product_id', referencedColumnName: 'id' },
+  })
+  products: Product[];
 
   @Column({ type: 'varchar', length: 100, default: '' })
   season: string;

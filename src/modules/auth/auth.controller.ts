@@ -1,5 +1,7 @@
 import { CurrentUser } from '@common/decorator/current-user.decorator';
+import { Permissions } from '@common/decorator/permissions.decorator';
 import { Public } from '@common/decorator/public.decorator';
+import { Permission } from '@common/permissions/permissions.constant';
 import { Body, Controller, Get, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { User } from '../user/user.entity';
@@ -21,6 +23,7 @@ export class AuthController {
   @Get('me')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get current authenticated user' })
+  @Permissions(Permission.AUTH_ME)
   async getMe(@CurrentUser() user: User) {
     return this.authService.getMe(user.id);
   }

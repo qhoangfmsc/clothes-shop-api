@@ -1,4 +1,5 @@
 import { JwtAuthGuard } from '@common/guards/jwt-auth.guard';
+import { PermissionsGuard } from '@common/guards/permissions.guard';
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { CoreModule } from './core/core.module';
@@ -37,6 +38,10 @@ import { WishlistModule } from './modules/wishlist/wishlist.module';
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: PermissionsGuard,
     },
   ],
 })

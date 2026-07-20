@@ -5,8 +5,8 @@ import { OrderItem } from './order-item.entity';
 
 @Entity('orders')
 export class Order extends BaseEntity {
-  @Column({ type: 'varchar', length: 16, name: 'user_id' })
-  userId: string;
+  @Column({ type: 'varchar', length: 16, nullable: true, name: 'user_id' })
+  userId: string | null;
 
   @Column({ type: 'varchar', length: 20, default: 'pending' })
   status: string; // pending | confirmed | shipping | delivered | completed | cancelled

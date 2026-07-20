@@ -1,7 +1,10 @@
+import { throwAppError } from '@common/exceptions/app.exception';
+import { ECategoryErrorCode } from '@common/exceptions/error-codes';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Category } from './category.entity';
+import { CreateCategoryDto, UpdateCategoryDto } from './dtos/category.dto';
 
 @Injectable()
 export class CategoryService {
@@ -16,10 +19,12 @@ export class CategoryService {
     });
 
     const data = categories.map((cat) => ({
+      id: cat.id,
       slug: cat.slug,
       title: cat.title,
       description: cat.description,
       subcategories: (cat.subcategories || []).map((sub) => ({
+        id: sub.id,
         slug: sub.slug,
         label: sub.label,
         description: sub.description,
@@ -38,10 +43,12 @@ export class CategoryService {
 
     return {
       data: {
+        id: category.id,
         slug: category.slug,
         title: category.title,
         description: category.description,
         subcategories: (category.subcategories || []).map((sub) => ({
+          id: sub.id,
           slug: sub.slug,
           label: sub.label,
           description: sub.description,
@@ -49,5 +56,97 @@ export class CategoryService {
         })),
       },
     };
+  }
+
+  // ============================================
+  // ADMIN METHODS
+  // ============================================
+
+  async create(dto: CreateCategoryDto) {
+    await this.ensureSlugUnique(dto.slug);
+    if (dto.subcategories && dto.subcategories.length > 0) {
+      this.validateSubCategorySlugs(dto.subcategories);
+    }
+    const category = this.categoryRepo.create(dto);
+    try {
+      return { data: await this.categoryRepo.save(category) };
+    } catch (err: any) {
+      // Catch UQ_subcategories_category_slug collision (DB unique constraint)
+      if (err.code === '23505') {
+        throwAppError(ECategoryErrorCode.CATEGORY_SUBSLUG_DUPLICATE);
+      }
+      throw err;
+    }
+  }
+
+  async update(id: string, dto: UpdateCategoryDto) {
+    const category = await this.categoryRepo.findOne({ where: { id } });
+    if (!category) {
+      throw new NotFoundException('Category not found');
+    }
+
+    // Check slug uniqueness nếu slug được thay đổi
+    if (dto.slug && dto.slug !== category.slug) {
+      await this.ensureSlugUnique(dto.slug);
+    }
+
+    // Validate subcategory slugs mới không trùng nhau
+    if (dto.subcategories && dto.subcategories.length > 0) {
+      this.validateSubCategorySlugs(dto.subcategories);
+    }
+    // Nếu có subcategories mới → cascade sẽ xoá sub cũ và tạo lại
+    if (dto.subcategories !== undefined) {
+      category.subcategories = [];
+      await this.categoryRepo.save(category);
+    }
+
+    Object.assign(category, dto);
+    try {
+      return { data: await this.categoryRepo.save(category) };
+    } catch (err: any) {
+      if (err.code === '23505') {
+        throwAppError(ECategoryErrorCode.CATEGORY_SUBSLUG_DUPLICATE);
+      }
+      throw err;
+    }
+  }
+
+  // ============================================
+  // PRIVATE HELPERS
+  // ============================================
+
+  private async ensureSlugUnique(slug: string) {
+    const existing = await this.categoryRepo.findOne({ where: { slug } });
+    if (existing) {
+      throwAppError(ECategoryErrorCode.CATEGORY_SLUG_DUPLICATE);
+    }
+  }
+
+  /**
+   * Validate subcategory slugs không trùng lặp trong cùng 1 request
+   */
+  private validateSubCategorySlugs(subcategories: { slug: string }[]) {
+    const slugs = subcategories.map((s) => s.slug);
+    const uniqueSlugs = new Set(slugs);
+    if (slugs.length !== uniqueSlugs.size) {
+      throwAppError(ECategoryErrorCode.CATEGORY_SUBSLUG_DUPLICATE);
+    }
+  }
+
+  async delete(id: string) {
+    const category = await this.categoryRepo.findOne({ where: { id } });
+    if (!category) {
+      throw new NotFoundException('Category not found');
+    }
+    try {
+      await this.categoryRepo.remove(category);
+      return { message: 'Category deleted successfully' };
+    } catch (err: any) {
+      // Catch FK RESTRICT error từ DB (còn products tham chiếu)
+      if (err.code === '23503') {
+        throwAppError(ECategoryErrorCode.CATEGORY_HAS_PRODUCTS);
+      }
+      throw err;
+    }
   }
 }

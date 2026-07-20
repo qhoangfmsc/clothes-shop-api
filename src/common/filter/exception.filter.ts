@@ -16,16 +16,15 @@ export class AllExceptionFilter implements ExceptionFilter {
       statusCode = exception.getStatus();
       const exceptionResponse = exception.getResponse();
       responseBody = typeof exceptionResponse === 'string' ? { statusCode, message: exceptionResponse } : exceptionResponse;
-    } else if (exception instanceof Error) {
-      responseBody = {
-        statusCode,
-        message: exception.message,
-      };
+    } else {
+      // Không leak internal error messages ra client
+      this.logger.error(exception.message, (exception as Error).stack);
+      responseBody = { statusCode, message: 'Internal server error' };
     }
 
-    // Log 500 errors with stack trace for debugging
-    if (statusCode === HttpStatus.INTERNAL_SERVER_ERROR) {
-      this.logger.error(exception.message, (exception as Error).stack);
+    // Log chi tiết cho 500 errors
+    if (statusCode >= 500) {
+      this.logger.error(`[${statusCode}] ${exception.message}`, (exception as Error).stack);
     }
 
     response.status(statusCode).json(responseBody);

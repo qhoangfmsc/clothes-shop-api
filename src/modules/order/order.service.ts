@@ -1,9 +1,12 @@
+import { throwAppError } from '@common/exceptions/app.exception';
+import { EOrderErrorCode } from '@common/exceptions/error-codes';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { Address } from '../address/address.entity';
 import { Cart } from '../cart/cart.entity';
 import { CartItem } from '../cart/cart-item.entity';
+import { UpdateOrderStatusDto } from './dtos/admin-order.dto';
 import { CreateOrderDto } from './dtos/order.dto';
 import { Order } from './order.entity';
 import { OrderItem } from './order-item.entity';
@@ -15,19 +18,31 @@ const SHIPPING_FEES: Record<string, number> = {
 };
 const FREE_SHIPPING_THRESHOLD = 150;
 
+/**
+ * Luồng trạng thái hợp lệ
+ * pending   → confirmed | cancelled
+ * confirmed → shipping  | cancelled
+ * shipping  → delivered
+ * delivered → completed
+ * completed → (terminal)
+ * cancelled → (terminal)
+ */
+const VALID_TRANSITIONS: Record<string, string[]> = {
+  pending: ['confirmed', 'cancelled'],
+  confirmed: ['shipping', 'cancelled'],
+  shipping: ['delivered'],
+  delivered: ['completed'],
+  completed: [],
+  cancelled: [],
+};
+
 @Injectable()
 export class OrderService {
   constructor(
     @InjectRepository(Order)
     private readonly orderRepo: Repository<Order>,
-    @InjectRepository(OrderItem)
-    private readonly orderItemRepo: Repository<OrderItem>,
-    @InjectRepository(Cart)
-    private readonly cartRepo: Repository<Cart>,
-    @InjectRepository(CartItem)
-    private readonly cartItemRepo: Repository<CartItem>,
-    @InjectRepository(Address)
-    private readonly addressRepo: Repository<Address>,
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
   ) {}
 
   async findAll(userId: string) {
@@ -50,77 +65,86 @@ export class OrderService {
 
   /**
    * Checkout: cart → order
-   * 1. Load cart items with product info
-   * 2. Snapshot product data into order items
-   * 3. Calculate totals
-   * 4. Create order
-   * 5. Clear cart
+   * Wrapped in a DB transaction — nếu bất kỳ bước nào fail, toàn bộ rollback.
    */
   async checkout(userId: string, dto: CreateOrderDto) {
-    // Load cart
-    const cart = await this.cartRepo.findOne({
-      where: { userId },
-      relations: ['items', 'items.product'],
-    });
-
-    if (!cart || !cart.items || cart.items.length === 0) {
-      throw new BadRequestException('Cart is empty');
-    }
-
-    // Load address
-    const address = await this.addressRepo.findOne({
-      where: { id: dto.addressId, userId },
-    });
-    if (!address) throw new NotFoundException('Address not found');
-
-    // Calculate
-    const shippingMethod = dto.shippingMethod || 'standard';
-    const subtotal = cart.items.reduce((sum, item) => sum + Number(item.product?.price ?? 0) * item.quantity, 0);
-    const shippingFee = subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : (SHIPPING_FEES[shippingMethod] ?? 8);
-    const total = subtotal + shippingFee;
-
-    // Create order
-    const order = this.orderRepo.create({
-      userId,
-      status: 'pending',
-      subtotal,
-      shippingFee,
-      total,
-      shippingMethod,
-      shippingAddress: {
-        fullName: address.fullName,
-        phone: address.phone,
-        addressLine1: address.addressLine1,
-        addressLine2: address.addressLine2,
-        city: address.city,
-        province: address.province,
-        postalCode: address.postalCode,
-        country: address.country,
-      },
-      note: dto.note || '',
-    });
-    const savedOrder = await this.orderRepo.save(order);
-
-    // Create order items (snapshot)
-    const orderItems = cart.items.map((cartItem) => {
-      return this.orderItemRepo.create({
-        orderId: savedOrder.id,
-        productId: cartItem.productId,
-        productName: cartItem.product?.name ?? '',
-        productImage: cartItem.product?.images?.[0] ?? '',
-        price: Number(cartItem.product?.price ?? 0),
-        quantity: cartItem.quantity,
-        size: cartItem.size,
-        color: cartItem.color,
+    return this.dataSource.transaction(async (manager) => {
+      // Load cart with items & product info
+      const cart = await manager.findOne(Cart, {
+        where: { userId },
+        relations: ['items', 'items.product'],
       });
+
+      if (!cart?.items?.length) {
+        throw new BadRequestException('Cart is empty');
+      }
+
+      // Validate product availability (sản phẩm bị xoá hoặc disabled)
+      const missingProducts = cart.items.filter((item) => !item.product || item.product.status !== 'active');
+      if (missingProducts.length > 0) {
+        const names = missingProducts.map((i) => i.product?.name || i.productId).join(', ');
+        throw new BadRequestException(`Some products are no longer available: ${names}`);
+      }
+
+      // Load & validate address
+      const address = await manager.findOne(Address, {
+        where: { id: dto.addressId, userId },
+      });
+      if (!address) throw new NotFoundException('Address not found');
+
+      // Calculate totals
+      const shippingMethod = dto.shippingMethod || 'standard';
+      const subtotal = cart.items.reduce((sum, item) => sum + Number(item.product!.price) * item.quantity, 0);
+      const shippingFee = subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : (SHIPPING_FEES[shippingMethod] ?? 8);
+      const total = subtotal + shippingFee;
+
+      // Create order
+      const order = manager.create(Order, {
+        userId,
+        status: 'pending',
+        subtotal,
+        shippingFee,
+        total,
+        shippingMethod,
+        shippingAddress: {
+          fullName: address.fullName,
+          phone: address.phone,
+          addressLine1: address.addressLine1,
+          addressLine2: address.addressLine2,
+          city: address.city,
+          province: address.province,
+          postalCode: address.postalCode,
+          country: address.country,
+        },
+        note: dto.note || '',
+      });
+      const savedOrder = await manager.save(order);
+
+      // Create order items (snapshot product info)
+      const orderItems = cart.items.map((cartItem) =>
+        manager.create(OrderItem, {
+          orderId: savedOrder.id,
+          productId: cartItem.productId,
+          productName: cartItem.product!.name,
+          productImage: cartItem.product!.images?.[0] ?? '',
+          price: Number(cartItem.product!.price),
+          quantity: cartItem.quantity,
+          size: cartItem.size,
+          color: cartItem.color,
+        }),
+      );
+      await manager.save(orderItems);
+
+      // Clear cart
+      await manager.delete(CartItem, { cartId: cart.id });
+
+      // Return full order (re-read within transaction for consistency)
+      const result = await manager.findOne(Order, {
+        where: { id: savedOrder.id },
+        relations: ['items'],
+      });
+      return { data: result };
     });
-    await this.orderItemRepo.save(orderItems);
-
-    // Clear cart
-    await this.cartItemRepo.delete({ cartId: cart.id });
-
-    // Return full order
-    return this.findOne(userId, savedOrder.id);
   }
 
   async cancel(userId: string, orderId: string) {
@@ -134,5 +158,55 @@ export class OrderService {
     order.status = 'cancelled';
     await this.orderRepo.save(order);
     return this.findOne(userId, orderId);
+  }
+
+  // ============================================
+  // ADMIN METHODS
+  // ============================================
+
+  async findAllAdmin(query?: { status?: string; page?: number; limit?: number }) {
+    const page = query?.page || 1;
+    const limit = query?.limit || 25;
+
+    const where: any = {};
+    if (query?.status) where.status = query.status;
+
+    const [data, total] = await this.orderRepo.findAndCount({
+      where,
+      relations: ['items'],
+      order: { createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+
+    return { data, total, page, limit };
+  }
+
+  async findOneAdmin(orderId: string) {
+    const order = await this.orderRepo.findOne({
+      where: { id: orderId },
+      relations: ['items'],
+    });
+    if (!order) throwAppError(EOrderErrorCode.ORDER_NOT_FOUND);
+    return { data: order };
+  }
+
+  async updateStatus(orderId: string, dto: UpdateOrderStatusDto) {
+    const order = await this.orderRepo.findOne({ where: { id: orderId } });
+    if (!order) throwAppError(EOrderErrorCode.ORDER_NOT_FOUND);
+
+    // Validate status transition
+    const allowed = VALID_TRANSITIONS[order.status];
+    if (!allowed || !allowed.includes(dto.status)) {
+      throwAppError(
+        EOrderErrorCode.ORDER_STATUS_INVALID_TRANSITION,
+        `Cannot change status from '${order.status}' to '${dto.status}'. Allowed transitions: ${allowed?.join(', ') || 'none'}`,
+      );
+    }
+
+    order.status = dto.status;
+    await this.orderRepo.save(order);
+
+    return this.findOneAdmin(orderId);
   }
 }

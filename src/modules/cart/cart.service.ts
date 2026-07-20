@@ -1,6 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { Product } from '../product/product.entity';
 import { Cart } from './cart.entity';
 import { CartItem } from './cart-item.entity';
 import { AddToCartDto, UpdateCartItemDto } from './dtos/cart.dto';
@@ -12,6 +13,8 @@ export class CartService {
     private readonly cartRepo: Repository<Cart>,
     @InjectRepository(CartItem)
     private readonly cartItemRepo: Repository<CartItem>,
+    @InjectRepository(Product)
+    private readonly productRepo: Repository<Product>,
   ) {}
 
   /** Get or create cart for user */
@@ -58,6 +61,11 @@ export class CartService {
 
   async addItem(userId: string, dto: AddToCartDto) {
     const cart = await this.getOrCreateCart(userId);
+
+    // Validate product exists and is active
+    const product = await this.productRepo.findOne({ where: { id: dto.productId } });
+    if (!product) throw new NotFoundException('Product not found');
+    if (product.status !== 'active') throw new BadRequestException('Product is not available');
 
     // Check if same product+size+color already in cart
     const existing = await this.cartItemRepo.findOne({
