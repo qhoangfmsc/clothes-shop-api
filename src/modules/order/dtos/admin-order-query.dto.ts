@@ -4,6 +4,12 @@ import { IsIn, IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validat
 import { ORDER_STATUSES } from './admin-order.dto';
 
 export class AdminOrderQueryDto {
+  @ApiPropertyOptional({ description: 'Filter by user ID' })
+  @IsString()
+  @IsOptional()
+  @MaxLength(16)
+  userId?: string;
+
   @ApiPropertyOptional({ description: 'Search keyword (order ID, phone, fullName)' })
   @IsString()
   @IsOptional()

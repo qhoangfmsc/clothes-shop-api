@@ -166,9 +166,14 @@ export class OrderService {
   // ============================================
 
   async findAllAdmin(query: AdminOrderQueryDto) {
-    const { search, status, sort, page = 1, limit = 25 } = query;
+    const { userId, search, status, sort, page = 1, limit = 25 } = query;
 
     const qb = this.orderRepo.createQueryBuilder('o').leftJoinAndSelect('o.items', 'items');
+
+    // Filter by userId
+    if (userId) {
+      qb.andWhere('o.user_id = :userId', { userId });
+    }
 
     // Filter by status
     if (status) {
