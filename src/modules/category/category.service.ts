@@ -6,6 +6,7 @@ import { FindOptionsOrder, FindOptionsWhere, ILike, Repository } from 'typeorm';
 import { Category } from './category.entity';
 import { AdminCategoryQueryDto } from './dtos/admin-category-query.dto';
 import { CreateCategoryDto, UpdateCategoryDto } from './dtos/category.dto';
+import { PublicCategoryQueryDto } from './dtos/public-category-query.dto';
 
 @Injectable()
 export class CategoryService {
@@ -34,6 +35,53 @@ export class CategoryService {
     }));
 
     return { data, total: data.length };
+  }
+
+  async findAllPublic(query: PublicCategoryQueryDto) {
+    const { search, sort } = query;
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 24;
+
+    const qb = this.categoryRepo.createQueryBuilder('c');
+
+    // Search
+    if (search) {
+      qb.andWhere('(c.title ILIKE :q OR c.slug ILIKE :q OR c.description ILIKE :q)', { q: `%${search}%` });
+    }
+
+    // Sort
+    switch (sort) {
+      case 'title_asc':
+        qb.orderBy('c.title', 'ASC');
+        break;
+      case 'title_desc':
+        qb.orderBy('c.title', 'DESC');
+        break;
+      default:
+        qb.orderBy('c.createdAt', 'DESC');
+        break;
+    }
+
+    qb.skip((page - 1) * limit).take(limit);
+
+    const [categories, total] = await qb.getManyAndCount();
+
+    // Map to same shape as findAll for consistency
+    const data = categories.map((cat) => ({
+      id: cat.id,
+      slug: cat.slug,
+      title: cat.title,
+      description: cat.description,
+      subcategories: (cat.subcategories || []).map((sub) => ({
+        id: sub.id,
+        slug: sub.slug,
+        label: sub.label,
+        description: sub.description,
+        count: sub.count,
+      })),
+    }));
+
+    return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
   async findBySlug(slug: string) {
@@ -70,11 +118,7 @@ export class CategoryService {
     let where: FindOptionsWhere<Category> | FindOptionsWhere<Category>[] | undefined;
     if (search) {
       const like = ILike(`%${search}%`);
-      where = [
-        { slug: like },
-        { title: like },
-        { description: like },
-      ];
+      where = [{ slug: like }, { title: like }, { description: like }];
     }
 
     // Sort: "field" = DESC, "-field" = ASC

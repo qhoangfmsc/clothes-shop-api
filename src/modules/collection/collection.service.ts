@@ -7,6 +7,7 @@ import { Product } from '../product/product.entity';
 import { Collection } from './collection.entity';
 import { AdminCollectionQueryDto } from './dtos/admin-collection-query.dto';
 import { CreateCollectionDto, UpdateCollectionDto } from './dtos/collection.dto';
+import { PublicCollectionQueryDto } from './dtos/public-collection-query.dto';
 
 @Injectable()
 export class CollectionService {
@@ -23,6 +24,38 @@ export class CollectionService {
       order: { createdAt: 'ASC' },
     });
     return { data, total: data.length };
+  }
+
+  async findAllPublic(query: PublicCollectionQueryDto) {
+    const { search, sort } = query;
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 24;
+
+    const qb = this.collectionRepo.createQueryBuilder('c').leftJoinAndSelect('c.products', 'p');
+
+    // Search
+    if (search) {
+      qb.andWhere('(c.name ILIKE :q OR c.slug ILIKE :q)', { q: `%${search}%` });
+    }
+
+    // Sort
+    switch (sort) {
+      case 'name_asc':
+        qb.orderBy('c.name', 'ASC');
+        break;
+      case 'name_desc':
+        qb.orderBy('c.name', 'DESC');
+        break;
+      default:
+        qb.orderBy('c.createdAt', 'DESC');
+        break;
+    }
+
+    qb.skip((page - 1) * limit).take(limit);
+
+    const [data, total] = await qb.getManyAndCount();
+
+    return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
   async findBySlug(slug: string) {

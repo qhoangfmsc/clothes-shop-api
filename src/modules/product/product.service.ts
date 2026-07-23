@@ -7,6 +7,7 @@ import { Category } from '../category/category.entity';
 import { SubCategory } from '../category/sub-category.entity';
 import { AdminProductQueryDto } from './dtos/admin-product-query.dto';
 import { CreateProductDto, UpdateProductDto } from './dtos/product.dto';
+import { PublicProductQueryDto } from './dtos/public-product-query.dto';
 import { Product } from './product.entity';
 
 @Injectable()
@@ -20,10 +21,12 @@ export class ProductService {
     private readonly subCategoryRepo: Repository<SubCategory>,
   ) {}
 
+  /**
+   * @deprecated Use findAllPublic instead — kept for backward compatibility.
+   */
   async findAll(query: { category?: string; subcategory?: string; badge?: string; sort?: string; limit?: number }) {
     const where: FindOptionsWhere<Product> = { status: 'active' };
 
-    // Resolve slug → ID để filter bằng FK (tránh TypeORM nested relation filter bug)
     if (query.category) {
       const cat = await this.categoryRepo.findOne({ where: { slug: query.category } });
       if (cat) {
@@ -33,7 +36,6 @@ export class ProductService {
       }
     }
     if (query.subcategory) {
-      // Lookup composite (category + subcategory slug) nếu có cả category context
       const subWhere: any = { slug: query.subcategory };
       if (where.category) {
         subWhere.category = { id: (where.category as any).id };
@@ -49,7 +51,6 @@ export class ProductService {
       where.badge = query.badge;
     }
 
-    // Sort
     let order: FindOptionsOrder<Product> = { createdAt: 'DESC' };
     if (query.sort) {
       switch (query.sort) {
@@ -73,6 +74,125 @@ export class ProductService {
     });
 
     return { data, total };
+  }
+
+  // ============================================
+  // PUBLIC METHODS (Phase 1)
+  // ============================================
+
+  async findAllPublic(query: PublicProductQueryDto) {
+    const { search, category, subcategory, badge, sort, minPrice, maxPrice, sizes, colors } = query;
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 24;
+
+    const qb = this.productRepo
+      .createQueryBuilder('p')
+      .leftJoinAndSelect('p.category', 'cat')
+      .leftJoinAndSelect('p.subcategory', 'sub')
+      .where('p.status = :status', { status: 'active' });
+
+    // Search: ILIKE on name, slug, description
+    if (search) {
+      qb.andWhere('(p.name ILIKE :q OR p.slug ILIKE :q OR p.description ILIKE :q)', { q: `%${search}%` });
+    }
+
+    // Filter by category slug
+    if (category) {
+      qb.andWhere('cat.slug = :catSlug', { catSlug: category });
+    }
+
+    // Filter by subcategory slug
+    if (subcategory) {
+      qb.andWhere('sub.slug = :subSlug', { subSlug: subcategory });
+    }
+
+    // Filter by badge
+    if (badge) {
+      qb.andWhere('p.badge = :badge', { badge });
+    }
+
+    // Filter by price range (decimal column — numeric comparison works)
+    if (minPrice != null) {
+      qb.andWhere('p.price >= :minPrice', { minPrice: Number(minPrice) });
+    }
+    if (maxPrice != null) {
+      qb.andWhere('p.price <= :maxPrice', { maxPrice: Number(maxPrice) });
+    }
+
+    // Filter by sizes — JSONB array, use jsonb_array_elements_text for containment
+    if (sizes) {
+      const sizeArr = sizes
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (sizeArr.length > 0) {
+        qb.andWhere('EXISTS (SELECT 1 FROM jsonb_array_elements_text(p.sizes) AS sz WHERE sz IN (:...sizeArr))', { sizeArr });
+      }
+    }
+
+    // Filter by colors — JSONB array of {name, hex}, match against name field
+    if (colors) {
+      const colorArr = colors
+        .split(',')
+        .map((c) => c.trim())
+        .filter(Boolean);
+      if (colorArr.length > 0) {
+        qb.andWhere("EXISTS (SELECT 1 FROM jsonb_array_elements(p.colors) AS c WHERE c->>'name' IN (:...colorArr))", { colorArr });
+      }
+    }
+
+    // Sort — whitelist with public-friendly convention
+    switch (sort) {
+      case 'price_asc':
+        qb.orderBy('p.price', 'ASC');
+        break;
+      case 'price_desc':
+        qb.orderBy('p.price', 'DESC');
+        break;
+      case 'name_asc':
+        qb.orderBy('p.name', 'ASC');
+        break;
+      case 'name_desc':
+        qb.orderBy('p.name', 'DESC');
+        break;
+      default:
+        qb.orderBy('p.createdAt', 'DESC');
+        break;
+    }
+
+    // Pagination
+    qb.skip((page - 1) * limit).take(limit);
+
+    const [data, total] = await qb.getManyAndCount();
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  async autocomplete(q: string) {
+    const results = await this.productRepo
+      .createQueryBuilder('p')
+      .select(['p.id', 'p.name', 'p.slug', 'p.price', 'p.images', 'p.status'])
+      .where('p.status = :status', { status: 'active' })
+      .andWhere('(p.name ILIKE :q OR p.slug ILIKE :q)', { q: `${q}%` })
+      .orderBy('p.name', 'ASC')
+      .take(8)
+      .getMany();
+
+    return {
+      data: results.map((p) => ({
+        id: p.id,
+        name: p.name,
+        slug: p.slug,
+        price: Number(p.price),
+        image: p.images?.[0] ?? null,
+      })),
+    };
   }
 
   async findById(id: string) {

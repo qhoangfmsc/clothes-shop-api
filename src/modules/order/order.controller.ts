@@ -1,10 +1,11 @@
 import { CurrentUser } from '@common/decorator/current-user.decorator';
 import { Permissions } from '@common/decorator/permissions.decorator';
 import { Permission } from '@common/permissions/permissions.constant';
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { User } from '../user/user.entity';
 import { CreateOrderDto } from './dtos/order.dto';
+import { PublicOrderQueryDto } from './dtos/public-order-query.dto';
 import { OrderService } from './order.service';
 
 @ApiTags('Orders')
@@ -14,10 +15,10 @@ export class OrderController {
   constructor(private readonly orderService: OrderService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Get order history' })
+  @ApiOperation({ summary: 'Get order history with pagination and status filter' })
   @Permissions(Permission.ORDER_VIEW_LIST)
-  findAll(@CurrentUser() user: User) {
-    return this.orderService.findAll(user.id);
+  findAll(@CurrentUser() user: User, @Query() query: PublicOrderQueryDto) {
+    return this.orderService.findAll(user.id, query);
   }
 
   @Get(':orderId')

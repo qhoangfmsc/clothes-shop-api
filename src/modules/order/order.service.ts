@@ -6,9 +6,10 @@ import { DataSource, Repository } from 'typeorm';
 import { Address } from '../address/address.entity';
 import { Cart } from '../cart/cart.entity';
 import { CartItem } from '../cart/cart-item.entity';
-import { AdminOrderQueryDto } from './dtos/admin-order-query.dto';
 import { UpdateOrderStatusDto } from './dtos/admin-order.dto';
+import { AdminOrderQueryDto } from './dtos/admin-order-query.dto';
 import { CreateOrderDto } from './dtos/order.dto';
+import { PublicOrderQueryDto } from './dtos/public-order-query.dto';
 import { Order } from './order.entity';
 import { OrderItem } from './order-item.entity';
 
@@ -46,13 +47,30 @@ export class OrderService {
     private readonly dataSource: DataSource,
   ) {}
 
-  async findAll(userId: string) {
-    const data = await this.orderRepo.find({
-      where: { userId },
-      relations: ['items'],
-      order: { createdAt: 'DESC' },
-    });
-    return { data, total: data.length };
+  async findAll(userId: string, query: PublicOrderQueryDto = {}) {
+    const { status, sort } = query;
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 24;
+
+    const qb = this.orderRepo.createQueryBuilder('o').leftJoinAndSelect('o.items', 'items').where('o.userId = :userId', { userId });
+
+    // Filter by status
+    if (status) {
+      qb.andWhere('o.status = :status', { status });
+    }
+
+    // Sort
+    if (sort === 'oldest') {
+      qb.orderBy('o.createdAt', 'ASC');
+    } else {
+      qb.orderBy('o.createdAt', 'DESC');
+    }
+
+    qb.skip((page - 1) * limit).take(limit);
+
+    const [data, total] = await qb.getManyAndCount();
+
+    return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
   async findOne(userId: string, orderId: string) {
@@ -182,10 +200,9 @@ export class OrderService {
 
     // Search: id, phone, fullName (phone & fullName nằm trong JSONB shipping_address)
     if (search) {
-      qb.andWhere(
-        '(o.id ILIKE :search OR o.shipping_address->>\'phone\' ILIKE :search OR o.shipping_address->>\'fullName\' ILIKE :search)',
-        { search: `%${search}%` },
-      );
+      qb.andWhere("(o.id ILIKE :search OR o.shipping_address->>'phone' ILIKE :search OR o.shipping_address->>'fullName' ILIKE :search)", {
+        search: `%${search}%`,
+      });
     }
 
     // Sort: "field" = DESC, "-field" = ASC

@@ -34,4 +34,16 @@ export class AuthController {
   async refresh(@Body() dto: RefreshTokenDto) {
     return this.authService.refreshToken(dto.refreshToken);
   }
+
+  @Get('permissions')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get list of all permission codes and names' })
+  @Permissions(Permission.USER_ADMIN_VIEW)
+  async getPermissions() {
+    const permissions = Object.entries(Permission)
+      .filter(([key]) => Number.isNaN(Number(key)))
+      .map(([name, code]) => ({ code, name }));
+
+    return { data: permissions };
+  }
 }
