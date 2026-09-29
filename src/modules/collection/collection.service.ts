@@ -61,7 +61,7 @@ export class CollectionService {
   async findBySlug(slug: string) {
     const collection = await this.collectionRepo.findOne({
       where: { slug },
-      relations: ['products'],
+      relations: ['products', 'products.category', 'products.subcategory'],
     });
     if (!collection) {
       throw new NotFoundException('Collection not found');

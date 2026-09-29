@@ -3,6 +3,12 @@ import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
 export class PublicCollectionQueryDto {
+  @ApiPropertyOptional({ description: 'Collection slug for single lookup' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  slug?: string;
+
   @ApiPropertyOptional({ description: 'Search collection name or slug' })
   @IsOptional()
   @IsString()
