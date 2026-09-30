@@ -84,6 +84,13 @@ export enum Permission {
   // ============================================
   USER_ADMIN_VIEW = 10000,
   USER_ADMIN_UPDATE = 10001,
+
+  // ============================================
+  // SITE CONFIG ADMIN (110xx)
+  // ============================================
+  SITE_CONFIG_VIEW = 11000,
+  SITE_CONFIG_UPSERT = 11001,
+  SITE_CONFIG_DELETE = 11002,
 }
 
 /**

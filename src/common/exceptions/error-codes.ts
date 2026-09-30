@@ -29,6 +29,7 @@ export enum ECategoryErrorCode {
   CATEGORY_SLUG_DUPLICATE = 1102,
   CATEGORY_SUBSLUG_DUPLICATE = 1103,
   CATEGORY_HAS_PRODUCTS = 1104,
+  CATEGORY_SUBCATEGORY_HAS_PRODUCTS = 1105,
 }
 
 // ============================================
@@ -57,6 +58,14 @@ export enum EUserErrorCode {
 }
 
 // ============================================
+// SITE CONFIG MODULE ERRORS (15xx)
+// ============================================
+export enum ESiteConfigErrorCode {
+  SITE_CONFIG_NOT_FOUND = 1501,
+  SITE_CONFIG_KEY_INVALID = 1502,
+}
+
+// ============================================
 // PERMISSION ERRORS (90xx)
 // ============================================
 export enum EPermissionErrorCode {
@@ -81,6 +90,7 @@ export const ErrorMessages: Record<number, string> = {
   [ECategoryErrorCode.CATEGORY_SLUG_DUPLICATE]: 'Category slug already exists',
   [ECategoryErrorCode.CATEGORY_SUBSLUG_DUPLICATE]: 'Subcategory slug must be unique within a category',
   [ECategoryErrorCode.CATEGORY_HAS_PRODUCTS]: 'Cannot delete category — products still reference it',
+  [ECategoryErrorCode.CATEGORY_SUBCATEGORY_HAS_PRODUCTS]: 'Cannot remove subcategory — products still reference it',
   [ECollectionErrorCode.COLLECTION_NOT_FOUND]: 'Collection not found',
   [ECollectionErrorCode.COLLECTION_SLUG_DUPLICATE]: 'Collection slug already exists',
   [ECollectionErrorCode.COLLECTION_PRODUCT_NOT_FOUND]: 'One or more products not found',
@@ -88,4 +98,6 @@ export const ErrorMessages: Record<number, string> = {
   [EOrderErrorCode.ORDER_STATUS_INVALID_TRANSITION]: 'Invalid status transition',
   [EUserErrorCode.USER_NOT_FOUND]: 'User not found',
   [EUserErrorCode.USER_CANNOT_MODIFY_SELF]: 'Cannot modify your own role or status',
+  [ESiteConfigErrorCode.SITE_CONFIG_NOT_FOUND]: 'Site config not found',
+  [ESiteConfigErrorCode.SITE_CONFIG_KEY_INVALID]: 'Invalid site config key',
 };

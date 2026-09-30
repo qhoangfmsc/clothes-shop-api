@@ -13,6 +13,9 @@ export class Category extends BaseEntity {
   @Column({ type: 'text', default: '' })
   description: string;
 
+  @Column({ type: 'varchar', length: 500, nullable: true, name: 'hero_image' })
+  heroImage: string | null;
+
   @OneToMany(
     () => SubCategory,
     (sub) => sub.category,

@@ -31,7 +31,11 @@ export class CollectionService {
     const page = query.page ?? 1;
     const limit = query.limit ?? 24;
 
-    const qb = this.collectionRepo.createQueryBuilder('c').leftJoinAndSelect('c.products', 'p');
+    // Không join "products" (many-to-many) ở đây: join + skip/take sẽ áp LIMIT/OFFSET
+    // lên các dòng SQL đã bị nhân theo product, làm sai lệch cả `total` lẫn số
+    // collection thực trả về mỗi trang. Paginate trước trên "collections" thuần, xong
+    // load products riêng cho đúng tập id đã phân trang (bên dưới).
+    const qb = this.collectionRepo.createQueryBuilder('c');
 
     // Search
     if (search) {
@@ -54,6 +58,17 @@ export class CollectionService {
     qb.skip((page - 1) * limit).take(limit);
 
     const [data, total] = await qb.getManyAndCount();
+
+    if (data.length > 0) {
+      const withProducts = await this.collectionRepo.find({
+        where: { id: In(data.map((c) => c.id)) },
+        relations: ['products'],
+      });
+      const productsById = new Map(withProducts.map((c) => [c.id, c.products]));
+      for (const coll of data) {
+        coll.products = productsById.get(coll.id) ?? [];
+      }
+    }
 
     return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
   }

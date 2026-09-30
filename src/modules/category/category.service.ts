@@ -2,11 +2,12 @@ import { throwAppError } from '@common/exceptions/app.exception';
 import { ECategoryErrorCode } from '@common/exceptions/error-codes';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { FindOptionsOrder, FindOptionsWhere, ILike, Repository } from 'typeorm';
+import { FindOptionsOrder, FindOptionsWhere, ILike, In, Repository } from 'typeorm';
 import { Category } from './category.entity';
 import { AdminCategoryQueryDto } from './dtos/admin-category-query.dto';
-import { CreateCategoryDto, UpdateCategoryDto } from './dtos/category.dto';
+import { CreateCategoryDto, CreateSubCategoryDto, UpdateCategoryDto } from './dtos/category.dto';
 import { PublicCategoryQueryDto } from './dtos/public-category-query.dto';
+import { SubCategory } from './sub-category.entity';
 
 @Injectable()
 export class CategoryService {
@@ -25,6 +26,7 @@ export class CategoryService {
       slug: cat.slug,
       title: cat.title,
       description: cat.description,
+      heroImage: cat.heroImage,
       subcategories: (cat.subcategories || []).map((sub) => ({
         id: sub.id,
         slug: sub.slug,
@@ -42,6 +44,10 @@ export class CategoryService {
     const page = query.page ?? 1;
     const limit = query.limit ?? 24;
 
+    // Không join "subcategories" (1-nhiều) ở đây: join + skip/take sẽ áp LIMIT/OFFSET
+    // lên các dòng SQL đã bị nhân theo subcategory, làm sai lệch cả `total` lẫn số
+    // category thực trả về mỗi trang. Paginate trước trên "categories" thuần, xong
+    // load subcategories riêng cho đúng tập id đã phân trang (bên dưới).
     const qb = this.categoryRepo.createQueryBuilder('c');
 
     // Search
@@ -66,12 +72,22 @@ export class CategoryService {
 
     const [categories, total] = await qb.getManyAndCount();
 
+    if (categories.length > 0) {
+      // eager: true trên Category.subcategories tự load kèm qua .find() (không cần khai relations)
+      const withSubs = await this.categoryRepo.find({ where: { id: In(categories.map((c) => c.id)) } });
+      const subsById = new Map(withSubs.map((c) => [c.id, c.subcategories]));
+      for (const cat of categories) {
+        cat.subcategories = subsById.get(cat.id) ?? [];
+      }
+    }
+
     // Map to same shape as findAll for consistency
     const data = categories.map((cat) => ({
       id: cat.id,
       slug: cat.slug,
       title: cat.title,
       description: cat.description,
+      heroImage: cat.heroImage,
       subcategories: (cat.subcategories || []).map((sub) => ({
         id: sub.id,
         slug: sub.slug,
@@ -96,6 +112,7 @@ export class CategoryService {
         slug: category.slug,
         title: category.title,
         description: category.description,
+        heroImage: category.heroImage,
         subcategories: (category.subcategories || []).map((sub) => ({
           id: sub.id,
           slug: sub.slug,
@@ -171,17 +188,13 @@ export class CategoryService {
     if (dto.subcategories && dto.subcategories.length > 0) {
       this.validateSubCategorySlugs(dto.subcategories);
     }
-    // Nếu có subcategories mới → xoá sub cũ và tạo lại
+    // Đồng bộ theo slug thay vì xoá hết tạo lại (xem reconcileSubCategories)
     if (dto.subcategories !== undefined) {
-      // Phải xoá explicit vì TypeORM khi clear array + save sẽ SET category_id = NULL
-      // (vi phạm NOT NULL) thay vì DELETE row. onDelete: CASCADE chỉ áp dụng khi DELETE.
-      if (category.subcategories && category.subcategories.length > 0) {
-        await this.categoryRepo.manager.remove(category.subcategories);
-      }
-      category.subcategories = [];
+      await this.reconcileSubCategories(category, dto.subcategories);
     }
 
-    Object.assign(category, dto);
+    const { subcategories, ...rest } = dto;
+    Object.assign(category, rest);
     try {
       return { data: await this.categoryRepo.save(category) };
     } catch (err: any) {
@@ -211,6 +224,43 @@ export class CategoryService {
     const uniqueSlugs = new Set(slugs);
     if (slugs.length !== uniqueSlugs.size) {
       throwAppError(ECategoryErrorCode.CATEGORY_SUBSLUG_DUPLICATE);
+    }
+  }
+
+  /**
+   * Đồng bộ subcategories theo slug thay vì xoá hết rồi tạo lại: subcategory khớp slug
+   * được update tại chỗ (giữ nguyên id), chỉ subcategory bị bỏ khỏi payload mới bị xoá.
+   * Xoá hết-tạo-lại sẽ đổi id → vỡ FK_products_subcategory (RESTRICT) ngay khi subcategory
+   * đó đang có sản phẩm tham chiếu, kể cả khi payload gửi lên y hệt dữ liệu cũ.
+   */
+  private async reconcileSubCategories(category: Category, incoming: CreateSubCategoryDto[]) {
+    const existingBySlug = new Map((category.subcategories || []).map((sub) => [sub.slug, sub]));
+    const incomingSlugs = new Set(incoming.map((item) => item.slug));
+
+    category.subcategories = incoming.map((item) => {
+      const existing = existingBySlug.get(item.slug);
+      if (existing) {
+        existing.label = item.label;
+        existing.description = item.description ?? '';
+        existing.count = item.count ?? 0;
+        return existing;
+      }
+      return { slug: item.slug, label: item.label, description: item.description ?? '', count: item.count ?? 0 } as SubCategory;
+    });
+
+    const removed = [...existingBySlug.values()].filter((sub) => !incomingSlugs.has(sub.slug));
+    if (removed.length > 0) {
+      try {
+        await this.categoryRepo.manager.remove(removed);
+      } catch (err: any) {
+        if (err.code === '23503') {
+          throwAppError(
+            ECategoryErrorCode.CATEGORY_SUBCATEGORY_HAS_PRODUCTS,
+            `Không thể xoá subcategory đang có sản phẩm tham chiếu: ${removed.map((s) => s.slug).join(', ')}`,
+          );
+        }
+        throw err;
+      }
     }
   }
 

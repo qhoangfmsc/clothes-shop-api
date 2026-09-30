@@ -13,6 +13,7 @@ import { OrderModule } from './modules/order/order.module';
 import { ProductModule } from './modules/product/product.module';
 import { ReviewModule } from './modules/review/review.module';
 import { ShippingModule } from './modules/shipping/shipping.module';
+import { SiteConfigModule } from './modules/site-config/site-config.module';
 import { SizeGuideModule } from './modules/size-guide/size-guide.module';
 import { UserModule } from './modules/user/user.module';
 import { WishlistModule } from './modules/wishlist/wishlist.module';
@@ -28,6 +29,7 @@ import { WishlistModule } from './modules/wishlist/wishlist.module';
     ReviewModule,
     ShippingModule,
     SizeGuideModule,
+    SiteConfigModule,
     AddressModule,
     WishlistModule,
     CartModule,

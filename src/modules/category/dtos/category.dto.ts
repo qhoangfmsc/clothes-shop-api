@@ -2,6 +2,8 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsArray, IsInt, IsNotEmpty, IsOptional, IsString, MaxLength, Min, ValidateNested } from 'class-validator';
 
+const HERO_IMAGE_EXAMPLE = 'https://example.com/category-hero.jpg';
+
 export class CreateSubCategoryDto {
   @ApiProperty({ example: 'tshirt' })
   @IsString()
@@ -45,6 +47,16 @@ export class CreateCategoryDto {
   @IsOptional()
   description?: string;
 
+  @ApiPropertyOptional({
+    example: HERO_IMAGE_EXAMPLE,
+    nullable: true,
+    description: 'Ảnh banner hero cho category, hiển thị ở CategoryGrid',
+  })
+  @IsString()
+  @IsOptional()
+  @MaxLength(500)
+  heroImage?: string | null;
+
   @ApiPropertyOptional({ type: [CreateSubCategoryDto] })
   @IsArray()
   @IsOptional()
@@ -70,6 +82,16 @@ export class UpdateCategoryDto {
   @IsString()
   @IsOptional()
   description?: string;
+
+  @ApiPropertyOptional({
+    example: HERO_IMAGE_EXAMPLE,
+    nullable: true,
+    description: 'Ảnh banner hero cho category, hiển thị ở CategoryGrid',
+  })
+  @IsString()
+  @IsOptional()
+  @MaxLength(500)
+  heroImage?: string | null;
 
   @ApiPropertyOptional({ type: [CreateSubCategoryDto] })
   @IsArray()
