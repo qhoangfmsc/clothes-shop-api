@@ -216,7 +216,7 @@ set -e
 
 DATE=$(date +%Y-%m-%d_%H-%M)
 BACKUP_DIR="./backups"
-DB_URL="${DATABASE_URL:-postgresql://oribaebi:oribaebi_dev@localhost:5432/clothes_shop}"
+DB_URL="${DATABASE_URL:-postgresql://doovan:doovan_dev@localhost:5432/clothes_shop}"
 
 mkdir -p "$BACKUP_DIR"
 

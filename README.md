@@ -1,6 +1,6 @@
 # Clothes Shop API
 
-> **Ori Baebi** — Backend API for the fashion e-commerce store.
+> **DOOVAN** — Backend API for the fashion e-commerce store.
 
 NestJS backend serving the [clothes-shop](../clothes-shop) Next.js frontend.
 

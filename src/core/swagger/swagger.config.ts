@@ -4,7 +4,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 export async function setupSwagger(app: INestApplication) {
   const config = new DocumentBuilder()
     .setTitle('Clothes Shop API')
-    .setDescription('Ori Baebi — Backend API for the fashion e-commerce store')
+    .setDescription('DOOVAN — Backend API for the fashion e-commerce store')
     .setVersion('1.0')
     .addTag('Products', 'Product listing and detail')
     .addTag('Categories', 'Category and subcategory management')

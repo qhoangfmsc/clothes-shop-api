@@ -324,15 +324,15 @@ services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: oribaebi
-      POSTGRES_PASSWORD: oribaebi_dev
+      POSTGRES_USER: doovan
+      POSTGRES_PASSWORD: doovan_dev
       POSTGRES_DB: clothes_shop
     ports:
       - '5432:5432'
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U oribaebi']
+      test: ['CMD-SHELL', 'pg_isready -U doovan']
       interval: 5s
       timeout: 5s
       retries: 5
@@ -342,7 +342,7 @@ services:
     ports:
       - '7001:7001'
     environment:
-      DATABASE_URL: postgresql://oribaebi:oribaebi_dev@db:5432/clothes_shop
+      DATABASE_URL: postgresql://doovan:doovan_dev@db:5432/clothes_shop
       JWT_SECRET: dev_jwt_secret
       JWT_EXPIRES_IN: 1d
       JWT_REFRESH_EXPIRES_IN: 30d
@@ -360,7 +360,7 @@ services:
     ports:
       - '5050:80'
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@oribaebi.com
+      PGADMIN_DEFAULT_EMAIL: admin@doovan.com
       PGADMIN_DEFAULT_PASSWORD: admin
     depends_on:
       - db
