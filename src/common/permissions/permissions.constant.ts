@@ -91,6 +91,13 @@ export enum Permission {
   SITE_CONFIG_VIEW = 11000,
   SITE_CONFIG_UPSERT = 11001,
   SITE_CONFIG_DELETE = 11002,
+
+  // ============================================
+  // MEDIA ADMIN (120xx)
+  // ============================================
+  MEDIA_VIEW = 12000,
+  MEDIA_UPLOAD = 12001,
+  MEDIA_DELETE = 12002,
 }
 
 /**

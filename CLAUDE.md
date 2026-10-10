@@ -19,6 +19,7 @@ src/
 │   ├── address/
 │   ├── wishlist/
 │   ├── review/
+│   ├── media/      # Admin media upload (Supabase Storage REST + media_files metadata table)
 │   ├── user/        # entity + service + admin controller
 │   ├── auth/        # Google login, JWT strategy
 │   ├── shipping/    # Static data, no DB

@@ -66,6 +66,17 @@ export enum ESiteConfigErrorCode {
 }
 
 // ============================================
+// MEDIA MODULE ERRORS (16xx)
+// ============================================
+export enum EMediaErrorCode {
+  MEDIA_NOT_CONFIGURED = 1601,
+  MEDIA_FILE_REQUIRED = 1602,
+  MEDIA_INVALID_TYPE = 1603,
+  MEDIA_FILE_NOT_FOUND = 1604,
+  MEDIA_STORAGE_ERROR = 1605,
+}
+
+// ============================================
 // PERMISSION ERRORS (90xx)
 // ============================================
 export enum EPermissionErrorCode {
@@ -100,4 +111,9 @@ export const ErrorMessages: Record<number, string> = {
   [EUserErrorCode.USER_CANNOT_MODIFY_SELF]: 'Cannot modify your own role or status',
   [ESiteConfigErrorCode.SITE_CONFIG_NOT_FOUND]: 'Site config not found',
   [ESiteConfigErrorCode.SITE_CONFIG_KEY_INVALID]: 'Invalid site config key',
+  [EMediaErrorCode.MEDIA_NOT_CONFIGURED]: 'Media storage is not configured',
+  [EMediaErrorCode.MEDIA_FILE_REQUIRED]: 'Multipart field "file" is required',
+  [EMediaErrorCode.MEDIA_INVALID_TYPE]: 'Unsupported file type — only JPEG, PNG, WebP, GIF, AVIF images are allowed',
+  [EMediaErrorCode.MEDIA_FILE_NOT_FOUND]: 'Media file not found',
+  [EMediaErrorCode.MEDIA_STORAGE_ERROR]: 'Media storage request failed',
 };
