@@ -2,7 +2,7 @@ import { throwAppError } from '@common/exceptions/app.exception';
 import { EOrderErrorCode } from '@common/exceptions/error-codes';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import { Address } from '../address/address.entity';
 import { Cart } from '../cart/cart.entity';
 import { CartItem } from '../cart/cart-item.entity';
@@ -94,12 +94,22 @@ export class OrderService {
         relations: ['items', 'items.product'],
       });
 
-      if (!cart?.items?.length) {
+      // Tập item sẽ đặt: theo cartItemIds nếu có, ngược lại là cả giỏ
+      let selectedItems = cart?.items ?? [];
+      if (dto.cartItemIds) {
+        const ids = new Set(dto.cartItemIds);
+        selectedItems = selectedItems.filter((item) => ids.has(item.id));
+        if (selectedItems.length !== ids.size) {
+          throw new BadRequestException('Some selected cart items do not exist in your cart');
+        }
+      }
+
+      if (!cart || !selectedItems.length) {
         throw new BadRequestException('Cart is empty');
       }
 
       // Validate product availability (sản phẩm bị xoá hoặc disabled)
-      const missingProducts = cart.items.filter((item) => !item.product || item.product.status !== 'active');
+      const missingProducts = selectedItems.filter((item) => !item.product || item.product.status !== 'active');
       if (missingProducts.length > 0) {
         const names = missingProducts.map((i) => i.product?.name || i.productId).join(', ');
         throw new BadRequestException(`Some products are no longer available: ${names}`);
@@ -113,7 +123,7 @@ export class OrderService {
 
       // Calculate totals
       const shippingMethod = dto.shippingMethod || 'standard';
-      const subtotal = cart.items.reduce((sum, item) => sum + Number(item.product!.price) * item.quantity, 0);
+      const subtotal = selectedItems.reduce((sum, item) => sum + Number(item.product!.price) * item.quantity, 0);
       const shippingFee = subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : (SHIPPING_FEES[shippingMethod] ?? 8);
       const total = subtotal + shippingFee;
 
@@ -140,7 +150,7 @@ export class OrderService {
       const savedOrder = await manager.save(order);
 
       // Create order items (snapshot product info)
-      const orderItems = cart.items.map((cartItem) =>
+      const orderItems = selectedItems.map((cartItem) =>
         manager.create(OrderItem, {
           orderId: savedOrder.id,
           productId: cartItem.productId,
@@ -154,8 +164,8 @@ export class OrderService {
       );
       await manager.save(orderItems);
 
-      // Clear cart
-      await manager.delete(CartItem, { cartId: cart.id });
+      // Remove only the ordered items from the cart (whole cart when cartItemIds is omitted)
+      await manager.delete(CartItem, { cartId: cart.id, id: In(selectedItems.map((item) => item.id)) });
 
       // Return full order (re-read within transaction for consistency)
       const result = await manager.findOne(Order, {

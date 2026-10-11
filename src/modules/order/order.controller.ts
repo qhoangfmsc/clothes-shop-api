@@ -29,7 +29,11 @@ export class OrderController {
   }
 
   @Post()
-  @ApiOperation({ summary: 'Checkout — create order from cart' })
+  @ApiOperation({
+    summary: 'Checkout — create order from cart',
+    description:
+      'Optional `cartItemIds` orders only the selected cart items (they are removed from the cart, the rest stay). Omit it to order the whole cart.',
+  })
   @Permissions(Permission.ORDER_CREATE)
   checkout(@CurrentUser() user: User, @Body() dto: CreateOrderDto) {
     return this.orderService.checkout(user.id, dto);
