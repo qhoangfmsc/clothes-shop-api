@@ -1,3 +1,4 @@
+import { parseSort } from '@common/base/sort.util';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -18,18 +19,9 @@ export class ReviewService {
 
     const qb = this.reviewRepo.createQueryBuilder('r').where('r.productId = :productId', { productId });
 
-    // Sort
-    switch (sort) {
-      case 'rating_desc':
-        qb.orderBy('r.rating', 'DESC');
-        break;
-      case 'rating_asc':
-        qb.orderBy('r.rating', 'ASC');
-        break;
-      default:
-        qb.orderBy('r.createdAt', 'DESC');
-        break;
-    }
+    // Sort: `field` = ASC, `-field` = DESC
+    const { field, direction } = parseSort(sort, '-createdAt');
+    qb.orderBy(`r.${field}`, direction);
 
     qb.skip((page - 1) * limit).take(limit);
 

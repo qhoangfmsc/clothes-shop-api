@@ -16,6 +16,10 @@ export class Category extends BaseEntity {
   @Column({ type: 'varchar', length: 500, nullable: true, name: 'hero_image' })
   heroImage: string | null;
 
+  /** Thứ hạng hiển thị duy nhất: 1 = ưu tiên cao nhất, số càng lớn càng thấp. */
+  @Column({ type: 'int' })
+  priority: number;
+
   @OneToMany(
     () => SubCategory,
     (sub) => sub.category,

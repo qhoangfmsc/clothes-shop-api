@@ -30,6 +30,9 @@ export enum ECategoryErrorCode {
   CATEGORY_SUBSLUG_DUPLICATE = 1103,
   CATEGORY_HAS_PRODUCTS = 1104,
   CATEGORY_SUBCATEGORY_HAS_PRODUCTS = 1105,
+  CATEGORY_REORDER_DUPLICATE_ID = 1106,
+  CATEGORY_REORDER_INCOMPLETE = 1107,
+  CATEGORY_PRIORITY_OUT_OF_RANGE = 1108,
 }
 
 // ============================================
@@ -74,6 +77,7 @@ export enum EMediaErrorCode {
   MEDIA_INVALID_TYPE = 1603,
   MEDIA_FILE_NOT_FOUND = 1604,
   MEDIA_STORAGE_ERROR = 1605,
+  MEDIA_FILE_TOO_LARGE = 1606,
 }
 
 // ============================================
@@ -102,6 +106,9 @@ export const ErrorMessages: Record<number, string> = {
   [ECategoryErrorCode.CATEGORY_SUBSLUG_DUPLICATE]: 'Subcategory slug must be unique within a category',
   [ECategoryErrorCode.CATEGORY_HAS_PRODUCTS]: 'Cannot delete category — products still reference it',
   [ECategoryErrorCode.CATEGORY_SUBCATEGORY_HAS_PRODUCTS]: 'Cannot remove subcategory — products still reference it',
+  [ECategoryErrorCode.CATEGORY_REORDER_DUPLICATE_ID]: 'Duplicate category id in reorder request',
+  [ECategoryErrorCode.CATEGORY_REORDER_INCOMPLETE]: 'Reorder request must contain every category exactly once',
+  [ECategoryErrorCode.CATEGORY_PRIORITY_OUT_OF_RANGE]: 'Priority is out of range',
   [ECollectionErrorCode.COLLECTION_NOT_FOUND]: 'Collection not found',
   [ECollectionErrorCode.COLLECTION_SLUG_DUPLICATE]: 'Collection slug already exists',
   [ECollectionErrorCode.COLLECTION_PRODUCT_NOT_FOUND]: 'One or more products not found',
@@ -116,4 +123,5 @@ export const ErrorMessages: Record<number, string> = {
   [EMediaErrorCode.MEDIA_INVALID_TYPE]: 'Unsupported file type — only JPEG, PNG, WebP, GIF, AVIF images are allowed',
   [EMediaErrorCode.MEDIA_FILE_NOT_FOUND]: 'Media file not found',
   [EMediaErrorCode.MEDIA_STORAGE_ERROR]: 'Media storage request failed',
+  [EMediaErrorCode.MEDIA_FILE_TOO_LARGE]: 'File is too large for media storage',
 };

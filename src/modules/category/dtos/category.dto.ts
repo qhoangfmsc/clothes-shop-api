@@ -1,6 +1,17 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsArray, IsInt, IsNotEmpty, IsOptional, IsString, MaxLength, Min, ValidateNested } from 'class-validator';
+import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  IsArray,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  MaxLength,
+  Min,
+  ValidateNested,
+} from 'class-validator';
 
 const HERO_IMAGE_EXAMPLE = 'https://example.com/category-hero.jpg';
 
@@ -93,10 +104,35 @@ export class UpdateCategoryDto {
   @MaxLength(500)
   heroImage?: string | null;
 
+  @ApiPropertyOptional({
+    example: 1,
+    minimum: 1,
+    description: 'Thứ hạng mới (1 = ưu tiên cao nhất). Các danh mục khác tự dịch chỗ để không trùng',
+  })
+  @IsInt()
+  @IsOptional()
+  @Min(1)
+  priority?: number;
+
   @ApiPropertyOptional({ type: [CreateSubCategoryDto] })
   @IsArray()
   @IsOptional()
   @ValidateNested({ each: true })
   @Type(() => CreateSubCategoryDto)
   subcategories?: CreateSubCategoryDto[];
+}
+
+export class ReorderCategoriesDto {
+  @ApiProperty({
+    type: [String],
+    example: ['V1StGXR8_Z5jdHi6', 'abcDEF1234567890'],
+    description: 'Toàn bộ id danh mục theo thứ tự mới: phần tử đầu = priority 1',
+  })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(500)
+  @IsString({ each: true })
+  @IsNotEmpty({ each: true })
+  @MaxLength(255, { each: true })
+  ids: string[];
 }

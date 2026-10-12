@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, IsString, Min, MinLength } from 'class-validator';
+import { IsInt, IsOptional, IsString, Max, Min, MinLength } from 'class-validator';
 
 export class FindBaseDto {
   @IsOptional()
@@ -12,6 +12,7 @@ export class FindBaseDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
+  @Max(200)
   limit = 25;
 
   @IsOptional()

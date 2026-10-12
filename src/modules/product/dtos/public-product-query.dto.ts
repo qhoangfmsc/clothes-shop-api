@@ -1,3 +1,4 @@
+import { sortValues } from '@common/base/sort.util';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
@@ -27,10 +28,14 @@ export class PublicProductQueryDto {
   @IsIn(['new', 'sale', 'bestseller'])
   badge?: string;
 
-  @ApiPropertyOptional({ enum: ['price_asc', 'price_desc', 'newest', 'name_asc', 'name_desc'] })
+  @ApiPropertyOptional({
+    enum: sortValues(['price', 'name', 'createdAt']),
+    description: 'Sort: field = ASC, -field = DESC. Mặc định: -createdAt',
+    example: 'price',
+  })
   @IsOptional()
   @IsString()
-  @IsIn(['price_asc', 'price_desc', 'newest', 'name_asc', 'name_desc'])
+  @IsIn(sortValues(['price', 'name', 'createdAt']))
   sort?: string;
 
   @ApiPropertyOptional({ type: Number, minimum: 0 })
@@ -59,18 +64,18 @@ export class PublicProductQueryDto {
   @MaxLength(255)
   colors?: string;
 
-  @ApiPropertyOptional({ type: Number, minimum: 1, maximum: 100, default: 1 })
+  @ApiPropertyOptional({ type: Number, minimum: 1, default: 1 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
   page?: number;
 
-  @ApiPropertyOptional({ type: Number, minimum: 1, maximum: 100, default: 24 })
+  @ApiPropertyOptional({ type: Number, minimum: 1, maximum: 200, default: 24 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(100)
+  @Max(200)
   limit?: number;
 }

@@ -1,3 +1,4 @@
+import { parseSort } from '@common/base/sort.util';
 import { throwAppError } from '@common/exceptions/app.exception';
 import { EProductErrorCode } from '@common/exceptions/error-codes';
 import { Injectable, NotFoundException } from '@nestjs/common';
@@ -51,20 +52,8 @@ export class ProductService {
       where.badge = query.badge;
     }
 
-    let order: FindOptionsOrder<Product> = { createdAt: 'DESC' };
-    if (query.sort) {
-      switch (query.sort) {
-        case 'price_asc':
-          order = { price: 'ASC' };
-          break;
-        case 'price_desc':
-          order = { price: 'DESC' };
-          break;
-        case 'newest':
-          order = { createdAt: 'DESC' };
-          break;
-      }
-    }
+    const { field, direction } = parseSort(query.sort, '-createdAt');
+    const order: FindOptionsOrder<Product> = { [field]: direction };
 
     const [data, total] = await this.productRepo.findAndCount({
       where,
@@ -141,24 +130,9 @@ export class ProductService {
       }
     }
 
-    // Sort — whitelist with public-friendly convention
-    switch (sort) {
-      case 'price_asc':
-        qb.orderBy('p.price', 'ASC');
-        break;
-      case 'price_desc':
-        qb.orderBy('p.price', 'DESC');
-        break;
-      case 'name_asc':
-        qb.orderBy('p.name', 'ASC');
-        break;
-      case 'name_desc':
-        qb.orderBy('p.name', 'DESC');
-        break;
-      default:
-        qb.orderBy('p.createdAt', 'DESC');
-        break;
-    }
+    // Sort: `field` = ASC, `-field` = DESC
+    const { field, direction } = parseSort(sort, '-createdAt');
+    qb.orderBy(`p.${field}`, direction);
 
     // Pagination
     qb.skip((page - 1) * limit).take(limit);
@@ -255,13 +229,9 @@ export class ProductService {
       where = baseConditions;
     }
 
-    // Sort: "field" = DESC, "-field" = ASC
-    let order: FindOptionsOrder<Product> = { createdAt: 'DESC' };
-    if (sort) {
-      const isAsc = sort.startsWith('-');
-      const field = isAsc ? sort.slice(1) : sort;
-      order = { [field]: isAsc ? 'ASC' : 'DESC' };
-    }
+    // Sort: `field` = ASC, `-field` = DESC
+    const { field, direction } = parseSort(sort, '-createdAt');
+    const order: FindOptionsOrder<Product> = { [field]: direction };
 
     const [data, total] = await this.productRepo.findAndCount({
       where,

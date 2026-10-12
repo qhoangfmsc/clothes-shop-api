@@ -1,3 +1,4 @@
+import { sortValues } from '@common/base/sort.util';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
@@ -15,10 +16,14 @@ export class PublicCategoryQueryDto {
   @MaxLength(255)
   search?: string;
 
-  @ApiPropertyOptional({ enum: ['newest', 'title_asc', 'title_desc'] })
+  @ApiPropertyOptional({
+    enum: sortValues(['priority', 'title', 'createdAt']),
+    description: 'Sort: field = ASC, -field = DESC. Mặc định: priority',
+    example: 'priority',
+  })
   @IsOptional()
   @IsString()
-  @IsIn(['newest', 'title_asc', 'title_desc'])
+  @IsIn(sortValues(['priority', 'title', 'createdAt']))
   sort?: string;
 
   @ApiPropertyOptional({ type: Number, minimum: 1, default: 1 })
@@ -28,11 +33,11 @@ export class PublicCategoryQueryDto {
   @Min(1)
   page?: number;
 
-  @ApiPropertyOptional({ type: Number, minimum: 1, maximum: 100, default: 24 })
+  @ApiPropertyOptional({ type: Number, minimum: 1, maximum: 200, default: 24 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(100)
+  @Max(200)
   limit?: number;
 }

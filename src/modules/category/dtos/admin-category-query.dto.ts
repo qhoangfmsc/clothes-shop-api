@@ -1,6 +1,7 @@
+import { sortValues } from '@common/base/sort.util';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
 export class AdminCategoryQueryDto {
   @ApiPropertyOptional({ description: 'Search keyword (slug, title, description)' })
@@ -10,12 +11,12 @@ export class AdminCategoryQueryDto {
   search?: string;
 
   @ApiPropertyOptional({
-    description: 'Sort: title, -title, createdAt, -createdAt (prefix "-" = ascending, no prefix = descending)',
-    example: 'title',
+    description: 'Sort: priority, -priority, title, -title, createdAt, -createdAt (prefix "-" = descending, no prefix = ascending)',
+    example: 'priority',
   })
   @IsString()
   @IsOptional()
-  @IsIn(['title', '-title', 'createdAt', '-createdAt'])
+  @IsIn(sortValues(['priority', 'title', 'createdAt']))
   sort?: string;
 
   @ApiPropertyOptional({ default: 1, description: 'Page number' })
@@ -29,6 +30,7 @@ export class AdminCategoryQueryDto {
   @IsInt()
   @IsOptional()
   @Min(1)
+  @Max(200)
   @Type(() => Number)
   limit?: number = 25;
 }

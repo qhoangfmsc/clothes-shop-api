@@ -169,7 +169,20 @@ export class MediaService {
         HttpStatus.SERVICE_UNAVAILABLE,
       );
     }
+    // Supabase Storage có thể trả HTTP 400 kèm {"statusCode":"413","code":"EntityTooLarge"} trong body
+    if (res.status === 413 || this.isEntityTooLarge(detail)) {
+      throwAppError(EMediaErrorCode.MEDIA_FILE_TOO_LARGE, undefined, HttpStatus.PAYLOAD_TOO_LARGE);
+    }
     throwAppError(EMediaErrorCode.MEDIA_STORAGE_ERROR, `Media storage ${action} failed`, HttpStatus.BAD_GATEWAY);
+  }
+
+  private isEntityTooLarge(detail: string): boolean {
+    try {
+      const body = JSON.parse(detail) as { statusCode?: string | number; code?: string };
+      return String(body.statusCode) === '413' || body.code === 'EntityTooLarge';
+    } catch {
+      return false;
+    }
   }
 
   private publicUrl(config: StorageConfig, key: string): string {

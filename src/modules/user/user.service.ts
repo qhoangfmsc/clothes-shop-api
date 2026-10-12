@@ -1,3 +1,4 @@
+import { parseSort } from '@common/base/sort.util';
 import { throwAppError } from '@common/exceptions/app.exception';
 import { EUserErrorCode } from '@common/exceptions/error-codes';
 import { Injectable, NotFoundException } from '@nestjs/common';
@@ -33,13 +34,9 @@ export class UserService {
       where = baseConditions;
     }
 
-    // Sort: "field" = DESC, "-field" = ASC
-    let order: FindOptionsOrder<User> = { createdAt: 'DESC' };
-    if (sort) {
-      const isAsc = sort.startsWith('-');
-      const field = isAsc ? sort.slice(1) : sort;
-      order = { [field]: isAsc ? 'ASC' : 'DESC' };
-    }
+    // Sort: `field` = ASC, `-field` = DESC
+    const { field, direction } = parseSort(sort, '-createdAt');
+    const order: FindOptionsOrder<User> = { [field]: direction };
 
     const [data, total] = await this.userRepo.findAndCount({
       where,

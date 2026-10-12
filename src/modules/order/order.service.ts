@@ -1,3 +1,4 @@
+import { parseSort } from '@common/base/sort.util';
 import { throwAppError } from '@common/exceptions/app.exception';
 import { EOrderErrorCode } from '@common/exceptions/error-codes';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
@@ -59,12 +60,9 @@ export class OrderService {
       qb.andWhere('o.status = :status', { status });
     }
 
-    // Sort
-    if (sort === 'oldest') {
-      qb.orderBy('o.createdAt', 'ASC');
-    } else {
-      qb.orderBy('o.createdAt', 'DESC');
-    }
+    // Sort: `field` = ASC, `-field` = DESC
+    const { field, direction } = parseSort(sort, '-createdAt');
+    qb.orderBy(`o.${field}`, direction);
 
     qb.skip((page - 1) * limit).take(limit);
 
@@ -215,14 +213,9 @@ export class OrderService {
       });
     }
 
-    // Sort: "field" = DESC, "-field" = ASC
-    if (sort) {
-      const isAsc = sort.startsWith('-');
-      const field = isAsc ? sort.slice(1) : sort;
-      qb.orderBy(`o.${field}`, isAsc ? 'ASC' : 'DESC');
-    } else {
-      qb.orderBy('o.createdAt', 'DESC');
-    }
+    // Sort: `field` = ASC, `-field` = DESC
+    const { field, direction } = parseSort(sort, '-createdAt');
+    qb.orderBy(`o.${field}`, direction);
 
     qb.skip((page - 1) * limit).take(limit);
 

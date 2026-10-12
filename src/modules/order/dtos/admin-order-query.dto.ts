@@ -1,6 +1,7 @@
+import { sortValues } from '@common/base/sort.util';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 import { ORDER_STATUSES } from './admin-order.dto';
 
 export class AdminOrderQueryDto {
@@ -23,12 +24,12 @@ export class AdminOrderQueryDto {
   status?: string;
 
   @ApiPropertyOptional({
-    description: 'Sort: createdAt, -createdAt, total, -total (prefix "-" = ascending, no prefix = descending)',
+    description: 'Sort: createdAt, -createdAt, total, -total (prefix "-" = descending, no prefix = ascending)',
     example: '-createdAt',
   })
   @IsString()
   @IsOptional()
-  @IsIn(['createdAt', '-createdAt', 'total', '-total'])
+  @IsIn(sortValues(['createdAt', 'total']))
   sort?: string;
 
   @ApiPropertyOptional({ default: 1, description: 'Page number' })
@@ -42,6 +43,7 @@ export class AdminOrderQueryDto {
   @IsInt()
   @IsOptional()
   @Min(1)
+  @Max(200)
   @Type(() => Number)
   limit?: number = 25;
 }

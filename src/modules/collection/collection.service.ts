@@ -1,3 +1,4 @@
+import { parseSort } from '@common/base/sort.util';
 import { throwAppError } from '@common/exceptions/app.exception';
 import { ECollectionErrorCode } from '@common/exceptions/error-codes';
 import { Injectable, NotFoundException } from '@nestjs/common';
@@ -42,18 +43,9 @@ export class CollectionService {
       qb.andWhere('(c.name ILIKE :q OR c.slug ILIKE :q)', { q: `%${search}%` });
     }
 
-    // Sort
-    switch (sort) {
-      case 'name_asc':
-        qb.orderBy('c.name', 'ASC');
-        break;
-      case 'name_desc':
-        qb.orderBy('c.name', 'DESC');
-        break;
-      default:
-        qb.orderBy('c.createdAt', 'DESC');
-        break;
-    }
+    // Sort: `field` = ASC, `-field` = DESC
+    const { field, direction } = parseSort(sort, '-createdAt');
+    qb.orderBy(`c.${field}`, direction);
 
     qb.skip((page - 1) * limit).take(limit);
 
@@ -108,13 +100,9 @@ export class CollectionService {
       where = baseConditions;
     }
 
-    // Sort: "field" = DESC, "-field" = ASC
-    let order: FindOptionsOrder<Collection> = { createdAt: 'DESC' };
-    if (sort) {
-      const isAsc = sort.startsWith('-');
-      const field = isAsc ? sort.slice(1) : sort;
-      order = { [field]: isAsc ? 'ASC' : 'DESC' };
-    }
+    // Sort: `field` = ASC, `-field` = DESC
+    const { field, direction } = parseSort(sort, '-createdAt');
+    const order: FindOptionsOrder<Collection> = { [field]: direction };
 
     const [data, total] = await this.collectionRepo.findAndCount({
       where,

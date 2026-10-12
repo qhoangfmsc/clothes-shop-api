@@ -4,7 +4,7 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestj
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CategoryService } from './category.service';
 import { AdminCategoryQueryDto } from './dtos/admin-category-query.dto';
-import { CreateCategoryDto, UpdateCategoryDto } from './dtos/category.dto';
+import { CreateCategoryDto, ReorderCategoriesDto, UpdateCategoryDto } from './dtos/category.dto';
 
 @ApiTags('Admin — Categories')
 @Controller('api/admin/categories')
@@ -24,6 +24,14 @@ export class AdminCategoryController {
   @Permissions(Permission.CATEGORY_CREATE)
   create(@Body() dto: CreateCategoryDto) {
     return this.categoryService.create(dto);
+  }
+
+  // Phải khai báo trước ':id' để 'reorder' không bị bắt làm id
+  @Patch('reorder')
+  @ApiOperation({ summary: '[Admin] Sắp xếp lại toàn bộ danh mục (gửi danh sách id theo thứ tự mới, priority = vị trí 1..N)' })
+  @Permissions(Permission.CATEGORY_UPDATE)
+  reorder(@Body() dto: ReorderCategoriesDto) {
+    return this.categoryService.reorder(dto);
   }
 
   @Patch(':id')
