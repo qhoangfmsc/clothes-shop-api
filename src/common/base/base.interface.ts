@@ -1,4 +1,5 @@
 import { ApiResponseProperty } from '@nestjs/swagger';
+import { DEFAULT_PAGE, DEFAULT_PAGE_SIZE } from './pagination.util';
 
 export type DeepPartial<T> = {
   [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P];
@@ -15,7 +16,7 @@ export interface BaseListProps<T> {
   limit?: number | undefined;
   search?: string | undefined;
   searchProps?: (keyof T)[] | undefined;
-  sorts?: string | undefined;
+  sort?: string | undefined;
   filter?: DeepPartial<T>;
   relations?: (keyof T | string)[];
 }
@@ -23,8 +24,8 @@ export interface BaseListProps<T> {
 export class Paging<T> {
   items: T[] = [];
   total = 0;
-  page = 1;
-  limit = 20;
+  page = DEFAULT_PAGE;
+  limit = DEFAULT_PAGE_SIZE;
   totalPages = 0;
 }
 

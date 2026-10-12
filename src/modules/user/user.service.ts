@@ -1,3 +1,4 @@
+import { getPaging, paginated } from '@common/base/pagination.util';
 import { parseSort } from '@common/base/sort.util';
 import { throwAppError } from '@common/exceptions/app.exception';
 import { EUserErrorCode } from '@common/exceptions/error-codes';
@@ -16,7 +17,8 @@ export class UserService {
   ) {}
 
   async findAll(query: AdminUserQueryDto) {
-    const { search, role, status, sort, page = 1, limit = 25 } = query;
+    const { search, role, status, sort } = query;
+    const { page, limit } = getPaging(query);
 
     // Build where: search creates OR conditions, otherwise use base filters
     let where: FindOptionsWhere<User> | FindOptionsWhere<User>[];
@@ -59,7 +61,7 @@ export class UserService {
       updatedAt: user.updatedAt,
     }));
 
-    return { data: sanitized, total, page, limit };
+    return paginated(sanitized, total, page, limit);
   }
 
   async findOne(id: string) {

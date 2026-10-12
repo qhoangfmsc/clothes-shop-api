@@ -1,18 +1,19 @@
+import { ACTIVE_STATUSES, USER_ROLES } from '@common/constants/enum-values.constant';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsArray, IsIn, IsInt, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class UpdateUserDto {
-  @ApiPropertyOptional({ enum: ['user', 'admin'], example: 'admin' })
+  @ApiPropertyOptional({ enum: USER_ROLES, example: 'admin' })
   @IsString()
   @IsOptional()
-  @IsIn(['user', 'admin'])
+  @IsIn(USER_ROLES)
   @MaxLength(20)
   role?: string;
 
-  @ApiPropertyOptional({ enum: ['active', 'disabled'], example: 'active' })
+  @ApiPropertyOptional({ enum: ACTIVE_STATUSES, example: 'active' })
   @IsString()
   @IsOptional()
-  @IsIn(['active', 'disabled'])
+  @IsIn(ACTIVE_STATUSES)
   @MaxLength(20)
   status?: string;
 

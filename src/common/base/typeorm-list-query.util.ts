@@ -1,6 +1,8 @@
 import { BadRequestException } from '@nestjs/common';
 import { ObjectLiteral, SelectQueryBuilder } from 'typeorm';
 import { Paging } from './base.interface';
+import { getPaging } from './pagination.util';
+import { parseSort } from './sort.util';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -10,14 +12,13 @@ export interface TypeormListQueryProps {
   page?: number;
   limit?: number;
   search?: string;
-  sorts?: string;
+  /** `field` = ASC, `-field` = DESC — DTO đã whitelist bằng @SortField */
+  sort?: string;
   /** Filter map, values may include operator prefix like "gt:10", "in:1,2,3" */
   filter?: Record<string, any>;
 }
 
 export interface TypeormListQueryOptions {
-  /** Các cột được phép sort. Mặc định ['id'] */
-  sortableColumns?: string[];
   /** Các cột được phép search (sẽ dùng ILIKE) */
   searchableColumns?: string[];
 }
@@ -118,7 +119,6 @@ function applyFilterCondition(qb: SelectQueryBuilder<any>, alias: string, column
  * ```ts
  * const qb = this.repo.createQueryBuilder('group');
  * const result = await typeormListQuery(qb, 'group', query, {
- *   sortableColumns: ['id', 'createdAt', 'name'],
  *   searchableColumns: ['name', 'description'],
  * });
  * ```
@@ -129,35 +129,16 @@ export async function typeormListQuery<T extends ObjectLiteral>(
   props: TypeormListQueryProps,
   options: TypeormListQueryOptions = {},
 ): Promise<Paging<T>> {
-  const { sortableColumns = ['id'], searchableColumns = [] } = options;
+  const { searchableColumns = [] } = options;
 
-  const { page = 1, limit = 25, filter = {}, sorts: sortsParam, search } = props;
+  const { filter = {}, sort, search } = props;
+  const { page, limit } = getPaging(props);
 
   // -------------------------------------------------------------------------
   // Sort
   // -------------------------------------------------------------------------
-  let sorts: string[];
-  if (sortsParam) {
-    const parsed = sortsParam.split(',').map((s) => s.trim());
-    const invalidKeys = parsed.filter((item) => {
-      const key = item.startsWith('-') ? item.substring(1) : item;
-      return !sortableColumns.includes(key);
-    });
-    if (invalidKeys.length) {
-      throw new BadRequestException(`Invalid sorts: ${invalidKeys.join(', ')}`);
-    }
-    sorts = parsed;
-  } else {
-    sorts = ['-createdAt'];
-  }
-
-  for (const s of sorts) {
-    if (s.startsWith('-')) {
-      qb.addOrderBy(`${alias}.${s.slice(1)}`, 'DESC');
-    } else {
-      qb.addOrderBy(`${alias}.${s}`, 'ASC');
-    }
-  }
+  const { field, direction } = parseSort(sort, '-createdAt');
+  qb.addOrderBy(`${alias}.${field}`, direction);
 
   // -------------------------------------------------------------------------
   // Filter conditions

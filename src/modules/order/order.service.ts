@@ -1,3 +1,4 @@
+import { getPaging, paginated } from '@common/base/pagination.util';
 import { parseSort } from '@common/base/sort.util';
 import { throwAppError } from '@common/exceptions/app.exception';
 import { EOrderErrorCode } from '@common/exceptions/error-codes';
@@ -50,8 +51,7 @@ export class OrderService {
 
   async findAll(userId: string, query: PublicOrderQueryDto = {}) {
     const { status, sort } = query;
-    const page = query.page ?? 1;
-    const limit = query.limit ?? 24;
+    const { page, limit } = getPaging(query);
 
     const qb = this.orderRepo.createQueryBuilder('o').leftJoinAndSelect('o.items', 'items').where('o.userId = :userId', { userId });
 
@@ -68,7 +68,7 @@ export class OrderService {
 
     const [data, total] = await qb.getManyAndCount();
 
-    return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+    return paginated(data, total, page, limit);
   }
 
   async findOne(userId: string, orderId: string) {
@@ -192,7 +192,8 @@ export class OrderService {
   // ============================================
 
   async findAllAdmin(query: AdminOrderQueryDto) {
-    const { userId, search, status, sort, page = 1, limit = 25 } = query;
+    const { userId, search, status, sort } = query;
+    const { page, limit } = getPaging(query);
 
     const qb = this.orderRepo.createQueryBuilder('o').leftJoinAndSelect('o.items', 'items');
 
@@ -221,7 +222,7 @@ export class OrderService {
 
     const [data, total] = await qb.getManyAndCount();
 
-    return { data, total, page, limit };
+    return paginated(data, total, page, limit);
   }
 
   async findOneAdmin(orderId: string) {

@@ -1,19 +1,18 @@
-import { sortValues } from '@common/base/sort.util';
+import { ACTIVE_STATUSES, PRODUCT_BADGES } from '@common/constants/enum-values.constant';
+import { SearchField } from '@common/decorator/search-field.decorator';
+import { SortField } from '@common/decorator/sort-field.decorator';
+import { PaginationQueryDto } from '@common/dto/pagination-query.dto';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
 
-export class AdminProductQueryDto {
-  @ApiPropertyOptional({ description: 'Search keyword (name, slug, sku, description)' })
-  @IsString()
-  @IsOptional()
-  @MaxLength(255)
+export class AdminProductQueryDto extends PaginationQueryDto {
+  @SearchField('Search keyword (name, slug, sku, description)')
   search?: string;
 
-  @ApiPropertyOptional({ enum: ['active', 'disabled'], description: 'Filter by status' })
+  @ApiPropertyOptional({ enum: ACTIVE_STATUSES, description: 'Filter by status' })
   @IsString()
   @IsOptional()
-  @IsIn(['active', 'disabled'])
+  @IsIn(ACTIVE_STATUSES)
   status?: string;
 
   @ApiPropertyOptional({ description: 'Filter by category slug' })
@@ -22,33 +21,12 @@ export class AdminProductQueryDto {
   @MaxLength(255)
   category?: string;
 
-  @ApiPropertyOptional({ description: 'Filter by badge (new, sale, bestseller)' })
+  @ApiPropertyOptional({ enum: PRODUCT_BADGES, description: 'Filter by badge' })
   @IsString()
   @IsOptional()
-  @MaxLength(50)
+  @IsIn(PRODUCT_BADGES)
   badge?: string;
 
-  @ApiPropertyOptional({
-    description: 'Sort: price, -price, createdAt, -createdAt, name, -name (prefix "-" = descending, no prefix = ascending)',
-    example: '-price',
-  })
-  @IsString()
-  @IsOptional()
-  @IsIn(sortValues(['price', 'createdAt', 'name']))
+  @SortField(['price', 'createdAt', 'name'], '-createdAt')
   sort?: string;
-
-  @ApiPropertyOptional({ default: 1, description: 'Page number' })
-  @IsInt()
-  @IsOptional()
-  @Min(1)
-  @Type(() => Number)
-  page?: number = 1;
-
-  @ApiPropertyOptional({ default: 25, description: 'Items per page' })
-  @IsInt()
-  @IsOptional()
-  @Min(1)
-  @Max(200)
-  @Type(() => Number)
-  limit?: number = 25;
 }

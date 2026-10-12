@@ -1,3 +1,4 @@
+import { getPaging, paginated } from '@common/base/pagination.util';
 import { parseSort } from '@common/base/sort.util';
 import { throwAppError } from '@common/exceptions/app.exception';
 import { ECategoryErrorCode } from '@common/exceptions/error-codes';
@@ -43,8 +44,7 @@ export class CategoryService {
 
   async findAllPublic(query: PublicCategoryQueryDto) {
     const { search, sort } = query;
-    const page = query.page ?? 1;
-    const limit = query.limit ?? 24;
+    const { page, limit } = getPaging(query);
 
     // Không join "subcategories" (1-nhiều) ở đây: join + skip/take sẽ áp LIMIT/OFFSET
     // lên các dòng SQL đã bị nhân theo subcategory, làm sai lệch cả `total` lẫn số
@@ -91,7 +91,7 @@ export class CategoryService {
       })),
     }));
 
-    return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+    return paginated(data, total, page, limit);
   }
 
   async findBySlug(slug: string) {
@@ -124,7 +124,8 @@ export class CategoryService {
   // ============================================
 
   async findAllAdmin(query: AdminCategoryQueryDto) {
-    const { search, sort, page = 1, limit = 25 } = query;
+    const { search, sort } = query;
+    const { page, limit } = getPaging(query);
 
     // Build where: search creates OR conditions
     let where: FindOptionsWhere<Category> | FindOptionsWhere<Category>[] | undefined;
@@ -144,7 +145,7 @@ export class CategoryService {
       take: limit,
     });
 
-    return { data, total, page, limit };
+    return paginated(data, total, page, limit);
   }
 
   async create(dto: CreateCategoryDto) {

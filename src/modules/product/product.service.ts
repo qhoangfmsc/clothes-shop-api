@@ -1,3 +1,4 @@
+import { getPaging, paginated } from '@common/base/pagination.util';
 import { parseSort } from '@common/base/sort.util';
 import { throwAppError } from '@common/exceptions/app.exception';
 import { EProductErrorCode } from '@common/exceptions/error-codes';
@@ -71,8 +72,7 @@ export class ProductService {
 
   async findAllPublic(query: PublicProductQueryDto) {
     const { search, category, subcategory, badge, sort, minPrice, maxPrice, sizes, colors } = query;
-    const page = query.page ?? 1;
-    const limit = query.limit ?? 24;
+    const { page, limit } = getPaging(query);
 
     const qb = this.productRepo
       .createQueryBuilder('p')
@@ -139,13 +139,7 @@ export class ProductService {
 
     const [data, total] = await qb.getManyAndCount();
 
-    return {
-      data,
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
-    };
+    return paginated(data, total, page, limit);
   }
 
   async autocomplete(q: string) {
@@ -198,7 +192,8 @@ export class ProductService {
   // ============================================
 
   async findAllAdmin(query: AdminProductQueryDto) {
-    const { search, status, category, badge, sort, page = 1, limit = 25 } = query;
+    const { search, status, category, badge, sort } = query;
+    const { page, limit } = getPaging(query);
 
     // Build base conditions (non-search filters)
     const baseConditions: FindOptionsWhere<Product> = {};
@@ -211,7 +206,7 @@ export class ProductService {
       if (cat) {
         baseConditions.category = { id: cat.id };
       } else {
-        return { data: [], total: 0, page, limit };
+        return paginated([], 0, page, limit);
       }
     }
 
@@ -241,7 +236,7 @@ export class ProductService {
       take: limit,
     });
 
-    return { data, total, page, limit };
+    return paginated(data, total, page, limit);
   }
 
   async create(dto: CreateProductDto) {

@@ -1,20 +1,18 @@
-import { sortValues } from '@common/base/sort.util';
+import { SearchField } from '@common/decorator/search-field.decorator';
+import { SortField } from '@common/decorator/sort-field.decorator';
+import { PaginationQueryDto } from '@common/dto/pagination-query.dto';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
 import { ORDER_STATUSES } from './admin-order.dto';
 
-export class AdminOrderQueryDto {
+export class AdminOrderQueryDto extends PaginationQueryDto {
   @ApiPropertyOptional({ description: 'Filter by user ID' })
   @IsString()
   @IsOptional()
   @MaxLength(16)
   userId?: string;
 
-  @ApiPropertyOptional({ description: 'Search keyword (order ID, phone, fullName)' })
-  @IsString()
-  @IsOptional()
-  @MaxLength(255)
+  @SearchField('Search keyword (order ID, phone, fullName)')
   search?: string;
 
   @ApiPropertyOptional({ enum: ORDER_STATUSES, description: 'Filter by order status' })
@@ -23,27 +21,6 @@ export class AdminOrderQueryDto {
   @IsIn(ORDER_STATUSES)
   status?: string;
 
-  @ApiPropertyOptional({
-    description: 'Sort: createdAt, -createdAt, total, -total (prefix "-" = descending, no prefix = ascending)',
-    example: '-createdAt',
-  })
-  @IsString()
-  @IsOptional()
-  @IsIn(sortValues(['createdAt', 'total']))
+  @SortField(['createdAt', 'total'], '-createdAt')
   sort?: string;
-
-  @ApiPropertyOptional({ default: 1, description: 'Page number' })
-  @IsInt()
-  @IsOptional()
-  @Min(1)
-  @Type(() => Number)
-  page?: number = 1;
-
-  @ApiPropertyOptional({ default: 25, description: 'Items per page' })
-  @IsInt()
-  @IsOptional()
-  @Min(1)
-  @Max(200)
-  @Type(() => Number)
-  limit?: number = 25;
 }

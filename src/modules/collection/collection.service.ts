@@ -1,3 +1,4 @@
+import { getPaging, paginated } from '@common/base/pagination.util';
 import { parseSort } from '@common/base/sort.util';
 import { throwAppError } from '@common/exceptions/app.exception';
 import { ECollectionErrorCode } from '@common/exceptions/error-codes';
@@ -29,8 +30,7 @@ export class CollectionService {
 
   async findAllPublic(query: PublicCollectionQueryDto) {
     const { search, sort } = query;
-    const page = query.page ?? 1;
-    const limit = query.limit ?? 24;
+    const { page, limit } = getPaging(query);
 
     // Không join "products" (many-to-many) ở đây: join + skip/take sẽ áp LIMIT/OFFSET
     // lên các dòng SQL đã bị nhân theo product, làm sai lệch cả `total` lẫn số
@@ -62,7 +62,7 @@ export class CollectionService {
       }
     }
 
-    return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+    return paginated(data, total, page, limit);
   }
 
   async findBySlug(slug: string) {
@@ -82,7 +82,8 @@ export class CollectionService {
   // ============================================
 
   async findAllAdmin(query: AdminCollectionQueryDto) {
-    const { search, season, sort, page = 1, limit = 25 } = query;
+    const { search, season, sort } = query;
+    const { page, limit } = getPaging(query);
 
     // Build base conditions
     const baseConditions: FindOptionsWhere<Collection> = {};
@@ -112,7 +113,7 @@ export class CollectionService {
       take: limit,
     });
 
-    return { data, total, page, limit };
+    return paginated(data, total, page, limit);
   }
 
   async create(dto: CreateCollectionDto) {

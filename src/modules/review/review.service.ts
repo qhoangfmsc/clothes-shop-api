@@ -1,3 +1,4 @@
+import { getPaging, paginated } from '@common/base/pagination.util';
 import { parseSort } from '@common/base/sort.util';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -14,8 +15,7 @@ export class ReviewService {
 
   async findByProductId(productId: string, query: PublicReviewQueryDto = {}) {
     const { sort } = query;
-    const page = query.page ?? 1;
-    const limit = query.limit ?? 24;
+    const { page, limit } = getPaging(query);
 
     const qb = this.reviewRepo.createQueryBuilder('r').where('r.productId = :productId', { productId });
 
@@ -27,8 +27,8 @@ export class ReviewService {
 
     const [reviews, total] = await qb.getManyAndCount();
 
-    return {
-      data: reviews.map((r) => ({
+    return paginated(
+      reviews.map((r) => ({
         id: r.id,
         author: r.author,
         avatar: r.avatar,
@@ -41,7 +41,6 @@ export class ReviewService {
       total,
       page,
       limit,
-      totalPages: Math.ceil(total / limit),
-    };
+    );
   }
 }

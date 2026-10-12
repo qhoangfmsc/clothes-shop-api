@@ -1,3 +1,4 @@
+import { ACTIVE_STATUSES, PRODUCT_BADGES } from '@common/constants/enum-values.constant';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { ArrayMinSize, IsArray, IsIn, IsNotEmpty, IsNumber, IsOptional, IsString, MaxLength, Min, ValidateNested } from 'class-validator';
@@ -60,11 +61,10 @@ export class CreateProductDto {
   @IsNotEmpty()
   subcategoryId: string;
 
-  @ApiPropertyOptional({ example: 'new' })
-  @IsString()
+  @ApiPropertyOptional({ enum: PRODUCT_BADGES, example: 'new', nullable: true })
+  @IsIn(PRODUCT_BADGES)
   @IsOptional()
-  @MaxLength(50)
-  badge?: string;
+  badge?: string | null;
 
   @ApiProperty({ example: 'Áo thun cotton cao cấp...' })
   @IsString()
@@ -101,10 +101,10 @@ export class CreateProductDto {
   @IsString({ each: true })
   tags: string[];
 
-  @ApiPropertyOptional({ default: 'active', enum: ['active', 'disabled'] })
+  @ApiPropertyOptional({ default: 'active', enum: ACTIVE_STATUSES })
   @IsString()
   @IsOptional()
-  @IsIn(['active', 'disabled'])
+  @IsIn(ACTIVE_STATUSES)
   @MaxLength(20)
   status?: string;
 }
@@ -157,11 +157,10 @@ export class UpdateProductDto {
   @IsOptional()
   subcategoryId?: string;
 
-  @ApiPropertyOptional()
-  @IsString()
+  @ApiPropertyOptional({ enum: PRODUCT_BADGES, nullable: true })
+  @IsIn(PRODUCT_BADGES)
   @IsOptional()
-  @MaxLength(50)
-  badge?: string;
+  badge?: string | null;
 
   @ApiPropertyOptional()
   @IsString()
@@ -201,10 +200,10 @@ export class UpdateProductDto {
   @IsOptional()
   tags?: string[];
 
-  @ApiPropertyOptional({ enum: ['active', 'disabled'] })
+  @ApiPropertyOptional({ enum: ACTIVE_STATUSES })
   @IsString()
   @IsOptional()
-  @IsIn(['active', 'disabled'])
+  @IsIn(ACTIVE_STATUSES)
   @MaxLength(20)
   status?: string;
 }

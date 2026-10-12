@@ -1,37 +1,16 @@
-import { sortValues } from '@common/base/sort.util';
+import { SortField } from '@common/decorator/sort-field.decorator';
+import { PaginationQueryDto } from '@common/dto/pagination-query.dto';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsIn, IsOptional, IsString } from 'class-validator';
+import { ORDER_STATUSES } from './admin-order.dto';
 
-export class PublicOrderQueryDto {
-  @ApiPropertyOptional({ enum: ['pending', 'confirmed', 'shipping', 'delivered', 'completed', 'cancelled'] })
+export class PublicOrderQueryDto extends PaginationQueryDto {
+  @ApiPropertyOptional({ enum: ORDER_STATUSES, description: 'Filter by order status' })
   @IsOptional()
   @IsString()
-  @IsIn(['pending', 'confirmed', 'shipping', 'delivered', 'completed', 'cancelled'])
+  @IsIn(ORDER_STATUSES)
   status?: string;
 
-  @ApiPropertyOptional({
-    enum: sortValues(['createdAt']),
-    description: 'Sort: field = ASC, -field = DESC. Mặc định: -createdAt',
-    example: '-createdAt',
-  })
-  @IsOptional()
-  @IsString()
-  @IsIn(sortValues(['createdAt']))
+  @SortField(['createdAt'], '-createdAt')
   sort?: string;
-
-  @ApiPropertyOptional({ type: Number, minimum: 1, default: 1 })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  page?: number;
-
-  @ApiPropertyOptional({ type: Number, minimum: 1, maximum: 200, default: 24 })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(200)
-  limit?: number;
 }

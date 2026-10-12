@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import { paginated } from '@common/base/pagination.util';
 import { typeormListQuery } from '@common/base/typeorm-list-query.util';
 import { throwAppError } from '@common/exceptions/app.exception';
 import { EMediaErrorCode } from '@common/exceptions/error-codes';
@@ -53,12 +54,14 @@ export class MediaService {
   async findAll(query: MediaQueryDto) {
     // Chỉ đọc DB — không cần cấu hình storage
     const qb = this.mediaRepo.createQueryBuilder('m');
-    const { items, total, page, limit, totalPages } = await typeormListQuery(qb, 'm', query, {
-      sortableColumns: ['createdAt', 'name', 'size'],
-      searchableColumns: ['name'],
-    });
+    const { items, total, page, limit } = await typeormListQuery(qb, 'm', query, { searchableColumns: ['name'] });
 
-    return { data: items.map((m) => this.toDto(m)), total, page, limit, totalPages };
+    return paginated(
+      items.map((m) => this.toDto(m)),
+      total,
+      page,
+      limit,
+    );
   }
 
   async upload(file?: Express.Multer.File) {

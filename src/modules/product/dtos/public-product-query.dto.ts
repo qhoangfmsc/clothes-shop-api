@@ -1,13 +1,13 @@
-import { sortValues } from '@common/base/sort.util';
+import { PRODUCT_BADGES } from '@common/constants/enum-values.constant';
+import { SearchField } from '@common/decorator/search-field.decorator';
+import { SortField } from '@common/decorator/sort-field.decorator';
+import { PaginationQueryDto } from '@common/dto/pagination-query.dto';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 
-export class PublicProductQueryDto {
-  @ApiPropertyOptional({ description: 'Search product name, slug, or description' })
-  @IsOptional()
-  @IsString()
-  @MaxLength(255)
+export class PublicProductQueryDto extends PaginationQueryDto {
+  @SearchField('Search product name, slug, or description')
   search?: string;
 
   @ApiPropertyOptional({ description: 'Filter by category slug' })
@@ -22,20 +22,13 @@ export class PublicProductQueryDto {
   @MaxLength(255)
   subcategory?: string;
 
-  @ApiPropertyOptional({ enum: ['new', 'sale', 'bestseller'] })
+  @ApiPropertyOptional({ enum: PRODUCT_BADGES, description: 'Filter by badge' })
   @IsOptional()
   @IsString()
-  @IsIn(['new', 'sale', 'bestseller'])
+  @IsIn(PRODUCT_BADGES)
   badge?: string;
 
-  @ApiPropertyOptional({
-    enum: sortValues(['price', 'name', 'createdAt']),
-    description: 'Sort: field = ASC, -field = DESC. Mặc định: -createdAt',
-    example: 'price',
-  })
-  @IsOptional()
-  @IsString()
-  @IsIn(sortValues(['price', 'name', 'createdAt']))
+  @SortField(['price', 'name', 'createdAt'], '-createdAt')
   sort?: string;
 
   @ApiPropertyOptional({ type: Number, minimum: 0 })
@@ -63,19 +56,4 @@ export class PublicProductQueryDto {
   @IsString()
   @MaxLength(255)
   colors?: string;
-
-  @ApiPropertyOptional({ type: Number, minimum: 1, default: 1 })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  page?: number;
-
-  @ApiPropertyOptional({ type: Number, minimum: 1, maximum: 200, default: 24 })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(200)
-  limit?: number;
 }
