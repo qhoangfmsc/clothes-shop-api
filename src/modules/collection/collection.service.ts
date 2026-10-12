@@ -2,7 +2,7 @@ import { getPaging, paginated } from '@common/base/pagination.util';
 import { parseSort } from '@common/base/sort.util';
 import { throwAppError } from '@common/exceptions/app.exception';
 import { ECollectionErrorCode } from '@common/exceptions/error-codes';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { FindOptionsOrder, FindOptionsWhere, ILike, In, Repository } from 'typeorm';
 import { Product } from '../product/product.entity';
@@ -71,7 +71,7 @@ export class CollectionService {
       relations: ['products', 'products.category', 'products.subcategory'],
     });
     if (!collection) {
-      throw new NotFoundException('Collection not found');
+      throwAppError(ECollectionErrorCode.COLLECTION_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
     }
 
     return { data: collection, products: collection.products };
@@ -143,7 +143,7 @@ export class CollectionService {
       relations: ['products'],
     });
     if (!collection) {
-      throw new NotFoundException('Collection not found');
+      throwAppError(ECollectionErrorCode.COLLECTION_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
     }
 
     if (dto.slug && dto.slug !== collection.slug) {
@@ -164,7 +164,7 @@ export class CollectionService {
   async delete(id: string) {
     const collection = await this.collectionRepo.findOne({ where: { id } });
     if (!collection) {
-      throw new NotFoundException('Collection not found');
+      throwAppError(ECollectionErrorCode.COLLECTION_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
     }
     await this.collectionRepo.remove(collection);
     return { message: 'Collection deleted successfully' };

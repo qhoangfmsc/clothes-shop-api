@@ -39,7 +39,7 @@ Nguồn chuẩn: mục **List API Standards** trong `CLAUDE.md`. Skill này là 
    Query builder có join 1-nhiều thì paginate trên bảng chính trước rồi load quan hệ riêng (xem `CategoryService.findAllPublic`).
 6. **Controller**: `@Query() query: XxxQueryDto`; thêm `@Permissions(...)` đúng quyền cho route admin.
 7. **Test**: chạy `yarn test`. `src/common/dto/list-query.dto.spec.ts` tự quét mọi `*-query.dto.ts`. DTO không phải list thì thêm vào `NOT_LIST_DTO_FILES`, kèm lý do.
-8. **FE**: nếu hành vi thay đổi so với trước (default, tên param, giá trị sort, shape) → ghi vào `docs/fe-api-changes-<ngày>.md`.
+8. **Docs (bắt buộc)**: trước khi sửa, đọc `docs/modules/<module>.md` của module (skill `module-docs`, giai đoạn A); sau khi sửa, cập nhật mục 4.1 (query/response) và 4.8 nếu có lệch chuẩn, đổi `Cập nhật lần cuối`. Chưa cập nhật docs = chưa xong. Không tạo tài liệu riêng cho FE.
 
 ## Cấm
 

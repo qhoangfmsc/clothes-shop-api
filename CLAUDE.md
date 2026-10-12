@@ -98,7 +98,21 @@ Khi tạo hoặc sửa API list, dùng skill `list-api` (`.claude/skills/list-ap
 
 **Guard**: `src/common/dto/list-query.dto.spec.ts` tự quét mọi `*-query.dto.ts` và kiểm tra kế thừa `PaginationQueryDto`, default 1/25, `limit <= 200`, `sorts` bị từ chối, whitelist sort. Query DTO không phải list (vd autocomplete) thêm vào `NOT_LIST_DTO_FILES` trong spec đó. Thêm hoặc sửa list API → chạy `yarn test`.
 
-**Thay đổi chuẩn/hành vi API** (đổi default, đổi sort, đổi shape...) phải cập nhật `docs/fe-api-changes-*.md` để FE recheck.
+**Thay đổi chuẩn/hành vi API** (đổi default, đổi sort, đổi shape...) phải cập nhật file module tương ứng trong `docs/modules/` (và `docs/modules/common.md` nếu chạm helper dùng chung). Không viết tài liệu riêng cho FE.
+
+## Docs (`docs/`) — quy trình khép kín Docs → Feature → Docs (BẮT BUỘC)
+
+`docs/` là tài liệu BE thực tế theo **từng module**: `docs/modules/<module>.md` (mục lục `docs/README.md`, hạ tầng dùng chung ở `docs/modules/common.md`). Chỉ ghi những gì đã có trong code; KHÔNG viết tài liệu FE, roadmap, kế hoạch.
+
+Mọi việc chạm `src/modules`, `src/common`, `src/core`, `src/migrations` phải đi đủ 3 bước, đúng thứ tự:
+
+1. **Đọc & hiểu trước**: đọc `docs/modules/<module>.md` + code thực tế của mọi module bị ảnh hưởng (tạo module mới thì đọc `docs/README.md` + `common.md`). Chưa hiểu thì hỏi, không đoán, không code.
+2. **Làm feature**: theo các chuẩn trong file này.
+3. **Viết / cập nhật docs ngay trong cùng lượt**: tạo `docs/modules/<module>.md` (module mới) hoặc sửa các mục bị ảnh hưởng (module cũ) + `common.md` nếu chạm phần dùng chung.
+
+**Chưa cập nhật docs = chưa xong.** Báo cáo cuối phải nêu file docs đã tạo/sửa. Chỉ được bỏ qua docs khi thay đổi không đổi hành vi (đổi tên biến nội bộ, format, comment, test thuần) và phải nói rõ.
+
+Luật: `.claude/rules/module-docs.md` · Quy trình + template + checklist: skill `module-docs` (`.claude/skills/module-docs/`).
 
 ## Migration Convention
 

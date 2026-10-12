@@ -14,7 +14,7 @@ export class AdminProductController {
 
   @Get()
   @ApiOperation({ summary: '[Admin] Danh sách sản phẩm (search, filter, sort, pagination)' })
-  @Permissions(Permission.PRODUCT_CREATE)
+  @Permissions(Permission.PRODUCT_VIEW)
   findAll(@Query() query: AdminProductQueryDto) {
     return this.productService.findAllAdmin(query);
   }

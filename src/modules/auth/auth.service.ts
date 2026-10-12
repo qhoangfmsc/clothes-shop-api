@@ -5,13 +5,8 @@ import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../user/user.entity';
+import { DEFAULT_JWT_SECRET, JwtPayload, JwtTokenType } from './auth.constant';
 import { GoogleAuthService, GoogleUserPayload } from './google-auth.service';
-
-interface JwtPayload {
-  sub: string;
-  email: string;
-  role: string;
-}
 
 @Injectable()
 export class AuthService {
@@ -93,9 +88,11 @@ export class AuthService {
    */
   async refreshToken(refreshToken: string) {
     try {
-      const payload = this.jwtService.verify<JwtPayload>(refreshToken, {
-        secret: this.configService.get<string>('JWT_SECRET'),
-      });
+      const payload = this.jwtService.verify<JwtPayload>(refreshToken, { secret: this.jwtSecret });
+      // Chỉ nhận refresh token — access token (hoặc token cũ không có claim `type`) không đổi được lấy token mới
+      if (payload.type !== 'refresh') {
+        throw new UnauthorizedException('Invalid refresh token');
+      }
 
       const user = await this.userRepo.findOne({ where: { id: payload.sub } });
       if (!user || user.status !== 'active') {
@@ -109,26 +106,23 @@ export class AuthService {
     }
   }
 
+  private get jwtSecret(): string {
+    return this.configService.get<string>('JWT_SECRET', DEFAULT_JWT_SECRET);
+  }
+
   private generateTokens(user: User) {
-    const accessToken = this.generateAccessToken(user);
-    const refreshToken = this.jwtService.sign(
-      { sub: user.id, email: user.email, role: user.role },
-      {
-        secret: this.configService.get<string>('JWT_SECRET'),
-        expiresIn: this.configService.get('JWT_REFRESH_EXPIRES_IN', '30d') as any,
-      },
-    );
-    return { accessToken, refreshToken };
+    return { accessToken: this.generateAccessToken(user), refreshToken: this.signToken(user, 'refresh') };
   }
 
   private generateAccessToken(user: User): string {
-    return this.jwtService.sign(
-      { sub: user.id, email: user.email, role: user.role },
-      {
-        secret: this.configService.get<string>('JWT_SECRET'),
-        expiresIn: this.configService.get('JWT_EXPIRES_IN', '1d') as any,
-      },
-    );
+    return this.signToken(user, 'access');
+  }
+
+  private signToken(user: User, type: JwtTokenType): string {
+    const expiresIn =
+      type === 'access' ? this.configService.get('JWT_EXPIRES_IN', '1d') : this.configService.get('JWT_REFRESH_EXPIRES_IN', '30d');
+    const payload: JwtPayload = { sub: user.id, email: user.email, role: user.role, type };
+    return this.jwtService.sign(payload, { secret: this.jwtSecret, expiresIn: expiresIn as any });
   }
 
   private sanitizeUser(user: User) {

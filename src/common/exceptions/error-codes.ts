@@ -15,9 +15,6 @@ export enum EProductErrorCode {
   PRODUCT_SKU_DUPLICATE = 1003,
   PRODUCT_CATEGORY_NOT_FOUND = 1004,
   PRODUCT_SUBCATEGORY_MISMATCH = 1005,
-  PRODUCT_SIZES_REQUIRED = 1006,
-  PRODUCT_COLORS_REQUIRED = 1007,
-  PRODUCT_IMAGES_REQUIRED = 1008,
   PRODUCT_INVALID_PRICE = 1009,
 }
 
@@ -50,6 +47,7 @@ export enum ECollectionErrorCode {
 export enum EOrderErrorCode {
   ORDER_NOT_FOUND = 1301,
   ORDER_STATUS_INVALID_TRANSITION = 1302,
+  ORDER_PRODUCT_NOT_ORDERABLE = 1303,
 }
 
 // ============================================
@@ -97,9 +95,6 @@ export const ErrorMessages: Record<number, string> = {
   [EProductErrorCode.PRODUCT_SKU_DUPLICATE]: 'Product SKU already exists',
   [EProductErrorCode.PRODUCT_CATEGORY_NOT_FOUND]: 'Category or subcategory not found',
   [EProductErrorCode.PRODUCT_SUBCATEGORY_MISMATCH]: 'Subcategory does not belong to the specified category',
-  [EProductErrorCode.PRODUCT_SIZES_REQUIRED]: 'Product must have at least one size',
-  [EProductErrorCode.PRODUCT_COLORS_REQUIRED]: 'Product must have at least one color',
-  [EProductErrorCode.PRODUCT_IMAGES_REQUIRED]: 'Product must have at least one image',
   [EProductErrorCode.PRODUCT_INVALID_PRICE]: 'originalPrice must be greater than or equal to price',
   [ECategoryErrorCode.CATEGORY_NOT_FOUND]: 'Category not found',
   [ECategoryErrorCode.CATEGORY_SLUG_DUPLICATE]: 'Category slug already exists',
@@ -114,6 +109,7 @@ export const ErrorMessages: Record<number, string> = {
   [ECollectionErrorCode.COLLECTION_PRODUCT_NOT_FOUND]: 'One or more products not found',
   [EOrderErrorCode.ORDER_NOT_FOUND]: 'Order not found',
   [EOrderErrorCode.ORDER_STATUS_INVALID_TRANSITION]: 'Invalid status transition',
+  [EOrderErrorCode.ORDER_PRODUCT_NOT_ORDERABLE]: 'Some products cannot be ordered (sold out or custom order)',
   [EUserErrorCode.USER_NOT_FOUND]: 'User not found',
   [EUserErrorCode.USER_CANNOT_MODIFY_SELF]: 'Cannot modify your own role or status',
   [ESiteConfigErrorCode.SITE_CONFIG_NOT_FOUND]: 'Site config not found',

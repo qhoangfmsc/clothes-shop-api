@@ -1,4 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { throwAppError } from '@common/exceptions/app.exception';
+import { EProductErrorCode } from '@common/exceptions/error-codes';
+import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Product } from '../product/product.entity';
@@ -25,7 +27,7 @@ export class WishlistService {
   async add(userId: string, productId: string) {
     // Validate product exists
     const product = await this.productRepo.findOne({ where: { id: productId } });
-    if (!product) throw new NotFoundException('Product not found');
+    if (!product) throwAppError(EProductErrorCode.PRODUCT_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
 
     const existing = await this.wishlistRepo.findOne({ where: { userId, productId } });
     if (existing) return { data: existing, created: false };

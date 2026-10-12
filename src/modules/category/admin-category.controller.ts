@@ -14,7 +14,7 @@ export class AdminCategoryController {
 
   @Get()
   @ApiOperation({ summary: '[Admin] Danh sách danh mục (search, sort, pagination)' })
-  @Permissions(Permission.CATEGORY_CREATE)
+  @Permissions(Permission.CATEGORY_VIEW)
   findAll(@Query() query: AdminCategoryQueryDto) {
     return this.categoryService.findAllAdmin(query);
   }

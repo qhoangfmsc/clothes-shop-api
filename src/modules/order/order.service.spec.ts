@@ -8,13 +8,13 @@ import { OrderService } from './order.service';
 
 type Item = { id: string; productId: string; quantity: number; size: string; color: string; product: any };
 
-const item = (id: string, price: number, quantity = 1, status = 'active'): Item => ({
+const item = (id: string, price: number, quantity = 1, status = 'active', badge: string | null = null): Item => ({
   id,
   productId: `p-${id}`,
   quantity,
   size: 'M',
   color: 'black',
-  product: { name: `Product ${id}`, price, status, images: [] },
+  product: { name: `Product ${id}`, price, status, badge, images: [] },
 });
 
 function setup(cartItems: Item[]) {
@@ -119,6 +119,33 @@ describe('OrderService.checkout', () => {
   it('ignores inactive products that are not selected', async () => {
     const { service, savedItems } = setup([item('1', 20), item('2', 30, 1, 'disabled')]);
     await service.checkout('u1', { ...base, cartItemIds: ['1'] });
+    expect(savedItems).toHaveLength(1);
+  });
+
+  it.each(['sold_out', 'custom_order'])('rejects a selected %s product with error 1303 and changes nothing', async (badge) => {
+    const { service, manager, deleted } = setup([item('1', 20), item('2', 30, 1, 'active', badge)]);
+    await expect(service.checkout('u1', { ...base, cartItemIds: ['1', '2'] })).rejects.toMatchObject({
+      status: 400,
+      response: { errorCode: 1303, message: expect.stringContaining('Product 2') },
+    });
+    expect(manager.save).not.toHaveBeenCalled();
+    expect(deleted).toHaveLength(0);
+  });
+
+  it('rejects the whole-cart checkout when the cart holds a sold_out product', async () => {
+    const { service } = setup([item('1', 20), item('2', 30, 1, 'active', 'sold_out')]);
+    await expect(service.checkout('u1', base)).rejects.toMatchObject({ response: { errorCode: 1303 } });
+  });
+
+  it('ignores sold_out / custom_order products that are not selected', async () => {
+    const { service, savedItems } = setup([item('1', 20), item('2', 30, 1, 'active', 'custom_order')]);
+    await service.checkout('u1', { ...base, cartItemIds: ['1'] });
+    expect(savedItems.map((i) => i.productId)).toEqual(['p-1']);
+  });
+
+  it.each(['new', 'sale', 'bestseller', 'limited'])('still orders a %s product', async (badge) => {
+    const { service, savedItems } = setup([item('1', 20, 1, 'active', badge)]);
+    await service.checkout('u1', base);
     expect(savedItems).toHaveLength(1);
   });
 

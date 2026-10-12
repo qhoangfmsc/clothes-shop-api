@@ -1,4 +1,7 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { NON_ORDERABLE_BADGES } from '@common/constants/enum-values.constant';
+import { throwAppError } from '@common/exceptions/app.exception';
+import { EOrderErrorCode, EProductErrorCode } from '@common/exceptions/error-codes';
+import { BadRequestException, HttpStatus, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Product } from '../product/product.entity';
@@ -64,8 +67,15 @@ export class CartService {
 
     // Validate product exists and is active
     const product = await this.productRepo.findOne({ where: { id: dto.productId } });
-    if (!product) throw new NotFoundException('Product not found');
+    if (!product) throwAppError(EProductErrorCode.PRODUCT_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
     if (product.status !== 'active') throw new BadRequestException('Product is not available');
+    // sold_out / custom_order không thêm vào giỏ được (cùng mã lỗi với checkout để FE xử lý một chỗ)
+    if (product.badge && NON_ORDERABLE_BADGES.includes(product.badge)) {
+      throwAppError(
+        EOrderErrorCode.ORDER_PRODUCT_NOT_ORDERABLE,
+        `Product cannot be added to cart (sold out or custom order): ${product.name}`,
+      );
+    }
 
     // Check if same product+size+color already in cart
     const existing = await this.cartItemRepo.findOne({

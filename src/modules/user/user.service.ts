@@ -2,7 +2,7 @@ import { getPaging, paginated } from '@common/base/pagination.util';
 import { parseSort } from '@common/base/sort.util';
 import { throwAppError } from '@common/exceptions/app.exception';
 import { EUserErrorCode } from '@common/exceptions/error-codes';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { FindOptionsOrder, FindOptionsWhere, ILike, Repository } from 'typeorm';
 import { AdminUserQueryDto } from './dtos/admin-user-query.dto';
@@ -67,7 +67,7 @@ export class UserService {
   async findOne(id: string) {
     const user = await this.userRepo.findOne({ where: { id } });
     if (!user) {
-      throw new NotFoundException('User not found');
+      throwAppError(EUserErrorCode.USER_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
     }
 
     return {
@@ -89,7 +89,7 @@ export class UserService {
   async update(id: string, dto: UpdateUserDto, currentUserId?: string) {
     const user = await this.userRepo.findOne({ where: { id } });
     if (!user) {
-      throw new NotFoundException('User not found');
+      throwAppError(EUserErrorCode.USER_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
     }
 
     // Không cho admin tự sửa role hoặc disable chính mình

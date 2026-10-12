@@ -14,7 +14,7 @@ export class AdminCollectionController {
 
   @Get()
   @ApiOperation({ summary: '[Admin] Danh sách bộ sưu tập (search, filter, sort, pagination)' })
-  @Permissions(Permission.COLLECTION_CREATE)
+  @Permissions(Permission.COLLECTION_VIEW)
   findAll(@Query() query: AdminCollectionQueryDto) {
     return this.collectionService.findAllAdmin(query);
   }

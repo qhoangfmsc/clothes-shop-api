@@ -2,13 +2,14 @@ import { getPaging, paginated } from '@common/base/pagination.util';
 import { parseSort } from '@common/base/sort.util';
 import { throwAppError } from '@common/exceptions/app.exception';
 import { EProductErrorCode } from '@common/exceptions/error-codes';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { FindOptionsOrder, FindOptionsWhere, ILike, Not, Repository } from 'typeorm';
 import { Category } from '../category/category.entity';
 import { SubCategory } from '../category/sub-category.entity';
 import { AdminProductQueryDto } from './dtos/admin-product-query.dto';
 import { CreateProductDto, UpdateProductDto } from './dtos/product.dto';
+import { AUTOCOMPLETE_DEFAULT_LIMIT, ProductAutocompleteQueryDto } from './dtos/product-autocomplete-query.dto';
 import { PublicProductQueryDto } from './dtos/public-product-query.dto';
 import { Product } from './product.entity';
 
@@ -142,14 +143,19 @@ export class ProductService {
     return paginated(data, total, page, limit);
   }
 
-  async autocomplete(q: string) {
+  async autocomplete({ q, limit = AUTOCOMPLETE_DEFAULT_LIMIT }: ProductAutocompleteQueryDto) {
+    const keyword = q.replace(/[\\%_]/g, '\\$&');
+
     const results = await this.productRepo
       .createQueryBuilder('p')
-      .select(['p.id', 'p.name', 'p.slug', 'p.price', 'p.images', 'p.status'])
+      .select(['p.id', 'p.name', 'p.slug', 'p.price', 'p.images', 'p.badge', 'p.status'])
+      .addSelect('CASE WHEN p.name ILIKE :prefix THEN 0 ELSE 1 END', 'match_rank')
       .where('p.status = :status', { status: 'active' })
-      .andWhere('(p.name ILIKE :q OR p.slug ILIKE :q)', { q: `${q}%` })
-      .orderBy('p.name', 'ASC')
-      .take(8)
+      .andWhere('(p.name ILIKE :contains OR p.slug ILIKE :contains)', { contains: `%${keyword}%` })
+      .setParameter('prefix', `${keyword}%`)
+      .orderBy('match_rank', 'ASC')
+      .addOrderBy('p.name', 'ASC')
+      .limit(limit)
       .getMany();
 
     return {
@@ -159,6 +165,7 @@ export class ProductService {
         slug: p.slug,
         price: Number(p.price),
         image: p.images?.[0] ?? null,
+        badge: p.badge ?? null,
       })),
     };
   }
@@ -169,7 +176,7 @@ export class ProductService {
       relations: ['category', 'subcategory'],
     });
     if (!product) {
-      throw new NotFoundException('Product not found');
+      throwAppError(EProductErrorCode.PRODUCT_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
     }
 
     // Related products: same category, exclude self, active only
@@ -271,7 +278,7 @@ export class ProductService {
       where: { id },
       relations: ['category', 'subcategory'],
     });
-    if (!product) throw new NotFoundException('Product not found');
+    if (!product) throwAppError(EProductErrorCode.PRODUCT_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
 
     if (dto.slug && dto.slug !== product.slug) await this.ensureSlugUnique(dto.slug);
     if (dto.sku && dto.sku !== product.sku) await this.ensureSkuUnique(dto.sku);
@@ -314,7 +321,7 @@ export class ProductService {
 
   async delete(id: string) {
     const product = await this.productRepo.findOne({ where: { id } });
-    if (!product) throw new NotFoundException('Product not found');
+    if (!product) throwAppError(EProductErrorCode.PRODUCT_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
     await this.productRepo.remove(product);
     return { message: 'Product deleted successfully' };
   }

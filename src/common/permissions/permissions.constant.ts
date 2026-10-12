@@ -58,6 +58,7 @@ export enum Permission {
   PRODUCT_CREATE = 6000,
   PRODUCT_UPDATE = 6001,
   PRODUCT_DELETE = 6002,
+  PRODUCT_VIEW = 6003,
 
   // ============================================
   // CATEGORY ADMIN (70xx)
@@ -65,6 +66,7 @@ export enum Permission {
   CATEGORY_CREATE = 7000,
   CATEGORY_UPDATE = 7001,
   CATEGORY_DELETE = 7002,
+  CATEGORY_VIEW = 7003,
 
   // ============================================
   // COLLECTION ADMIN (80xx)
@@ -72,6 +74,7 @@ export enum Permission {
   COLLECTION_CREATE = 8000,
   COLLECTION_UPDATE = 8001,
   COLLECTION_DELETE = 8002,
+  COLLECTION_VIEW = 8003,
 
   // ============================================
   // ORDER ADMIN (90xx)

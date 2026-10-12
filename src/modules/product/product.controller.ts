@@ -20,7 +20,7 @@ export class ProductController {
   @Get('autocomplete')
   @ApiOperation({ summary: 'Search product suggestions for autocomplete (min 2 chars)' })
   async autocomplete(@Query() query: ProductAutocompleteQueryDto) {
-    return this.productService.autocomplete(query.q);
+    return this.productService.autocomplete(query);
   }
 
   @Get(':id')

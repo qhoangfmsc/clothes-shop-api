@@ -2,7 +2,7 @@ import { getPaging, paginated } from '@common/base/pagination.util';
 import { parseSort } from '@common/base/sort.util';
 import { throwAppError } from '@common/exceptions/app.exception';
 import { ECategoryErrorCode } from '@common/exceptions/error-codes';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, FindOptionsOrder, FindOptionsWhere, ILike, In, Repository } from 'typeorm';
 import { Category } from './category.entity';
@@ -97,7 +97,7 @@ export class CategoryService {
   async findBySlug(slug: string) {
     const category = await this.categoryRepo.findOne({ where: { slug } });
     if (!category) {
-      throw new NotFoundException('Category not found');
+      throwAppError(ECategoryErrorCode.CATEGORY_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
     }
 
     return {
@@ -173,7 +173,7 @@ export class CategoryService {
   async update(id: string, dto: UpdateCategoryDto) {
     const exists = await this.categoryRepo.exists({ where: { id } });
     if (!exists) {
-      throw new NotFoundException('Category not found');
+      throwAppError(ECategoryErrorCode.CATEGORY_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
     }
 
     const { subcategories, priority, ...rest } = dto;
@@ -198,7 +198,7 @@ export class CategoryService {
         }
         const category = await manager.findOne(Category, { where: { id } });
         if (!category) {
-          throw new NotFoundException('Category not found');
+          throwAppError(ECategoryErrorCode.CATEGORY_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
         }
 
         // Đồng bộ theo slug thay vì xoá hết tạo lại (xem reconcileSubCategories)
@@ -357,7 +357,7 @@ export class CategoryService {
         await this.lockPriorities(manager);
         const category = await manager.findOne(Category, { where: { id } });
         if (!category) {
-          throw new NotFoundException('Category not found');
+          throwAppError(ECategoryErrorCode.CATEGORY_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
         }
         const removedPriority = category.priority;
         await manager.remove(category);

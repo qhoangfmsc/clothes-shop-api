@@ -1,5 +1,6 @@
 import { getPaging, paginated } from '@common/base/pagination.util';
 import { parseSort } from '@common/base/sort.util';
+import { NON_ORDERABLE_BADGES } from '@common/constants/enum-values.constant';
 import { throwAppError } from '@common/exceptions/app.exception';
 import { EOrderErrorCode } from '@common/exceptions/error-codes';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
@@ -111,6 +112,13 @@ export class OrderService {
       if (missingProducts.length > 0) {
         const names = missingProducts.map((i) => i.product?.name || i.productId).join(', ');
         throw new BadRequestException(`Some products are no longer available: ${names}`);
+      }
+
+      // sold_out / custom_order không đặt được qua checkout thường (custom_order sẽ có luồng riêng)
+      const notOrderable = selectedItems.filter((item) => item.product?.badge && NON_ORDERABLE_BADGES.includes(item.product.badge));
+      if (notOrderable.length > 0) {
+        const names = [...new Set(notOrderable.map((i) => i.product.name))].join(', ');
+        throwAppError(EOrderErrorCode.ORDER_PRODUCT_NOT_ORDERABLE, `Some products cannot be ordered (sold out or custom order): ${names}`);
       }
 
       // Load & validate address

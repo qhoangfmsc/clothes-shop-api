@@ -12,10 +12,14 @@ import { MediaQueryDto } from './dtos/media-query.dto';
 import { MEDIA_ALLOWED_MIME_TYPES, MEDIA_KEY_PREFIX_LENGTH, MediaMimeType } from './media.constant';
 import { MediaFile } from './media-file.entity';
 
-interface StorageConfig {
+/** Phần cấu hình đủ để dựng URL công khai (không cần service key) */
+interface PublicStorageConfig {
   baseUrl: string;
-  serviceKey: string;
   bucket: string;
+}
+
+interface StorageConfig extends PublicStorageConfig {
+  serviceKey: string;
 }
 
 const STORAGE_TIMEOUT_MS = 15_000;
@@ -52,12 +56,14 @@ export class MediaService {
   }
 
   async findAll(query: MediaQueryDto) {
-    // Chỉ đọc DB — không cần cấu hình storage
+    // Chỉ đọc DB và dựng URL công khai — cần SUPABASE_URL + bucket, không cần service key.
+    // Kiểm tra 1 lần ở đầu để kết quả không phụ thuộc việc có file hay không.
+    const publicConfig = this.getPublicConfig();
     const qb = this.mediaRepo.createQueryBuilder('m');
     const { items, total, page, limit } = await typeormListQuery(qb, 'm', query, { searchableColumns: ['name'] });
 
     return paginated(
-      items.map((m) => this.toDto(m)),
+      items.map((m) => this.toDto(m, publicConfig)),
       total,
       page,
       limit,
@@ -97,7 +103,7 @@ export class MediaService {
       throw err;
     }
 
-    return { data: this.toDto(media) };
+    return { data: this.toDto(media, config) };
   }
 
   async delete(fileId: string) {
@@ -120,24 +126,38 @@ export class MediaService {
   // PRIVATE HELPERS
   // ============================================
 
-  /** Đọc cấu hình mỗi lần gọi; thiếu key/bucket → 503 kèm hướng dẫn cho FE */
-  private getConfig(): StorageConfig {
-    const url = this.configService.get<string>('SUPABASE_URL')?.trim();
-    const serviceKey = this.configService.get<string>('SUPABASE_SERVICE_ROLE_KEY')?.trim();
-    const bucket = this.configService.get<string>('SUPABASE_STORAGE_BUCKET')?.trim();
+  /** Đọc cấu hình mỗi lần gọi; thiếu biến nào → 503 kèm tên biến thiếu cho FE */
+  private readEnv() {
+    return {
+      url: this.configService.get<string>('SUPABASE_URL')?.trim(),
+      serviceKey: this.configService.get<string>('SUPABASE_SERVICE_ROLE_KEY')?.trim(),
+      bucket: this.configService.get<string>('SUPABASE_STORAGE_BUCKET')?.trim(),
+    };
+  }
 
-    const missing = [!url && 'SUPABASE_URL', !serviceKey && 'SUPABASE_SERVICE_ROLE_KEY', !bucket && 'SUPABASE_STORAGE_BUCKET'].filter(
-      Boolean,
+  private throwNotConfigured(missing: (string | false | undefined)[]): never {
+    return throwAppError(
+      EMediaErrorCode.MEDIA_NOT_CONFIGURED,
+      `Media storage is not configured. Missing env: ${missing.filter(Boolean).join(', ')}`,
+      HttpStatus.SERVICE_UNAVAILABLE,
     );
+  }
 
-    if (missing.length > 0 || !url || !serviceKey || !bucket) {
-      throwAppError(
-        EMediaErrorCode.MEDIA_NOT_CONFIGURED,
-        `Media storage is not configured. Missing env: ${missing.join(', ')}`,
-        HttpStatus.SERVICE_UNAVAILABLE,
-      );
+  /** Cấu hình tối thiểu để dựng URL công khai: SUPABASE_URL + SUPABASE_STORAGE_BUCKET */
+  private getPublicConfig(): PublicStorageConfig {
+    const { url, bucket } = this.readEnv();
+    if (!url || !bucket) {
+      this.throwNotConfigured([!url && 'SUPABASE_URL', !bucket && 'SUPABASE_STORAGE_BUCKET']);
     }
+    return { baseUrl: url.replace(/\/+$/, ''), bucket };
+  }
 
+  /** Cấu hình đầy đủ để gọi Storage API (thêm SUPABASE_SERVICE_ROLE_KEY) */
+  private getConfig(): StorageConfig {
+    const { url, serviceKey, bucket } = this.readEnv();
+    if (!url || !serviceKey || !bucket) {
+      this.throwNotConfigured([!url && 'SUPABASE_URL', !serviceKey && 'SUPABASE_SERVICE_ROLE_KEY', !bucket && 'SUPABASE_STORAGE_BUCKET']);
+    }
     return { baseUrl: url.replace(/\/+$/, ''), serviceKey, bucket };
   }
 
@@ -188,7 +208,7 @@ export class MediaService {
     }
   }
 
-  private publicUrl(config: StorageConfig, key: string): string {
+  private publicUrl(config: PublicStorageConfig, key: string): string {
     return `${config.baseUrl}/storage/v1/object/public/${encodeURIComponent(config.bucket)}/${encodeURIComponent(key)}`;
   }
 
@@ -201,14 +221,14 @@ export class MediaService {
     await this.assertOk(res, 'delete');
   }
 
-  private toDto(m: MediaFile): MediaFileDto {
+  private toDto(m: MediaFile, config: PublicStorageConfig): MediaFileDto {
     return {
       id: m.id,
       name: m.name,
       mimeType: m.mimeType,
       sizeOriginal: m.size,
       createdAt: m.createdAt.toISOString(),
-      url: this.publicUrl(this.getConfig(), m.storageKey),
+      url: this.publicUrl(config, m.storageKey),
     };
   }
 
