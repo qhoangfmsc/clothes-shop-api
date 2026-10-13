@@ -1,3 +1,4 @@
+import { ORDER_PAYMENT_STATUSES } from '@common/constants/enum-values.constant';
 import { SearchField } from '@common/decorator/search-field.decorator';
 import { SortField } from '@common/decorator/sort-field.decorator';
 import { PaginationQueryDto } from '@common/dto/pagination-query.dto';
@@ -20,6 +21,12 @@ export class AdminOrderQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsIn(ORDER_STATUSES)
   status?: string;
+
+  @ApiPropertyOptional({ enum: ORDER_PAYMENT_STATUSES, description: 'Filter by payment status' })
+  @IsString()
+  @IsOptional()
+  @IsIn(ORDER_PAYMENT_STATUSES)
+  paymentStatus?: string;
 
   @SortField(['createdAt', 'total'], '-createdAt')
   sort?: string;

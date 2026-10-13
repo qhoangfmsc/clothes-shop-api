@@ -1,64 +1,23 @@
 import { Public } from '@common/decorator/public.decorator';
 import { Controller, Get } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ShippingConfigService } from './shipping-config.service';
 
 /**
- * Static shipping data — no DB needed for now.
- * Matches FE ShippingInfo type.
+ * Mọi thông tin (phí ship, ngưỡng miễn phí, nội dung phương thức, chính sách đổi trả) lấy từ `SHIPPING_CONFIG`
+ * (site-config, admin chỉnh được) — cùng nguồn với phí tính khi checkout.
+ * Không còn `notes`: các câu ghi chú cố định trước đây (gói quà, giao quốc tế) không phải tính năng có thật.
  */
-const SHIPPING_DATA = {
-  methods: [
-    {
-      id: 'standard',
-      name: 'Standard Shipping',
-      description: 'Delivered in eco-friendly packaging',
-      estimatedDays: '5-7 business days',
-      price: 8,
-      freeAbove: 150,
-      icon: 'truck' as const,
-    },
-    {
-      id: 'express',
-      name: 'Express Shipping',
-      description: 'Priority handling and faster delivery',
-      estimatedDays: '2-3 business days',
-      price: 15,
-      icon: 'express' as const,
-    },
-    {
-      id: 'store-pickup',
-      name: 'Store Pickup',
-      description: 'Pick up at our flagship store',
-      estimatedDays: '1-2 business days',
-      price: 0,
-      icon: 'store' as const,
-    },
-  ],
-  returnPolicy: {
-    days: 30,
-    description: 'We accept returns within 30 days of purchase for a full refund.',
-    conditions: [
-      'Items must be unworn and in original condition',
-      'All tags must be attached',
-      'Original packaging required',
-      'Sale items are final sale',
-    ],
-  },
-  freeShippingThreshold: 150,
-  notes: [
-    'Free standard shipping on orders over $150',
-    'International shipping available to select countries',
-    'Gift wrapping available at checkout (+$5)',
-  ],
-};
-
 @ApiTags('Shipping')
 @Controller('api/shipping')
 @Public()
 export class ShippingController {
+  constructor(private readonly shippingConfigService: ShippingConfigService) {}
+
   @Get()
-  @ApiOperation({ summary: 'Get shipping methods and return policy' })
-  getShippingInfo() {
-    return { data: SHIPPING_DATA };
+  @ApiOperation({ summary: 'Get shipping methods, free-shipping threshold and return policy' })
+  async getShippingInfo() {
+    const { methods, freeShippingThreshold, returnPolicy } = await this.shippingConfigService.get();
+    return { data: { methods, returnPolicy, freeShippingThreshold } };
   }
 }

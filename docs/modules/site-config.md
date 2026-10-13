@@ -1,10 +1,10 @@
 # site-config (`src/modules/site-config`)
 
-> Cập nhật lần cuối: 2026-10-12
+> Cập nhật lần cuối: 2026-10-13
 
 ## 1. Tổng quan
 
-Module cấu hình nội dung trang theo `key` (hiện là các banner). Mỗi key gắn với đúng một `type`; `value` là chuỗi do FE/admin tự định hình (thường là `JSON.stringify` của một mảng), BE không diễn giải bên trong.
+Module cấu hình theo `key`: các banner nội dung trang và cấu hình phí ship. Mỗi key gắn với đúng một `type`; `value` là chuỗi JSON. Với banner, FE/admin tự định hình nội dung và BE không diễn giải; riêng key mà BE đọc để tính toán (`SHIPPING_CONFIG`) có validator cấu trúc riêng.
 
 | Mục | Giá trị |
 |---|---|
@@ -16,7 +16,7 @@ Module cấu hình nội dung trang theo `key` (hiện là các banner). Mỗi k
 
 ## 2. Mục đích & nghiệp vụ phục vụ
 
-Admin chỉnh nội dung hero/banner ở các vị trí cố định của trang (Shop, New In, Collections, menu điều hướng) mà không cần deploy; FE công khai đọc theo key để render.
+Admin chỉnh nội dung hero/banner ở các vị trí cố định của trang (Shop, New In, Collections, menu điều hướng) và phí ship/ngưỡng miễn phí ship mà không cần deploy; FE công khai đọc theo key để render, BE đọc `SHIPPING_CONFIG` để tính phí khi checkout.
 
 ## 3. Submodule & chức năng
 
@@ -55,8 +55,11 @@ Registry (`site-config.constant.ts`):
 | `NEW_IN_HERO_BANNERS` | `BANNER` |
 | `COLLECTIONS_HERO_BANNERS` | `BANNER` |
 | `NAV_MENU_BANNERS` | `BANNER` |
+| `SHIPPING_CONFIG` | `SHIPPING` |
 
-`SiteConfigType` có hai giá trị: `BANNER`, `TEXT` (chưa có key nào dùng `TEXT`).
+`SiteConfigType` có ba giá trị: `BANNER`, `TEXT` (chưa có key nào dùng `TEXT`), `SHIPPING`.
+
+Cấu trúc `value` của `SHIPPING_CONFIG` và quy tắc validate: xem [shipping](shipping.md). Admin sửa qua `PUT /api/admin/site-config/SHIPPING_CONFIG` với `value` là chuỗi JSON của cấu hình; `GET /api/site-config?key=SHIPPING_CONFIG` trả dòng thô, FE nên đọc `GET /api/shipping`.
 
 ### 4.2 Dữ liệu
 
@@ -66,23 +69,24 @@ Bảng `site_configs` (entity `SiteConfig extends BaseEntity`):
 |---|---|---|
 | `id` | varchar(16) PK | nanoid16 |
 | `key` | varchar(64) | UNIQUE (`UQ_site_configs_key`) |
-| `type` | varchar(32) | `CK_site_configs_type` ∈ (`BANNER`, `TEXT`) |
+| `type` | varchar(32) | `CK_site_configs_type` ∈ (`BANNER`, `TEXT`, `SHIPPING`) |
 | `value` | text | chuỗi JSON |
 | `created_at`, `updated_at` | timestamptz | |
 
-Migration `AddSiteConfig` seed 4 key trên với `value = '[]'`.
+Migration `AddSiteConfig` seed 4 key banner với `value = '[]'`; migration `AddShippingConfig` mở rộng CHECK và seed `SHIPPING_CONFIG` (type `SHIPPING`) với phí/ngưỡng đang áp dụng (standard 8, express 15, store-pickup 0, miễn phí từ 150), không ghi đè nếu đã có dòng.
 
 ### 4.3 Validation (3 tầng)
 
 - **DTO**: `key` thuộc enum `SiteConfigKey` (public); `value` là JSON hợp lệ và không rỗng (admin).
-- **Service**: `key` ở route admin phải thuộc `SiteConfigKey` (path param là string tự do nên được kiểm tra thủ công); xoá yêu cầu config tồn tại.
+- **Service**: `key` ở route admin phải thuộc `SiteConfigKey` (path param là string tự do nên được kiểm tra thủ công); key có validator trong `SITE_CONFIG_VALUE_VALIDATORS` (`site-config.validators.ts`, hiện chỉ `SHIPPING_CONFIG`) phải qua validator cấu trúc, sai → `SITE_CONFIG_VALUE_INVALID`; xoá yêu cầu config tồn tại.
 - **DB**: UNIQUE `key`, CHECK `type`.
 
 ### 4.4 Luồng xử lý & quy tắc nghiệp vụ
 
-- **Upsert**: key không thuộc registry → `SITE_CONFIG_KEY_INVALID`; `type` = `SITE_CONFIG_KEY_TYPE[key]`; tìm dòng theo key: có thì cập nhật `value` và `type`, chưa thì tạo mới. Cố ý không dùng `repo.upsert()` vì câu `INSERT … ON CONFLICT` thô bỏ qua hook `@BeforeInsert` nên id không được sinh.
+- **Upsert**: key không thuộc registry → `SITE_CONFIG_KEY_INVALID`; nếu key có validator thì `value` được validate và thay bằng bản JSON chuẩn hoá (sai → `SITE_CONFIG_VALUE_INVALID`); `type` = `SITE_CONFIG_KEY_TYPE[key]`; tìm dòng theo key: có thì cập nhật `value` và `type`, chưa thì tạo mới. Cố ý không dùng `repo.upsert()` vì câu `INSERT … ON CONFLICT` thô bỏ qua hook `@BeforeInsert` nên id không được sinh.
 - **Delete**: không tìm thấy → `SITE_CONFIG_NOT_FOUND`; xoá dòng thật (sau đó public trả `data: null` cho key đó).
-- **Thêm key mới** nằm ở `SiteConfigKey` + `SITE_CONFIG_KEY_TYPE` (BE sở hữu registry; FE không tự tạo key).
+- **Đọc cho BE**: `findValue(key)` trả `value` thô hoặc `null` (dùng bởi `ShippingConfigService`).
+- **Thêm key mới** nằm ở `SiteConfigKey` + `SITE_CONFIG_KEY_TYPE` (BE sở hữu registry; FE không tự tạo key); type mới cần migration mở rộng `CK_site_configs_type`.
 
 ### 4.5 Error code
 
@@ -90,17 +94,18 @@ Migration `AddSiteConfig` seed 4 key trên với `value = '[]'`.
 |---|---|---|
 | 1501 | `SITE_CONFIG_NOT_FOUND` | Xoá key chưa có dòng |
 | 1502 | `SITE_CONFIG_KEY_INVALID` | Upsert với key ngoài registry |
+| 1503 | `SITE_CONFIG_VALUE_INVALID` | Upsert key có validator (hiện `SHIPPING_CONFIG`) với `value` sai cấu trúc; message liệt kê từng lỗi |
 
 ### 4.6 Phụ thuộc & cấu hình
 
-`TypeOrmModule.forFeature([SiteConfig])`. Không có biến môi trường.
+`TypeOrmModule.forFeature([SiteConfig])`. Không có biến môi trường. `site-config.validators.ts` import hàm validate thuần từ `shipping/shipping-config.ts` (không phụ thuộc module Nest); `ShippingModule` import `SiteConfigModule`.
 
 ### 4.7 Test
 
-Chưa có test.
+- `site-config.service.spec.ts` — `upsert` (lưu `SHIPPING_CONFIG` với type `SHIPPING` sau khi validate, từ chối cấu hình sai với 1503 và không lưu, cập nhật dòng có sẵn, key banner vẫn nhận JSON bất kỳ, key lạ → 1502) và `findValue`.
 
 ### 4.8 Lưu ý hiện trạng
 
 - Admin `DELETE` với key ngoài registry cũng trả `SITE_CONFIG_NOT_FOUND` (không phân biệt với key hợp lệ nhưng chưa có dòng).
-- BE chỉ kiểm tra `value` là JSON hợp lệ, không kiểm tra cấu trúc bên trong (ví dụ danh sách `{ image, title, href }`).
+- Với key banner, BE chỉ kiểm tra `value` là JSON hợp lệ, không kiểm tra cấu trúc bên trong (ví dụ danh sách `{ image, title, href }`); chỉ `SHIPPING_CONFIG` được kiểm cấu trúc.
 - Danh sách admin trả `{ data, total }`, không phân trang (số key cố định).

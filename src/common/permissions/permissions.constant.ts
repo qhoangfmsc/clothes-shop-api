@@ -101,6 +101,14 @@ export enum Permission {
   MEDIA_VIEW = 12000,
   MEDIA_UPLOAD = 12001,
   MEDIA_DELETE = 12002,
+
+  // ============================================
+  // PAYMENT (130xx) + PAYMENT ADMIN (140xx)
+  // ============================================
+  PAYMENT_CREATE = 13000,
+  PAYMENT_VIEW = 13001,
+  PAYMENT_ADMIN_VIEW = 14000,
+  PAYMENT_ADMIN_CONFIRM = 14001,
 }
 
 /**
@@ -121,6 +129,9 @@ export const DEFAULT_USER_PERMISSIONS: Permission[] = [
   Permission.ORDER_VIEW_DETAIL,
   Permission.ORDER_CREATE,
   Permission.ORDER_CANCEL,
+
+  Permission.PAYMENT_CREATE,
+  Permission.PAYMENT_VIEW,
 
   Permission.ADDRESS_VIEW,
   Permission.ADDRESS_CREATE,

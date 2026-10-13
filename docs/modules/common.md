@@ -1,6 +1,6 @@
 # common & core (`src/common`, `src/core`, `src/main*.ts`, `src/migrations`)
 
-> Cập nhật lần cuối: 2026-10-12
+> Cập nhật lần cuối: 2026-10-13
 
 ## 1. Tổng quan
 
@@ -51,13 +51,13 @@ Phần hạ tầng dùng chung cho mọi module: bootstrap ứng dụng, guard x
 | CORS | origin = `CORS_ORIGINS` (phân tách bằng dấu phẩy) hoặc `http://localhost:3000`; `credentials: true`; methods `GET, POST, PUT, PATCH, DELETE, OPTIONS`; headers `Content-Type, Authorization, X-Requested-With` |
 | Bảo mật header | `helmet()` |
 | Request id | `RequestIdMiddleware`: dùng `x-request-id` của request hoặc sinh `randomUUID()`, trả lại trong header response |
-| Body | JSON và urlencoded giới hạn `5mb` |
+| Body | JSON và urlencoded giới hạn `5mb`. Parser JSON có `verify` giữ bytes gốc vào `req.rawBody` cho request có đường dẫn bắt đầu `/api/webhooks/` (webhook ký trên raw body; xem [payment](payment.md)) |
 | ValidationPipe toàn cục | `transform: true`, `whitelist: true`, `forbidNonWhitelisted: true` (field lạ bị từ chối) |
 | Exception filter | `AllExceptionFilter` |
 | Shutdown hooks | bật |
 | Swagger | `/api-docs`, title "Clothes Shop API", `persistAuthorization`, `docExpansion: none`; tag mô tả: Products, Categories, Collections, Reviews, Shipping, Size Guides |
 
-`MainModule` import: `CoreModule`, `AuthModule`, `UserModule`, `ProductModule`, `CategoryModule`, `CollectionModule`, `ReviewModule`, `ShippingModule`, `SizeGuideModule`, `SiteConfigModule`, `MediaModule`, `AddressModule`, `WishlistModule`, `CartModule`, `OrderModule`. Hai `APP_GUARD` theo thứ tự: `JwtAuthGuard` → `PermissionsGuard`.
+`MainModule` import: `CoreModule`, `AuthModule`, `UserModule`, `ProductModule`, `CategoryModule`, `CollectionModule`, `ReviewModule`, `ShippingModule`, `SizeGuideModule`, `SiteConfigModule`, `MediaModule`, `AddressModule`, `WishlistModule`, `CartModule`, `OrderModule`, `PaymentModule`. Hai `APP_GUARD` theo thứ tự: `JwtAuthGuard` → `PermissionsGuard`.
 
 `MainController` (`@Public`, ẩn khỏi Swagger):
 
@@ -112,8 +112,10 @@ Format `[MM][SS]`, nhóm theo module.
 | User admin | `USER_ADMIN_VIEW 10000`, `USER_ADMIN_UPDATE 10001` |
 | Site config admin | `SITE_CONFIG_VIEW 11000`, `SITE_CONFIG_UPSERT 11001`, `SITE_CONFIG_DELETE 11002` |
 | Media admin | `MEDIA_VIEW 12000`, `MEDIA_UPLOAD 12001`, `MEDIA_DELETE 12002` |
+| Payment (khách) | `PAYMENT_CREATE 13000`, `PAYMENT_VIEW 13001` |
+| Payment admin | `PAYMENT_ADMIN_VIEW 14000`, `PAYMENT_ADMIN_CONFIRM 14001` |
 
-`DEFAULT_USER_PERMISSIONS` (gán cho user mới đăng nhập lần đầu, role `user`): `AUTH_ME`, `AUTH_REFRESH`, toàn bộ nhóm Cart, Order (khách), Address, Wishlist. Admin không cần khai báo.
+`DEFAULT_USER_PERMISSIONS` (gán cho user mới đăng nhập lần đầu, role `user`): `AUTH_ME`, `AUTH_REFRESH`, toàn bộ nhóm Cart, Order (khách), Payment (khách), Address, Wishlist. Admin không cần khai báo.
 
 ### 4.5 Phân trang / sort / search / response chuẩn cho API list
 
@@ -137,6 +139,7 @@ Enum dùng chung (`@common/constants/enum-values.constant`):
 |---|---|
 | `ACTIVE_STATUSES` | `active`, `disabled` |
 | `USER_ROLES` | `user`, `admin` |
+| `ORDER_PAYMENT_STATUSES` | `unpaid`, `paid` (`orders.payment_status`) |
 | `PRODUCT_BADGES` | `new`, `sale`, `bestseller`, `sold_out`, `limited`, `custom_order` |
 | `NON_ORDERABLE_BADGES` | `sold_out`, `custom_order` (không cho thêm vào giỏ / checkout) |
 
@@ -153,10 +156,11 @@ Format `[MM][EE]` (4 chữ số). `throwAppError(errorCode, message?, statusCode
 | 10xx | Product | `EProductErrorCode` | 1001–1005, 1009 |
 | 11xx | Category | `ECategoryErrorCode` | 1101–1108 |
 | 12xx | Collection | `ECollectionErrorCode` | 1201–1203 |
-| 13xx | Order | `EOrderErrorCode` | 1301–1303 |
+| 13xx | Order | `EOrderErrorCode` | 1301–1307 |
 | 14xx | User | `EUserErrorCode` | 1401–1402 |
-| 15xx | Site config | `ESiteConfigErrorCode` | 1501–1502 |
+| 15xx | Site config | `ESiteConfigErrorCode` | 1501–1503 |
 | 16xx | Media | `EMediaErrorCode` | 1601–1606 |
+| 17xx | Payment | `EPaymentErrorCode` | 1701–1710 |
 | 90xx | Permission | `EPermissionErrorCode` | 9001 `PERMISSION_DENIED`, 9002 `NO_PERMISSION_DEFINED` |
 
 Chi tiết từng mã nằm ở mục Error code của module tương ứng.
@@ -206,6 +210,11 @@ Entity **không** extends `BaseEntity` (tự khai báo id nanoid16): `Wishlist` 
 | `1791774171535-MakeCategoryPriorityUnique` | Đánh số lại 1..N, UNIQUE DEFERRABLE, CHECK ≥ 1 |
 | `1791788759258-AddProductBadgeCheck` | CHECK badge (3 giá trị đầu) |
 | `1791789223339-ExtendProductBadgeEnum` | Mở rộng badge sang 6 giá trị, đổi tên `CHK_` → `CK_` |
+| `1791824744900-AddPayments` | `orders.payment_status`/`paid_at` (+ CHECK), bảng `payment_attempts`, `payment_transactions`, cấp `PAYMENT_CREATE`/`PAYMENT_VIEW` cho user hiện có `ORDER_CREATE`/`ORDER_VIEW_DETAIL`. Idempotent (`IF NOT EXISTS`, chuẩn hoá cột/constraint đã có): chạy được trên DB sạch, DB còn schema thanh toán cũ và khi chạy lại |
+| `1791857616252-AddShippingConfig` | Mở rộng `CK_site_configs_type` thêm `SHIPPING`; seed dòng `SHIPPING_CONFIG` (phí ship/ngưỡng miễn phí hiện hành), idempotent |
+| `1791861660340-AddPaymentConfirmation` | `payment_transactions.confirmed_by`/`confirmed_at`/`confirm_note` (FK users SET NULL), thêm `MANUALLY_CONFIRMED` vào CHECK `verification_status`, CHECK `confirmed_at` ↔ `MANUALLY_CONFIRMED`; idempotent |
+| `1791865521461-PaymentTransactionUniquePerProvider` | `payment_transactions`: UNIQUE chuyển từ `provider_transaction_id` sang (`provider`, `provider_transaction_id`); bỏ tiền tố `manual:` ở giao dịch cũ; idempotent |
+| `1791872292172-ConfirmPaidPendingOrders` | Đơn đã `paid` mà còn `pending` → `confirmed` (áp quy tắc tự xác nhận khi đã trả cho đơn cũ); idempotent |
 
 ### 4.10 Biến môi trường (chỉ tên)
 
@@ -218,6 +227,7 @@ Entity **không** extends `BaseEntity` (tự khai báo id nanoid16): `Wishlist` 
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | module auth |
 | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET` | module media |
 | `STORAGE_URL` | `utils/transform.ts` (`transformImageUrl`) |
+| `SEPAY_RECEIVING_BANK_CODE`, `SEPAY_RECEIVING_BANK_NAME`, `SEPAY_RECEIVING_ACCOUNT`, `SEPAY_RECEIVING_ACCOUNT_NAME`, `SEPAY_WEBHOOK_SECRET`, `PAYMENT_TRANSFER_PREFIX`, `PAYMENT_VND_PER_UNIT` | module payment (`PAYMENT_VND_PER_UNIT` còn được module order đọc khi báo giá) |
 
 ### 4.11 Lệnh
 

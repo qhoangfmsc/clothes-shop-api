@@ -5,6 +5,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { SITE_CONFIG_KEY_TYPE, SiteConfigKey } from './site-config.constant';
 import { SiteConfig } from './site-config.entity';
+import { SITE_CONFIG_VALUE_VALIDATORS } from './site-config.validators';
 
 @Injectable()
 export class SiteConfigService {
@@ -20,6 +21,12 @@ export class SiteConfigService {
   async findOnePublic(key: SiteConfigKey) {
     const config = await this.siteConfigRepo.findOne({ where: { key } });
     return { data: config ?? null };
+  }
+
+  /** Giá trị thô của 1 key cho code BE đọc (null nếu chưa có dòng) */
+  async findValue(key: SiteConfigKey): Promise<string | null> {
+    const config = await this.siteConfigRepo.findOne({ where: { key }, select: ['value'] });
+    return config?.value ?? null;
   }
 
   // ============================================
@@ -46,6 +53,7 @@ export class SiteConfigService {
       throwAppError(ESiteConfigErrorCode.SITE_CONFIG_KEY_INVALID);
     }
     const type = SITE_CONFIG_KEY_TYPE[key as SiteConfigKey];
+    const validated = SITE_CONFIG_VALUE_VALIDATORS[key as SiteConfigKey]?.(value) ?? value;
 
     // NOTE: intentionally NOT using repo.upsert() here — it issues a raw
     // INSERT ... ON CONFLICT and bypasses TypeORM entity lifecycle hooks,
@@ -53,10 +61,10 @@ export class SiteConfigService {
     // a never-before-configured key fails with a NOT NULL violation on "id".
     let config = await this.siteConfigRepo.findOne({ where: { key: key as SiteConfigKey } });
     if (config) {
-      config.value = value;
+      config.value = validated;
       config.type = type;
     } else {
-      config = this.siteConfigRepo.create({ key: key as SiteConfigKey, type, value });
+      config = this.siteConfigRepo.create({ key: key as SiteConfigKey, type, value: validated });
     }
 
     return { data: await this.siteConfigRepo.save(config) };

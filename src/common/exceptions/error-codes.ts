@@ -48,6 +48,10 @@ export enum EOrderErrorCode {
   ORDER_NOT_FOUND = 1301,
   ORDER_STATUS_INVALID_TRANSITION = 1302,
   ORDER_PRODUCT_NOT_ORDERABLE = 1303,
+  ORDER_ADDRESS_REQUIRED = 1304,
+  ORDER_PICKUP_CONTACT_REQUIRED = 1305,
+  ORDER_PICKUP_CONTACT_NOT_ALLOWED = 1306,
+  ORDER_CANCEL_PAID_NOT_ALLOWED = 1307,
 }
 
 // ============================================
@@ -64,6 +68,7 @@ export enum EUserErrorCode {
 export enum ESiteConfigErrorCode {
   SITE_CONFIG_NOT_FOUND = 1501,
   SITE_CONFIG_KEY_INVALID = 1502,
+  SITE_CONFIG_VALUE_INVALID = 1503,
 }
 
 // ============================================
@@ -76,6 +81,22 @@ export enum EMediaErrorCode {
   MEDIA_FILE_NOT_FOUND = 1604,
   MEDIA_STORAGE_ERROR = 1605,
   MEDIA_FILE_TOO_LARGE = 1606,
+}
+
+// ============================================
+// PAYMENT MODULE ERRORS (17xx)
+// ============================================
+export enum EPaymentErrorCode {
+  PAYMENT_NOT_CONFIGURED = 1701,
+  PAYMENT_ORDER_NOT_PAYABLE = 1702,
+  PAYMENT_ATTEMPT_NOT_FOUND = 1703,
+  PAYMENT_INVALID_SIGNATURE = 1704,
+  PAYMENT_INVALID_PAYLOAD = 1705,
+  PAYMENT_CODE_GENERATION_FAILED = 1706,
+  PAYMENT_CONFIRM_INPUT_INVALID = 1707,
+  PAYMENT_TRANSACTION_NOT_FOUND = 1708,
+  PAYMENT_TRANSACTION_NOT_CONFIRMABLE = 1709,
+  PAYMENT_AMOUNT_MISMATCH = 1710,
 }
 
 // ============================================
@@ -110,14 +131,29 @@ export const ErrorMessages: Record<number, string> = {
   [EOrderErrorCode.ORDER_NOT_FOUND]: 'Order not found',
   [EOrderErrorCode.ORDER_STATUS_INVALID_TRANSITION]: 'Invalid status transition',
   [EOrderErrorCode.ORDER_PRODUCT_NOT_ORDERABLE]: 'Some products cannot be ordered (sold out or custom order)',
+  [EOrderErrorCode.ORDER_ADDRESS_REQUIRED]: 'addressId is required for this shipping method',
+  [EOrderErrorCode.ORDER_PICKUP_CONTACT_REQUIRED]: 'pickupContact is required for store-pickup when addressId is not sent',
+  [EOrderErrorCode.ORDER_PICKUP_CONTACT_NOT_ALLOWED]: 'pickupContact is only allowed for store-pickup',
+  [EOrderErrorCode.ORDER_CANCEL_PAID_NOT_ALLOWED]: 'This order has been paid and cannot be cancelled online — please contact the shop',
   [EUserErrorCode.USER_NOT_FOUND]: 'User not found',
   [EUserErrorCode.USER_CANNOT_MODIFY_SELF]: 'Cannot modify your own role or status',
   [ESiteConfigErrorCode.SITE_CONFIG_NOT_FOUND]: 'Site config not found',
   [ESiteConfigErrorCode.SITE_CONFIG_KEY_INVALID]: 'Invalid site config key',
+  [ESiteConfigErrorCode.SITE_CONFIG_VALUE_INVALID]: 'Invalid site config value',
   [EMediaErrorCode.MEDIA_NOT_CONFIGURED]: 'Media storage is not configured',
   [EMediaErrorCode.MEDIA_FILE_REQUIRED]: 'Multipart field "file" is required',
   [EMediaErrorCode.MEDIA_INVALID_TYPE]: 'Unsupported file type — only JPEG, PNG, WebP, GIF, AVIF images are allowed',
   [EMediaErrorCode.MEDIA_FILE_NOT_FOUND]: 'Media file not found',
   [EMediaErrorCode.MEDIA_STORAGE_ERROR]: 'Media storage request failed',
   [EMediaErrorCode.MEDIA_FILE_TOO_LARGE]: 'File is too large for media storage',
+  [EPaymentErrorCode.PAYMENT_NOT_CONFIGURED]: 'Payment is not configured',
+  [EPaymentErrorCode.PAYMENT_ORDER_NOT_PAYABLE]: 'Order cannot be paid (already paid or cancelled)',
+  [EPaymentErrorCode.PAYMENT_ATTEMPT_NOT_FOUND]: 'No payment session for this order',
+  [EPaymentErrorCode.PAYMENT_INVALID_SIGNATURE]: 'Invalid webhook signature',
+  [EPaymentErrorCode.PAYMENT_INVALID_PAYLOAD]: 'Invalid webhook payload',
+  [EPaymentErrorCode.PAYMENT_CODE_GENERATION_FAILED]: 'Could not generate a unique transfer code',
+  [EPaymentErrorCode.PAYMENT_CONFIRM_INPUT_INVALID]: 'Send either transactionId, or reference + amount',
+  [EPaymentErrorCode.PAYMENT_TRANSACTION_NOT_FOUND]: 'Payment transaction not found',
+  [EPaymentErrorCode.PAYMENT_TRANSACTION_NOT_CONFIRMABLE]: 'This transaction cannot be used to confirm the payment',
+  [EPaymentErrorCode.PAYMENT_AMOUNT_MISMATCH]: 'Transaction amount does not match the amount of the payment session',
 };

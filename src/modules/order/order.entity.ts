@@ -29,6 +29,13 @@ export class Order extends BaseEntity {
   @Column({ type: 'varchar', length: 500, default: '' })
   note: string;
 
+  /** Tách khỏi `status` (luồng giao hàng): chỉ webhook SePay hợp lệ mới đổi unpaid → paid */
+  @Column({ type: 'varchar', length: 10, default: 'unpaid', name: 'payment_status' })
+  paymentStatus: string; // unpaid | paid
+
+  @Column({ type: 'timestamp with time zone', nullable: true, name: 'paid_at' })
+  paidAt: Date | null;
+
   @ManyToOne(() => User, { onDelete: 'SET NULL' })
   @JoinColumn({ name: 'user_id' })
   user: User;

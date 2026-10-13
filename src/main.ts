@@ -1,4 +1,5 @@
-import { ValidationPipe } from '@nestjs/common';
+import type { IncomingMessage } from 'node:http';
+import { type RawBodyRequest, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { json, urlencoded } from 'express';
 import helmet from 'helmet';
@@ -22,7 +23,15 @@ async function bootstrap() {
   app.use(helmet());
   app.use(new RequestIdMiddleware().use);
 
-  app.use(json({ limit: '5mb' }));
+  // Webhook SePay ký trên bytes gốc của body → giữ lại `req.rawBody` cho route webhook
+  app.use(
+    json({
+      limit: '5mb',
+      verify: (req: RawBodyRequest<IncomingMessage>, _res, buf) => {
+        if (req.url?.startsWith('/api/webhooks/')) req.rawBody = buf;
+      },
+    }),
+  );
   app.use(urlencoded({ extended: true, limit: '5mb' }));
 
   // Strict validation: strip unknown fields, reject them
