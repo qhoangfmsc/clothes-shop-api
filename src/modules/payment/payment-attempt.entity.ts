@@ -34,6 +34,10 @@ export class PaymentAttempt extends BaseEntity {
   @Column({ type: 'timestamp with time zone', name: 'paid_at', nullable: true })
   paidAt: Date | null;
 
+  /** Admin tạo mã này cho đơn (vd khách thanh toán tại cửa hàng); null = khách tự tạo */
+  @Column({ type: 'varchar', length: 16, name: 'created_by', nullable: true })
+  createdBy: string | null;
+
   @ManyToOne(() => Order, { onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'order_id' })
   order: Order;

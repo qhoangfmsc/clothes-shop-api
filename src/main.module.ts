@@ -12,7 +12,9 @@ import { CollectionModule } from './modules/collection/collection.module';
 import { MediaModule } from './modules/media/media.module';
 import { OrderModule } from './modules/order/order.module';
 import { PaymentModule } from './modules/payment/payment.module';
+import { PendingCountModule } from './modules/pending-count/pending-count.module';
 import { ProductModule } from './modules/product/product.module';
+import { ReturnModule } from './modules/return/return.module';
 import { ReviewModule } from './modules/review/review.module';
 import { ShippingModule } from './modules/shipping/shipping.module';
 import { SiteConfigModule } from './modules/site-config/site-config.module';
@@ -38,6 +40,8 @@ import { WishlistModule } from './modules/wishlist/wishlist.module';
     CartModule,
     OrderModule,
     PaymentModule,
+    ReturnModule,
+    PendingCountModule,
   ],
   controllers: [MainController],
   providers: [

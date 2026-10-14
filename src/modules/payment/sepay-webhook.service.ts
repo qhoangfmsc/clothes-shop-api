@@ -132,7 +132,7 @@ export class SepayWebhookService {
       return result('ACCOUNT_MISMATCH');
     }
     // Tiền đến lần 2 cho phiên/đơn đã trả → ghi nhận để hoàn tiền thủ công, không đổi gì
-    if (attempt.status === 'PAID' || order.paymentStatus === 'paid') return result('DUPLICATE_PAYMENT');
+    if (attempt.status === 'PAID' || order.paymentStatus !== 'unpaid') return result('DUPLICATE_PAYMENT');
     if (order.status === 'cancelled' || attempt.status === 'CANCELLED') return result('NOT_PAYABLE');
     if (payload.transferAmount !== attempt.amount) return result('AMOUNT_MISMATCH');
 

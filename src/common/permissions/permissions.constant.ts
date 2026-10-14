@@ -109,6 +109,16 @@ export enum Permission {
   PAYMENT_VIEW = 13001,
   PAYMENT_ADMIN_VIEW = 14000,
   PAYMENT_ADMIN_CONFIRM = 14001,
+  PAYMENT_ADMIN_REFUND = 14002,
+  PAYMENT_ADMIN_CREATE_QR = 14003,
+
+  // ============================================
+  // RETURN (150xx) + RETURN ADMIN (160xx)
+  // ============================================
+  RETURN_CREATE = 15000,
+  RETURN_VIEW = 15001,
+  RETURN_ADMIN_VIEW = 16000,
+  RETURN_ADMIN_PROCESS = 16001,
 }
 
 /**
@@ -132,6 +142,9 @@ export const DEFAULT_USER_PERMISSIONS: Permission[] = [
 
   Permission.PAYMENT_CREATE,
   Permission.PAYMENT_VIEW,
+
+  Permission.RETURN_CREATE,
+  Permission.RETURN_VIEW,
 
   Permission.ADDRESS_VIEW,
   Permission.ADDRESS_CREATE,

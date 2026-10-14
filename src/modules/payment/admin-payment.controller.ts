@@ -40,6 +40,17 @@ export class AdminPaymentController {
     return this.paymentService.getOrderPaymentsAdmin(orderId);
   }
 
+  @Post('orders/:orderId/qr')
+  @ApiOperation({
+    summary: '[Admin] Tạo mã QR mới cho đơn (vd khách thanh toán tại cửa hàng); mọi mã cũ của đơn hết hạn ngay',
+    description:
+      'Luôn tạo mã mới và đặt các mã đang chờ của đơn thành EXPIRED (trả về `supersededTransferCodes`). Nếu khách đã chuyển theo mã cũ, tiền được ghi LATE: xác nhận thủ công đúng mã đó ở API confirm. Đơn đã trả/đã huỷ → 1702.',
+  })
+  @Permissions(Permission.PAYMENT_ADMIN_CREATE_QR)
+  createQr(@CurrentUser() admin: User, @Param('orderId') orderId: string) {
+    return this.paymentService.createQrAdmin(admin.id, orderId);
+  }
+
   @Post('orders/:orderId/confirm')
   @ApiOperation({
     summary: '[Admin] Xác nhận thủ công đơn đã thanh toán (khi webhook SePay không tới nhưng tiền đã về)',

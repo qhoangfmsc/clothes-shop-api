@@ -87,6 +87,7 @@ Không có bảng riêng. Cấu hình nằm ở `site_configs` (key `SHIPPING_CO
 
 - `ShippingConfigService.get()` đọc `site_configs` key `SHIPPING_CONFIG` mỗi lần gọi (không cache, admin đổi là áp dụng ngay). Chưa có dòng, hoặc giá trị lưu không parse/validate được (log lỗi) → trả bản sao `DEFAULT_SHIPPING_CONFIG`, không làm lỗi checkout.
 - `GET /api/shipping` trả `{ methods, returnPolicy, freeShippingThreshold }` lấy nguyên từ config.
+- Module [return](return.md) đọc `returnPolicy.days` mỗi lần kiểm điều kiện trả hàng: hạn = `orders.delivered_at` + số ngày đó (tính từ lúc giao, không phải lúc mua).
 - Checkout ([order](order.md)) gọi cùng `get()`: phí = `0` nếu `subtotal >= freeShippingThreshold` (khi ngưỡng không `null`), ngược lại `price` của phương thức đã chọn (không tìm thấy thì dùng `price` của `standard`).
 
 ### 4.5 Error code
@@ -112,4 +113,5 @@ Không có bảng riêng. Cấu hình nằm ở `site_configs` (key `SHIPPING_CO
 - Đơn vị tiền của `price`/ngưỡng giống `orders.total` (đơn vị cửa hàng, không phải VND; xem [payment](payment.md)). API này không trả ký hiệu tiền tệ; số VND tương ứng của một giỏ cụ thể nằm ở `amountVnd` của `POST /api/orders/quote` ([order](order.md)).
 - Phí đã tính được ghi vào `orders.shipping_fee`/`total` lúc checkout; đổi config không ảnh hưởng đơn đã tạo hay phiên thanh toán đã tạo.
 - Dòng `SHIPPING_CONFIG` bị xoá (`DELETE` site-config) → hệ thống dùng giá trị mặc định trong code, không lỗi.
+- Chỉ `returnPolicy.days` được hệ thống dùng để kiểm tra (hạn trả hàng của module [return](return.md)); `description` và `conditions` chỉ là văn bản hiển thị, không được kiểm tự động.
 - Nội dung `returnPolicy` mặc định là tiếng Anh; muốn hiển thị tiếng khác thì admin lưu văn bản mong muốn vào config.

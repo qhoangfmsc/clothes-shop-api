@@ -318,3 +318,13 @@ describe('SepayWebhookService.handle', () => {
     });
   });
 });
+
+describe('money arriving for a code that an admin replaced', () => {
+  it('is recorded as LATE against that code and does not pay the order by itself (admin confirms by transferCode)', async () => {
+    const replaced = attempt({ status: 'EXPIRED', expiresAt: pastDate(1000) });
+    const { call, manager, row } = setup({ orders: [order()], attempts: [replaced, attempt({ id: 'a2', transferCode: 'DHNEWCODE1' })] });
+    await call(sepayBody());
+    expect(row(PaymentTransaction)).toMatchObject({ verificationStatus: 'LATE', paymentAttemptId: 'a1' });
+    expect(manager.tables.get(Order)![0].paymentStatus).toBe('unpaid');
+  });
+});

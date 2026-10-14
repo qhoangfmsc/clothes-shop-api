@@ -7,7 +7,7 @@
 
 | Khái niệm | Trả lời câu hỏi | Giá trị | Nằm ở |
 |---|---|---|---|
-| **Trạng thái thanh toán** của đơn | Khách đã trả chưa? | `unpaid`, `paid` (sau này thêm `refunded`) | `orders.payment_status` |
+| **Trạng thái thanh toán** của đơn | Khách đã trả chưa? | `unpaid`, `paid`, `refunded` | `orders.payment_status` |
 | **Trạng thái xử lý** của đơn | Cửa hàng làm tới đâu? | `pending` (chờ xác nhận) → `confirmed` → `shipping` → `delivered` → `completed`; hoặc `cancelled` | `orders.status` |
 | **Mã chuyển khoản** (phiên QR) | Mã nào đã cấp cho khách, còn hiệu lực không? | `PENDING`, `PAID`, `EXPIRED`, `CANCELLED` | `payment_attempts` |
 
@@ -56,7 +56,7 @@ Mỗi lần khách tạo lại QR sẽ có **mã mới**; mã cũ vẫn được
 
 | # | Việc | Khi nào cần |
 |---|---|---|
-| C1 | Trạng thái `refunded` và luồng hoàn tiền | Khi có đơn phải huỷ sau khi đã trả (hiện admin huỷ được đơn đã trả nhưng hoàn tiền làm tay bên ngoài hệ thống) |
+| C1 | ~~Trạng thái `refunded` và luồng hoàn tiền~~ — **đã làm** (huỷ đơn đã trả tự tạo yêu cầu hoàn; admin chuyển khoản rồi ghi mã giao dịch ở `/api/admin/refunds`). **Trả hàng sau khi giao cũng đã làm** (module `return`: khách xin trả, admin duyệt/nhận hàng, tự sinh khoản hoàn) | |
 | C2 | Tự kéo giao dịch từ API của SePay để đối soát tự động | Khi số đơn nhiều, không muốn so sao kê bằng tay |
 | C3 | Giữ tồn kho khi tạo đơn | Hiện không có tồn kho; hai khách có thể mua cùng một món cuối cùng |
 | C4 | Email xác nhận thanh toán cho khách | Khi muốn khách biết ngay mà không cần ở trang QR |

@@ -26,6 +26,7 @@ import { convertToVnd } from './payment-amount.util';
 import { PaymentAttempt } from './payment-attempt.entity';
 import { resolveAttemptStatus } from './payment-attempt-status.util';
 import { PaymentConfigService, QrConfig } from './payment-config.service';
+import { applyTransactionNeedsReviewFilter } from './payment-needs-review.util';
 import { applyOrderPaid } from './payment-paid.util';
 import { PaymentTransaction } from './payment-transaction.entity';
 
@@ -69,12 +70,7 @@ export class PaymentService {
       // Khoá dòng đơn: hai request đồng thời cho cùng đơn phải tuần tự → luôn chỉ có 1 phiên PENDING
       const order = await manager.findOne(Order, { where: { id: dto.orderId, userId }, lock: { mode: 'pessimistic_write' } });
       if (!order) throwAppError(EOrderErrorCode.ORDER_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
-      if (order.paymentStatus === 'paid') {
-        throwAppError(EPaymentErrorCode.PAYMENT_ORDER_NOT_PAYABLE, 'Order has already been paid');
-      }
-      if (order.status === 'cancelled') {
-        throwAppError(EPaymentErrorCode.PAYMENT_ORDER_NOT_PAYABLE, 'Order has been cancelled');
-      }
+      this.assertPayable(order);
 
       let attempt = await manager.findOne(PaymentAttempt, { where: { orderId: order.id, status: 'PENDING' } });
       if (attempt && attempt.expiresAt.getTime() <= Date.now()) {
@@ -83,22 +79,53 @@ export class PaymentService {
         attempt = null;
       }
 
-      if (!attempt) {
-        attempt = await manager.save(
-          manager.create(PaymentAttempt, {
-            orderId: order.id,
-            transferCode: await this.generateUniqueTransferCode(manager, config.prefix),
-            amount: this.toVnd(order.total, config.vndPerUnit),
-            bankAccount: config.account,
-            status: 'PENDING',
-            expiresAt: new Date(Date.now() + PAYMENT_QR_TTL_MS),
-            paidAt: null,
-          }),
-        );
-      }
+      if (!attempt) attempt = await this.insertAttempt(manager, order, config, null);
 
       return { data: this.toQrView(attempt, config) };
     });
+  }
+
+  /**
+   * [Admin] Tạo mã QR mới cho một đơn bất kỳ (vd khách thanh toán tại cửa hàng). Luôn là mã MỚI: mọi mã đang chờ của đơn hết hạn ngay
+   * (`EXPIRED`), nên mỗi đơn chỉ có đúng một mã còn hiệu lực. Tiền chuyển vào mã đã bị thay thế được ghi `LATE` (không tự xác nhận):
+   * admin xác nhận thủ công đúng mã đó nếu khách đã chuyển trước khi mã bị thay.
+   */
+  async createQrAdmin(adminId: string, orderId: string) {
+    const config = this.paymentConfig.getQrConfig();
+
+    return this.dataSource.transaction(async (manager) => {
+      const order = await manager.findOne(Order, { where: { id: orderId }, lock: { mode: 'pessimistic_write' } });
+      if (!order) throwAppError(EOrderErrorCode.ORDER_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
+      this.assertPayable(order);
+
+      const superseded = await manager.find(PaymentAttempt, { where: { orderId: order.id, status: 'PENDING' } });
+      if (superseded.length)
+        await manager.update(PaymentAttempt, { orderId: order.id, status: 'PENDING' }, { status: 'EXPIRED', expiresAt: new Date() });
+
+      const attempt = await this.insertAttempt(manager, order, config, adminId);
+      return { data: { ...this.toQrView(attempt, config), supersededTransferCodes: superseded.map((old) => old.transferCode) } };
+    });
+  }
+
+  /** Đơn còn nhận thanh toán: chưa trả/hoàn và chưa huỷ */
+  private assertPayable(order: Order) {
+    if (order.paymentStatus !== 'unpaid') throwAppError(EPaymentErrorCode.PAYMENT_ORDER_NOT_PAYABLE, 'Order has already been paid');
+    if (order.status === 'cancelled') throwAppError(EPaymentErrorCode.PAYMENT_ORDER_NOT_PAYABLE, 'Order has been cancelled');
+  }
+
+  private async insertAttempt(manager: EntityManager, order: Order, config: QrConfig, createdBy: string | null): Promise<PaymentAttempt> {
+    return manager.save(
+      manager.create(PaymentAttempt, {
+        orderId: order.id,
+        transferCode: await this.generateUniqueTransferCode(manager, config.prefix),
+        amount: this.toVnd(order.total, config.vndPerUnit),
+        bankAccount: config.account,
+        status: 'PENDING',
+        expiresAt: new Date(Date.now() + PAYMENT_QR_TTL_MS),
+        paidAt: null,
+        createdBy,
+      }),
+    );
   }
 
   /** Trạng thái thanh toán của đơn — chỉ đọc DB, không gọi SePay */
@@ -106,7 +133,7 @@ export class PaymentService {
     const order = await this.orderRepo.findOne({ where: { id: orderId, userId } });
     if (!order) throwAppError(EOrderErrorCode.ORDER_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
 
-    if (order.paymentStatus === 'paid') return { data: { orderId, status: 'PAID' as PaymentAttemptStatus } };
+    if (order.paymentStatus !== 'unpaid') return { data: { orderId, status: 'PAID' as PaymentAttemptStatus } };
 
     const attempt = await this.attemptRepo.findOne({ where: { orderId }, order: { createdAt: 'DESC' } });
     if (!attempt) throwAppError(EPaymentErrorCode.PAYMENT_ATTEMPT_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
@@ -145,7 +172,7 @@ export class PaymentService {
 
   /** [Admin] Giao dịch ngân hàng đã nhận (kể cả chưa khớp) để đối soát */
   async findTransactionsAdmin(query: AdminPaymentTransactionQueryDto) {
-    const { orderId, verificationStatus, search, sort } = query;
+    const { orderId, verificationStatus, search, needsReview, sort } = query;
     const { page, limit } = getPaging(query);
 
     // Kèm tóm tắt đơn của phiên khớp (chỉ vài cột) để màn đối soát không phải gọi thêm API
@@ -156,6 +183,8 @@ export class PaymentService {
       .addSelect(['o.id', 'o.status', 'o.paymentStatus', 'o.total', 'o.userId']);
 
     if (orderId) qb.andWhere('a.order_id = :orderId', { orderId });
+    // Chỉ giao dịch cần admin xử lý (cùng điều kiện với con số trên menu admin)
+    if (needsReview) applyTransactionNeedsReviewFilter(qb);
     if (verificationStatus) qb.andWhere('t.verification_status = :verificationStatus', { verificationStatus });
     if (search) {
       qb.andWhere('(t.transfer_content ILIKE :search OR t.provider_transaction_id ILIKE :search OR a.transfer_code ILIKE :search)', {
@@ -174,6 +203,12 @@ export class PaymentService {
     return paginated(data, total, page, limit);
   }
 
+  /** Số giao dịch cần admin xử lý — cùng điều kiện với bộ lọc `needsReview` của `findTransactionsAdmin` */
+  async countNeedsReview(): Promise<number> {
+    const qb = this.transactionRepo.createQueryBuilder('t').leftJoin('t.paymentAttempt', 'a').leftJoin('a.order', 'o');
+    return applyTransactionNeedsReviewFilter(qb).getCount();
+  }
+
   /**
    * Đánh dấu `EXPIRED` các phiên `PENDING` đã quá hạn (không đụng phiên của đơn đã huỷ — phiên đó thuộc về `CANCELLED`).
    * Trả số phiên đã đổi. Idempotent; được gọi bởi bộ đếm giờ mỗi phút và khi admin tra cứu.
@@ -189,8 +224,10 @@ export class PaymentService {
   }
 
   /** Đơn bị huỷ (khách hoặc admin): các mã chuyển khoản còn chờ của đơn không còn hiệu lực → `CANCELLED` */
-  async cancelPendingAttempts(orderId: string): Promise<void> {
-    await this.attemptRepo.update({ orderId, status: 'PENDING' }, { status: 'CANCELLED' });
+  async cancelPendingAttempts(orderId: string, manager?: EntityManager): Promise<void> {
+    // Có `manager` thì chạy trong transaction của nơi gọi (huỷ đơn + huỷ mã + tạo yêu cầu hoàn là một khối)
+    if (manager) await manager.update(PaymentAttempt, { orderId, status: 'PENDING' }, { status: 'CANCELLED' });
+    else await this.attemptRepo.update({ orderId, status: 'PENDING' }, { status: 'CANCELLED' });
   }
 
   /**
@@ -243,6 +280,7 @@ export class PaymentService {
       createdAt: attempt.createdAt,
       expiresAt: attempt.expiresAt,
       paidAt: attempt.paidAt,
+      createdBy: attempt.createdBy,
       order: {
         id: attempt.order.id,
         status: attempt.order.status,
@@ -322,7 +360,7 @@ export class PaymentService {
     return this.dataSource.transaction(async (manager) => {
       const order = await manager.findOne(Order, { where: { id: orderId }, lock: { mode: 'pessimistic_write' } });
       if (!order) throwAppError(EOrderErrorCode.ORDER_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
-      if (order.paymentStatus === 'paid') throwAppError(EPaymentErrorCode.PAYMENT_ORDER_NOT_PAYABLE, 'Order has already been paid');
+      if (order.paymentStatus !== 'unpaid') throwAppError(EPaymentErrorCode.PAYMENT_ORDER_NOT_PAYABLE, 'Order has already been paid');
       if (order.status === 'cancelled') throwAppError(EPaymentErrorCode.PAYMENT_ORDER_NOT_PAYABLE, 'Order has been cancelled');
 
       // Giao dịch làm bằng chứng

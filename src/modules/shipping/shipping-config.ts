@@ -34,7 +34,7 @@ export interface ShippingMethodConfig {
 }
 
 export interface ReturnPolicyConfig {
-  /** Số ngày được đổi trả kể từ lúc mua */
+  /** Số ngày được đổi trả kể từ lúc đơn được giao (orders.delivered_at) */
   days: number;
   description: string;
   conditions: string[];

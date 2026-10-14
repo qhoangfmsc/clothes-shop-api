@@ -27,7 +27,9 @@ Toàn bộ module được khai báo trong `src/main.module.ts`. Hai guard toàn
 | [cart](modules/cart.md) | `src/modules/cart` | `/api/cart` | DB | Giỏ hàng của user |
 | [address](modules/address.md) | `src/modules/address` | `/api/addresses` | DB | Sổ địa chỉ giao hàng |
 | [order](modules/order.md) | `src/modules/order` | `/api/orders`, `/api/admin/orders` | DB | Checkout từ giỏ, lịch sử đơn, quản trị trạng thái đơn |
-| [payment](modules/payment.md) | `src/modules/payment` | `/api/payments`, `/api/webhooks/sepay`, `/api/admin/payments` | DB + SePay webhook | Thanh toán VietQR: phiên QR, webhook SePay (HMAC), đối soát giao dịch |
+| [pending-count](modules/pending-count.md) | `src/modules/pending-count` | `/api/admin/pending-counts` | DB (qua các module khác) | Số việc chờ admin xử lý cho badge menu: đơn, giao dịch, hoàn tiền, trả hàng |
+| [return](modules/return.md) | `src/modules/return` | `/api/returns`, `/api/admin/returns` | DB | Trả hàng sau khi giao: yêu cầu của khách, duyệt/nhận hàng của admin, sinh khoản hoàn tiền |
+| [payment](modules/payment.md) | `src/modules/payment` | `/api/payments`, `/api/webhooks/sepay`, `/api/admin/payments`, `/api/admin/refunds` | DB + SePay webhook | Thanh toán VietQR: phiên QR, webhook SePay (HMAC), đối soát giao dịch, theo dõi hoàn tiền |
 | [media](modules/media.md) | `src/modules/media` | `/api/admin/media` | DB + Supabase Storage | Upload/list/xoá ảnh |
 | [site-config](modules/site-config.md) | `src/modules/site-config` | `/api/site-config`, `/api/admin/site-config` | DB | Cấu hình theo key: banner nội dung trang, phí ship (`SHIPPING_CONFIG`) |
 | [shipping](modules/shipping.md) | `src/modules/shipping` | `/api/shipping` | Config (site_configs) + dữ liệu tĩnh | Phương thức vận chuyển và phí/ngưỡng miễn phí (admin chỉnh được), chính sách đổi trả |
@@ -46,5 +48,8 @@ address ──► user
 order ──► cart, address, product, user   (checkout đọc Cart/CartItem/Address qua EntityManager)
 order ──► shipping ──► site-config   (phí ship/ngưỡng miễn phí đọc từ dòng SHIPPING_CONFIG)
 payment ──► order   (đọc/khoá/cập nhật `orders.payment_status` qua EntityManager)
+return ──► order, payment, shipping   (đọc đơn/dòng hàng qua EntityManager; `RefundService` tạo khoản hoàn; `returnPolicy.days` từ shipping)
+pending-count ──► order, payment, return   (gọi `countNeedsAction`/`countNeedsReview`/`countRequested` của từng service)
+payment ──► return   (chỉ entity `ReturnRequest`/`ReturnRequestItem`: cập nhật trạng thái khi khoản hoàn xong hoặc bị từ chối)
 media ──► Supabase Storage (độc lập, ảnh được tham chiếu bằng URL chuỗi ở product/collection/category/site-config)
 ```

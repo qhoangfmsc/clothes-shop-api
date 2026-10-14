@@ -113,9 +113,11 @@ Format `[MM][SS]`, nhóm theo module.
 | Site config admin | `SITE_CONFIG_VIEW 11000`, `SITE_CONFIG_UPSERT 11001`, `SITE_CONFIG_DELETE 11002` |
 | Media admin | `MEDIA_VIEW 12000`, `MEDIA_UPLOAD 12001`, `MEDIA_DELETE 12002` |
 | Payment (khách) | `PAYMENT_CREATE 13000`, `PAYMENT_VIEW 13001` |
-| Payment admin | `PAYMENT_ADMIN_VIEW 14000`, `PAYMENT_ADMIN_CONFIRM 14001` |
+| Payment admin | `PAYMENT_ADMIN_VIEW 14000`, `PAYMENT_ADMIN_CONFIRM 14001`, `PAYMENT_ADMIN_REFUND 14002`, `PAYMENT_ADMIN_CREATE_QR 14003` |
+| Return (khách) | `RETURN_CREATE 15000`, `RETURN_VIEW 15001` |
+| Return admin | `RETURN_ADMIN_VIEW 16000`, `RETURN_ADMIN_PROCESS 16001` |
 
-`DEFAULT_USER_PERMISSIONS` (gán cho user mới đăng nhập lần đầu, role `user`): `AUTH_ME`, `AUTH_REFRESH`, toàn bộ nhóm Cart, Order (khách), Payment (khách), Address, Wishlist. Admin không cần khai báo.
+`DEFAULT_USER_PERMISSIONS` (gán cho user mới đăng nhập lần đầu, role `user`): `AUTH_ME`, `AUTH_REFRESH`, toàn bộ nhóm Cart, Order (khách), Payment (khách), Return (khách), Address, Wishlist. Admin không cần khai báo.
 
 ### 4.5 Phân trang / sort / search / response chuẩn cho API list
 
@@ -127,6 +129,7 @@ Format `[MM][SS]`, nhóm theo module.
 | `paginated(data, total, page, limit)` | `pagination.util` | `{ data, total, page, limit, totalPages }` với `totalPages = ceil(total / limit)` |
 | `@SortField(fields, defaultSort)` | `@common/decorator/sort-field.decorator` | Param `sort`: `IsString` + `IsIn(field, -field ...)`; `field` = ASC, `-field` = DESC |
 | `parseSort(sort, fallback)` | `@common/base/sort.util` | `{ field, direction }`; không có `sort` thì dùng `fallback` |
+| `parseQueryBoolean` | `@common/dto/query-boolean.transform` | `@Transform` cho filter boolean trong query (`needsAction`, `needsReview`): chỉ nhận `true`/`false`, giá trị khác giữ nguyên để `@IsBoolean()` từ chối (không dùng chuyển kiểu ngầm vì `Boolean('false') === true`) |
 | `@SearchField(desc)` | `@common/decorator/search-field.decorator` | Param `search`: `IsString`, `MaxLength(255)`, optional |
 | `typeormListQuery(qb, alias, props, options)` | `@common/base/typeorm-list-query.util` | Helper QueryBuilder: sort (mặc định `-createdAt`), filter theo operator (`lt gt lte gte ne eq in range`, giá trị thường = `eq`, mảng = overlap `&&`), search `ILIKE` trên `searchableColumns`, trả `Paging` (`items`, `total`, `page`, `limit`, `totalPages`). Hiện chỉ `MediaService` dùng |
 | Spec guard | `src/common/dto/list-query.dto.spec.ts` | Tự quét mọi `*-query.dto.ts`: kiểm tra extends `PaginationQueryDto`, default 1/25, `limit ≤ 200`, từ chối `sorts`, whitelist sort, nhận `field`/`-field`; danh sách DTO không phải list nằm ở `NOT_LIST_DTO_FILES` |
@@ -139,7 +142,7 @@ Enum dùng chung (`@common/constants/enum-values.constant`):
 |---|---|
 | `ACTIVE_STATUSES` | `active`, `disabled` |
 | `USER_ROLES` | `user`, `admin` |
-| `ORDER_PAYMENT_STATUSES` | `unpaid`, `paid` (`orders.payment_status`) |
+| `ORDER_PAYMENT_STATUSES` | `unpaid`, `paid`, `refunded` (`orders.payment_status`) |
 | `PRODUCT_BADGES` | `new`, `sale`, `bestseller`, `sold_out`, `limited`, `custom_order` |
 | `NON_ORDERABLE_BADGES` | `sold_out`, `custom_order` (không cho thêm vào giỏ / checkout) |
 
@@ -160,7 +163,8 @@ Format `[MM][EE]` (4 chữ số). `throwAppError(errorCode, message?, statusCode
 | 14xx | User | `EUserErrorCode` | 1401–1402 |
 | 15xx | Site config | `ESiteConfigErrorCode` | 1501–1503 |
 | 16xx | Media | `EMediaErrorCode` | 1601–1606 |
-| 17xx | Payment | `EPaymentErrorCode` | 1701–1710 |
+| 17xx | Payment | `EPaymentErrorCode` | 1701–1714 |
+| 18xx | Return | `EReturnErrorCode` | 1801–1805 |
 | 90xx | Permission | `EPermissionErrorCode` | 9001 `PERMISSION_DENIED`, 9002 `NO_PERMISSION_DEFINED` |
 
 Chi tiết từng mã nằm ở mục Error code của module tương ứng.
@@ -215,6 +219,9 @@ Entity **không** extends `BaseEntity` (tự khai báo id nanoid16): `Wishlist` 
 | `1791861660340-AddPaymentConfirmation` | `payment_transactions.confirmed_by`/`confirmed_at`/`confirm_note` (FK users SET NULL), thêm `MANUALLY_CONFIRMED` vào CHECK `verification_status`, CHECK `confirmed_at` ↔ `MANUALLY_CONFIRMED`; idempotent |
 | `1791865521461-PaymentTransactionUniquePerProvider` | `payment_transactions`: UNIQUE chuyển từ `provider_transaction_id` sang (`provider`, `provider_transaction_id`); bỏ tiền tố `manual:` ở giao dịch cũ; idempotent |
 | `1791872292172-ConfirmPaidPendingOrders` | Đơn đã `paid` mà còn `pending` → `confirmed` (áp quy tắc tự xác nhận khi đã trả cho đơn cũ); idempotent |
+| `1791879846109-AddRefunds` | `orders.payment_status` thêm `refunded` (CHECK, và `CK_orders_paid_at` tính cả `refunded`); bảng `refunds` (CHECK, FK RESTRICT/SET NULL, UNIQUE từng phần một yêu cầu đang chờ mỗi đơn và một `bank_reference`); idempotent, `down` đưa `refunded` về `paid` và bỏ bảng |
+| `1791884003973-AddReturns` | `orders.delivered_at` (+ CHECK, điền `updated_at` cho đơn đã giao), bảng `return_requests`, `return_request_items`, `refunds.return_request_id` + lý do `RETURN` (CHECK), cấp `RETURN_CREATE`/`RETURN_VIEW` cho user hiện có `ORDER_CREATE`/`ORDER_VIEW_DETAIL`; idempotent, `down` từ chối nếu đã có khoản hoàn `RETURN` |
+| `1791895935291-AddPaymentAttemptCreatedBy` | `payment_attempts.created_by` (FK users SET NULL, index): admin tạo mã QR cho đơn; idempotent |
 
 ### 4.10 Biến môi trường (chỉ tên)
 

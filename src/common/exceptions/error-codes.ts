@@ -97,6 +97,21 @@ export enum EPaymentErrorCode {
   PAYMENT_TRANSACTION_NOT_FOUND = 1708,
   PAYMENT_TRANSACTION_NOT_CONFIRMABLE = 1709,
   PAYMENT_AMOUNT_MISMATCH = 1710,
+  REFUND_NOT_FOUND = 1711,
+  REFUND_NOT_ALLOWED = 1712,
+  REFUND_NOT_PENDING = 1713,
+  REFUND_REFERENCE_DUPLICATE = 1714,
+}
+
+// ============================================
+// RETURN MODULE ERRORS (18xx)
+// ============================================
+export enum EReturnErrorCode {
+  RETURN_NOT_FOUND = 1801,
+  RETURN_NOT_ALLOWED = 1802,
+  RETURN_ITEM_INVALID = 1803,
+  RETURN_INVALID_STATE = 1804,
+  RETURN_RECEIVE_INVALID = 1805,
 }
 
 // ============================================
@@ -156,4 +171,13 @@ export const ErrorMessages: Record<number, string> = {
   [EPaymentErrorCode.PAYMENT_TRANSACTION_NOT_FOUND]: 'Payment transaction not found',
   [EPaymentErrorCode.PAYMENT_TRANSACTION_NOT_CONFIRMABLE]: 'This transaction cannot be used to confirm the payment',
   [EPaymentErrorCode.PAYMENT_AMOUNT_MISMATCH]: 'Transaction amount does not match the amount of the payment session',
+  [EPaymentErrorCode.REFUND_NOT_FOUND]: 'Refund not found',
+  [EPaymentErrorCode.REFUND_NOT_ALLOWED]: 'This order cannot be refunded',
+  [EPaymentErrorCode.REFUND_NOT_PENDING]: 'This refund has already been processed',
+  [EPaymentErrorCode.REFUND_REFERENCE_DUPLICATE]: 'This bank reference is already used by another refund',
+  [EReturnErrorCode.RETURN_NOT_FOUND]: 'Return request not found',
+  [EReturnErrorCode.RETURN_NOT_ALLOWED]: 'This order cannot be returned',
+  [EReturnErrorCode.RETURN_ITEM_INVALID]: 'Invalid items in the return request',
+  [EReturnErrorCode.RETURN_INVALID_STATE]: 'This action is not allowed for the current status of the return request',
+  [EReturnErrorCode.RETURN_RECEIVE_INVALID]: 'Invalid data to confirm the received goods',
 };

@@ -2,8 +2,10 @@ import { ORDER_PAYMENT_STATUSES } from '@common/constants/enum-values.constant';
 import { SearchField } from '@common/decorator/search-field.decorator';
 import { SortField } from '@common/decorator/sort-field.decorator';
 import { PaginationQueryDto } from '@common/dto/pagination-query.dto';
+import { parseQueryBoolean } from '@common/dto/query-boolean.transform';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsBoolean, IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
 import { ORDER_STATUSES } from './admin-order.dto';
 
 export class AdminOrderQueryDto extends PaginationQueryDto {
@@ -27,6 +29,16 @@ export class AdminOrderQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsIn(ORDER_PAYMENT_STATUSES)
   paymentStatus?: string;
+
+  @ApiPropertyOptional({
+    type: Boolean,
+    description:
+      'true = chỉ đơn cần admin thao tác: status `pending` hoặc `confirmed`, trừ đơn `pending` chưa thanh toán đang có mã QR còn hạn. Khớp con số `orders` của GET /api/admin/pending-counts. false/bỏ trống = không lọc',
+  })
+  @Transform(parseQueryBoolean)
+  @IsBoolean()
+  @IsOptional()
+  needsAction?: boolean;
 
   @SortField(['createdAt', 'total'], '-createdAt')
   sort?: string;

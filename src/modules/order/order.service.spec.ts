@@ -5,6 +5,9 @@ import { Cart } from '../cart/cart.entity';
 import { CartItem } from '../cart/cart-item.entity';
 import { PaymentService } from '../payment/payment.service';
 import { createFakeManager } from '../payment/payment.test-utils';
+import { PaymentAttempt } from '../payment/payment-attempt.entity';
+import { Refund } from '../payment/refund.entity';
+import { RefundService } from '../payment/refund.service';
 import { DEFAULT_SHIPPING_CONFIG, ShippingConfig } from '../shipping/shipping-config';
 import { Order } from './order.entity';
 import { OrderService } from './order.service';
@@ -61,7 +64,7 @@ function setup(cartItems: Item[], shippingConfig: ShippingConfig = DEFAULT_SHIPP
   const shippingConfigService: any = { get: jest.fn(async () => shippingConfig) };
   const paymentConfigService: any = { getVndPerUnit: jest.fn(() => vndPerUnit) };
   const paymentService: any = { listAttemptsForCustomer: jest.fn(async () => []), cancelPendingAttempts: jest.fn(async () => undefined) };
-  const service = new OrderService({} as any, dataSource, shippingConfigService, paymentConfigService, paymentService);
+  const service = new OrderService({} as any, dataSource, shippingConfigService, paymentConfigService, paymentService, {} as any);
   return { service, manager, deleted, savedOrders, savedItems, shippingConfigService, paymentService };
 }
 
@@ -453,7 +456,7 @@ describe('OrderService.checkout', () => {
   });
 });
 
-describe('OrderService.findOne — payment attempts for the customer', () => {
+describe('OrderService.findOne — payment attempts and refunds for the customer', () => {
   const attempts = [
     {
       transferCode: 'DHNEW00000',
@@ -474,93 +477,183 @@ describe('OrderService.findOne — payment attempts for the customer', () => {
       transactionRef: null,
     },
   ];
-  function make(order: any, listed: any[] = attempts) {
+  const listedRefunds = [
+    {
+      amount: 3_375_000,
+      status: 'COMPLETED',
+      reason: 'ADMIN_CANCELLED',
+      createdAt: new Date(),
+      processedAt: new Date(),
+      bankReference: 'FT1',
+    },
+  ];
+  function make(order: any, listed: any[] = attempts, refunds: any[] = []) {
     const orderRepo: any = {
       findOne: jest.fn(async ({ where }: any) => (order && where.id === order.id && where.userId === order.userId ? order : null)),
-      save: jest.fn(async (o: any) => o),
     };
-    const paymentService: any = {
-      listAttemptsForCustomer: jest.fn(async () => listed),
-      cancelPendingAttempts: jest.fn(async () => undefined),
-    };
-    const service = new OrderService(orderRepo, {} as any, {} as any, {} as any, paymentService);
-    return { service, orderRepo, paymentService };
+    const paymentService: any = { listAttemptsForCustomer: jest.fn(async () => listed) };
+    const refundService: any = { listForCustomer: jest.fn(async () => refunds) };
+    const service = new OrderService(orderRepo, {} as any, {} as any, {} as any, paymentService, refundService);
+    return { service, orderRepo, paymentService, refundService };
   }
   const order = { id: 'o1', userId: 'u1', status: 'pending', total: '135.00', items: [{ id: 'i1' }] };
 
-  it('returns the order with items and paymentAttempts (newest first, as given by the payment service)', async () => {
-    const { service, paymentService } = make(order);
+  it('returns the order with items, paymentAttempts (newest first, as given by the payment service) and refunds', async () => {
+    const { service, paymentService, refundService } = make(order, attempts, listedRefunds);
     const { data } = await service.findOne('u1', 'o1');
     expect(data).toMatchObject({ id: 'o1', total: '135.00', items: [{ id: 'i1' }] });
     expect(data.paymentAttempts).toEqual(attempts);
+    expect(data.refunds).toEqual(listedRefunds);
     expect(paymentService.listAttemptsForCustomer).toHaveBeenCalledWith(order);
+    expect(refundService.listForCustomer).toHaveBeenCalledWith('o1');
   });
 
-  it('returns an empty array for an order that never had a payment session', async () => {
+  it('returns empty arrays for an order that never had a payment session or a refund', async () => {
     const { service } = make(order, []);
-    expect((await service.findOne('u1', 'o1')).data.paymentAttempts).toEqual([]);
+    const { data } = await service.findOne('u1', 'o1');
+    expect(data.paymentAttempts).toEqual([]);
+    expect(data.refunds).toEqual([]);
   });
 
-  it("404 for another user's order and never asks for its payment attempts", async () => {
-    const { service, paymentService } = make(order);
+  it("404 for another user's order and never asks for its payment attempts or refunds", async () => {
+    const { service, paymentService, refundService } = make(order);
     await expect(service.findOne('someone-else', 'o1')).rejects.toMatchObject({ status: 404 });
     await expect(service.findOne('u1', 'nope')).rejects.toMatchObject({ status: 404 });
     expect(paymentService.listAttemptsForCustomer).not.toHaveBeenCalled();
-  });
-
-  it('cancel() returns the same shape, so the freshly cancelled order shows its sessions', async () => {
-    const { service, paymentService } = make({ ...order });
-    const { data } = await service.cancel('u1', 'o1');
-    expect(data.status).toBe('cancelled');
-    expect(data.paymentAttempts).toEqual(attempts);
-    expect(paymentService.listAttemptsForCustomer).toHaveBeenCalledWith(expect.objectContaining({ status: 'cancelled' }));
+    expect(refundService.listForCustomer).not.toHaveBeenCalled();
   });
 });
 
-describe('OrderService cancel rules with payments', () => {
-  function make(order: any) {
-    const orderRepo: any = {
-      findOne: jest.fn(async ({ where }: any) =>
-        where.id === order.id && (!where.userId || where.userId === order.userId) ? order : null,
-      ),
-      save: jest.fn(async (o: any) => o),
-    };
-    const paymentService: any = { listAttemptsForCustomer: jest.fn(async () => []), cancelPendingAttempts: jest.fn(async () => undefined) };
-    return { service: new OrderService(orderRepo, {} as any, {} as any, {} as any, paymentService), orderRepo, paymentService };
-  }
+/** Huỷ đơn với thanh toán + hoàn tiền: dùng `RefundService` thật trên EntityManager giả trong bộ nhớ */
+describe('OrderService cancel rules with payments and refunds', () => {
+  const paidAttempt = { id: 'att-paid', orderId: 'o1', status: 'PAID', amount: 3_375_000, transferCode: 'DHPAID0000', paidAt: new Date() };
   const base = { id: 'o1', userId: 'u1', status: 'pending', paymentStatus: 'unpaid', items: [] };
 
-  it('customer cancels an unpaid pending order and its pending payment codes are cancelled too', async () => {
-    const { service, paymentService } = make({ ...base });
+  function make(order: any, seed: { attempts?: any[]; refunds?: any[] } = {}) {
+    const manager = createFakeManager({ orders: [{ ...order }], attempts: seed.attempts ?? [], refunds: seed.refunds ?? [] });
+    const dataSource: any = { transaction: (cb: any) => cb(manager) };
+    const orderRepo: any = {
+      findOne: jest.fn(async ({ where }: any) => {
+        const row = manager.tables.get(Order)!.find((o) => o.id === where.id && (!where.userId || o.userId === where.userId));
+        return row ?? null;
+      }),
+    };
+    const paymentService: any = {
+      listAttemptsForCustomer: jest.fn(async () => []),
+      cancelPendingAttempts: jest.fn(async (orderId: string, m: any) =>
+        m.update(PaymentAttempt, { orderId, status: 'PENDING' }, { status: 'CANCELLED' }),
+      ),
+    };
+    const refundRepo: any = { find: (opts: any) => manager.find(Refund, opts) };
+    const refundService = new RefundService(dataSource, refundRepo, {} as any);
+    const service = new OrderService(orderRepo, dataSource, {} as any, {} as any, paymentService, refundService);
+    const row = () => manager.tables.get(Order)![0];
+    const refunds = () => manager.tables.get(Refund)!;
+    return { service, manager, paymentService, row, refunds };
+  }
+
+  it('customer cancels an unpaid pending order: its pending payment codes are cancelled and no refund is created', async () => {
+    const pending = { id: 'att-1', orderId: 'o1', status: 'PENDING', amount: 1, transferCode: 'DHAAAAAAAA' };
+    const { service, paymentService, refunds, manager } = make({ ...base }, { attempts: [pending] });
     const { data } = await service.cancel('u1', 'o1');
     expect(data.status).toBe('cancelled');
-    expect(paymentService.cancelPendingAttempts).toHaveBeenCalledWith('o1');
+    expect(data.refunds).toEqual([]);
+    expect(pending.status).toBe('CANCELLED');
+    expect(paymentService.cancelPendingAttempts).toHaveBeenCalledWith('o1', manager);
+    expect(refunds()).toHaveLength(0);
   });
 
-  it('customer cannot cancel a paid order (1307) — even if it is still pending — and nothing changes', async () => {
-    const { service, orderRepo, paymentService } = make({ ...base, paymentStatus: 'paid' });
+  it.each([
+    'pending',
+    'confirmed',
+    'shipping',
+    'delivered',
+    'completed',
+  ])('customer cannot cancel a paid order, whatever its status (%s) → 1307; nothing changes, no refund', async (status) => {
+    const { service, row, refunds, paymentService } = make({ ...base, status, paymentStatus: 'paid' }, { attempts: [paidAttempt] });
     await expect(service.cancel('u1', 'o1')).rejects.toMatchObject({ status: 400, response: { errorCode: 1307 } });
-    expect(orderRepo.save).not.toHaveBeenCalled();
+    expect(row().status).toBe(status);
+    expect(row().paymentStatus).toBe('paid');
+    expect(refunds()).toHaveLength(0);
     expect(paymentService.cancelPendingAttempts).not.toHaveBeenCalled();
   });
 
-  it('a paid order is auto-confirmed, so the old rule (only pending can be cancelled) also blocks the customer', async () => {
-    const { service } = make({ ...base, status: 'confirmed', paymentStatus: 'paid' });
-    await expect(service.cancel('u1', 'o1')).rejects.toMatchObject({ response: { errorCode: 1307 } });
+  it.each([
+    'paid',
+    'refunded',
+  ])('cancelling an already cancelled %s order is a plain 400 and creates no second refund', async (paymentStatus) => {
+    const { service, refunds } = make({ ...base, status: 'cancelled', paymentStatus }, { attempts: [paidAttempt] });
+    await expect(service.cancel('u1', 'o1')).rejects.toMatchObject({ status: 400 });
+    expect(refunds()).toHaveLength(0);
   });
 
   it('customer still gets the plain error for an unpaid order that already moved on', async () => {
-    const { service } = make({ ...base, status: 'confirmed' });
+    const { service, row } = make({ ...base, status: 'confirmed' });
     await expect(service.cancel('u1', 'o1')).rejects.toMatchObject({ status: 400 });
+    expect(row().status).toBe('confirmed');
   });
 
-  it('admin moving an order to cancelled also cancels its pending payment codes; other transitions do not', async () => {
-    const cancelled = make({ ...base });
-    await cancelled.service.updateStatus('o1', { status: 'cancelled' });
-    expect(cancelled.paymentService.cancelPendingAttempts).toHaveBeenCalledWith('o1');
+  it("404 for another user's order and nothing changes", async () => {
+    const { service, row, refunds } = make({ ...base, status: 'confirmed', paymentStatus: 'paid' }, { attempts: [paidAttempt] });
+    await expect(service.cancel('someone-else', 'o1')).rejects.toMatchObject({ status: 404 });
+    expect(row().status).toBe('confirmed');
+    expect(refunds()).toHaveLength(0);
+  });
 
-    const confirmed = make({ ...base });
-    await confirmed.service.updateStatus('o1', { status: 'confirmed' });
+  it('admin cancelling a paid order that has no paid payment session is refused (1712) and its status is untouched', async () => {
+    const { service, row } = make({ ...base, status: 'confirmed', paymentStatus: 'paid' }, { attempts: [] });
+    await expect(service.updateStatus('admin-1', 'o1', { status: 'cancelled' })).rejects.toMatchObject({ response: { errorCode: 1712 } });
+    expect(row().status).toBe('confirmed');
+  });
+
+  it('admin cancelling a paid order creates the refund request (ADMIN_CANCELLED, requested by that admin)', async () => {
+    const { service, row, refunds } = make({ ...base, status: 'confirmed', paymentStatus: 'paid' }, { attempts: [paidAttempt] });
+    await service.updateStatus('admin-1', 'o1', { status: 'cancelled' });
+    expect(row().status).toBe('cancelled');
+    expect(refunds()).toEqual([
+      expect.objectContaining({ amount: 3_375_000, status: 'REQUESTED', reason: 'ADMIN_CANCELLED', requestedBy: 'admin-1' }),
+    ]);
+  });
+
+  it('admin moving an unpaid order to cancelled cancels its pending payment codes and creates no refund; other transitions do neither', async () => {
+    const cancelled = make({ ...base });
+    await cancelled.service.updateStatus('admin-1', 'o1', { status: 'cancelled' });
+    expect(cancelled.paymentService.cancelPendingAttempts).toHaveBeenCalledWith('o1', cancelled.manager);
+    expect(cancelled.refunds()).toHaveLength(0);
+
+    const confirmed = make({ ...base, paymentStatus: 'paid' }, { attempts: [paidAttempt] });
+    await confirmed.service.updateStatus('admin-1', 'o1', { status: 'confirmed' });
+    expect(confirmed.row().status).toBe('confirmed');
     expect(confirmed.paymentService.cancelPendingAttempts).not.toHaveBeenCalled();
+    expect(confirmed.refunds()).toHaveLength(0);
+  });
+
+  it('admin cannot cancel once shipping (no refund is created by an invalid transition)', async () => {
+    const { service, row, refunds } = make({ ...base, status: 'shipping', paymentStatus: 'paid' }, { attempts: [paidAttempt] });
+    await expect(service.updateStatus('admin-1', 'o1', { status: 'cancelled' })).rejects.toMatchObject({ response: { errorCode: 1302 } });
+    expect(row().status).toBe('shipping');
+    expect(refunds()).toHaveLength(0);
+  });
+
+  it('admin: unknown order → 1301', async () => {
+    const { service } = make({ ...base });
+    await expect(service.updateStatus('admin-1', 'nope', { status: 'confirmed' })).rejects.toMatchObject({ response: { errorCode: 1301 } });
+  });
+
+  it('moving an order to delivered stamps delivered_at (the start of the return window); other statuses do not', async () => {
+    const delivered = make({ ...base, status: 'shipping' });
+    await delivered.service.updateStatus('admin-1', 'o1', { status: 'delivered' });
+    expect(delivered.row().status).toBe('delivered');
+    expect(delivered.row().deliveredAt).toBeInstanceOf(Date);
+
+    const shipping = make({ ...base, status: 'confirmed' });
+    await shipping.service.updateStatus('admin-1', 'o1', { status: 'shipping' });
+    expect(shipping.row().deliveredAt).toBeUndefined();
+
+    // completed giữ nguyên mốc đã giao
+    const stamp = new Date('2026-01-01');
+    const completed = make({ ...base, status: 'delivered', deliveredAt: stamp });
+    await completed.service.updateStatus('admin-1', 'o1', { status: 'completed' });
+    expect(completed.row().deliveredAt).toBe(stamp);
   });
 });

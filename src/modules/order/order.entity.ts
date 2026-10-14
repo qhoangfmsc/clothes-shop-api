@@ -29,12 +29,16 @@ export class Order extends BaseEntity {
   @Column({ type: 'varchar', length: 500, default: '' })
   note: string;
 
-  /** Tách khỏi `status` (luồng giao hàng): chỉ webhook SePay hợp lệ mới đổi unpaid → paid */
+  /** Tách khỏi `status` (luồng giao hàng): webhook SePay / admin xác nhận đổi unpaid → paid; admin hoàn tiền xong đổi paid → refunded */
   @Column({ type: 'varchar', length: 10, default: 'unpaid', name: 'payment_status' })
-  paymentStatus: string; // unpaid | paid
+  paymentStatus: string; // unpaid | paid | refunded
 
   @Column({ type: 'timestamp with time zone', nullable: true, name: 'paid_at' })
   paidAt: Date | null;
+
+  /** Lúc admin chuyển đơn sang `delivered`: mốc tính hạn đổi trả (`returnPolicy.days`) */
+  @Column({ type: 'timestamp with time zone', nullable: true, name: 'delivered_at' })
+  deliveredAt: Date | null;
 
   @ManyToOne(() => User, { onDelete: 'SET NULL' })
   @JoinColumn({ name: 'user_id' })

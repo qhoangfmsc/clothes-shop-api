@@ -300,3 +300,90 @@ describe('PaymentService.listAttemptsForCustomer', () => {
     expect((await statusService.getStatus('u1', 'o1')).data.status).toBe(fromList);
   });
 });
+
+describe('PaymentService.createQrAdmin', () => {
+  it('creates a code for any customer’s order, recorded as created by that admin, amount from the DB total', async () => {
+    const { service, attempts, manager } = setup({ orders: [order({ userId: 'someone-else' })] });
+    const { data } = await service.createQrAdmin('adm-1', 'o1');
+    expect(attempts()).toHaveLength(1);
+    expect(attempts()[0]).toMatchObject({
+      orderId: 'o1',
+      status: 'PENDING',
+      amount: 4_625_000,
+      createdBy: 'adm-1',
+      transferCode: data.transferContent,
+    });
+    expect(data).toMatchObject({ orderId: 'o1', amount: 4_625_000, status: 'PENDING', supersededTransferCodes: [] });
+    expect(data.transferContent).toMatch(/^DH[A-HJ-NP-Z2-9]{8}$/);
+    expect(data.qrUrl).toContain(`des=${data.transferContent}`);
+    expect(manager.locks[0]).toContain('Order');
+  });
+
+  it('every pending code of the order expires immediately and is reported; older EXPIRED/CANCELLED codes are untouched', async () => {
+    const pending = attempt({ id: 'a-pending', transferCode: 'DHPENDING1' });
+    const expired = attempt({ id: 'a-old', transferCode: 'DHEXPIRED1', status: 'EXPIRED', expiresAt: pastDate() });
+    const cancelled = attempt({ id: 'a-cx', transferCode: 'DHCANCEL11', status: 'CANCELLED' });
+    const { service, attempts } = setup({ orders: [order()], attempts: [pending, expired, cancelled] });
+
+    const { data } = await service.createQrAdmin('adm-1', 'o1');
+
+    expect(data.supersededTransferCodes).toEqual(['DHPENDING1']);
+    expect(pending.status).toBe('EXPIRED');
+    expect(pending.expiresAt.getTime()).toBeLessThanOrEqual(Date.now());
+    expect(expired.status).toBe('EXPIRED');
+    expect(cancelled.status).toBe('CANCELLED');
+    expect(attempts().filter((a) => a.status === 'PENDING')).toHaveLength(1); // đúng một mã còn hiệu lực
+    expect(attempts().filter((a) => a.status === 'PENDING')[0].transferCode).toBe(data.transferContent);
+  });
+
+  it('asking again always issues yet another new code and expires the previous admin code', async () => {
+    const { service, attempts } = setup({ orders: [order()] });
+    const first = (await service.createQrAdmin('adm-1', 'o1')).data;
+    const second = (await service.createQrAdmin('adm-1', 'o1')).data;
+    expect(second.transferContent).not.toBe(first.transferContent);
+    expect(second.supersededTransferCodes).toEqual([first.transferContent]);
+    expect(
+      attempts()
+        .map((a) => a.status)
+        .sort(),
+    ).toEqual(['EXPIRED', 'PENDING']);
+  });
+
+  it('the customer then reuses the admin’s still-valid code instead of creating one (same value everywhere)', async () => {
+    const { service, attempts } = setup({ orders: [order()] });
+    const admin = (await service.createQrAdmin('adm-1', 'o1')).data;
+    const customer = (await service.createQr('u1', { orderId: 'o1' })).data;
+    expect(customer.transferContent).toBe(admin.transferContent);
+    expect(attempts()).toHaveLength(1);
+  });
+
+  it.each([
+    ['already paid', { paymentStatus: 'paid' }],
+    ['refunded', { paymentStatus: 'refunded' }],
+    ['cancelled', { status: 'cancelled' }],
+  ])('refuses an order that is %s (1702) without touching its codes', async (_name, over) => {
+    const pending = attempt();
+    const { service, attempts } = setup({ orders: [order(over)], attempts: [pending] });
+    await expect(service.createQrAdmin('adm-1', 'o1')).rejects.toMatchObject({ response: { errorCode: 1702 } });
+    expect(pending.status).toBe('PENDING');
+    expect(attempts()).toHaveLength(1);
+  });
+
+  it('unknown order → 404 / 1301; missing configuration → 503 / 1701 and nothing is touched', async () => {
+    const h = setup({ orders: [order()], attempts: [attempt()] });
+    await expect(h.service.createQrAdmin('adm-1', 'nope')).rejects.toMatchObject({ status: 404, response: { errorCode: 1301 } });
+
+    const broken = setup({ orders: [order()], attempts: [attempt()] });
+    (broken.service as any).paymentConfig.getQrConfig = () => {
+      throw Object.assign(new Error('not configured'), { status: 503 });
+    };
+    await expect(broken.service.createQrAdmin('adm-1', 'o1')).rejects.toMatchObject({ status: 503 });
+    expect(broken.attempts()[0].status).toBe('PENDING');
+  });
+
+  it('customer-created codes keep created_by null', async () => {
+    const { service, attempts } = setup({ orders: [order()] });
+    await service.createQr('u1', { orderId: 'o1' });
+    expect(attempts()[0].createdBy).toBeNull();
+  });
+});
