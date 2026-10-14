@@ -1,6 +1,6 @@
 # common & core (`src/common`, `src/core`, `src/main*.ts`, `src/migrations`)
 
-> Cập nhật lần cuối: 2026-10-13
+> Cập nhật lần cuối: 2026-10-14
 
 ## 1. Tổng quan
 
@@ -116,8 +116,10 @@ Format `[MM][SS]`, nhóm theo module.
 | Payment admin | `PAYMENT_ADMIN_VIEW 14000`, `PAYMENT_ADMIN_CONFIRM 14001`, `PAYMENT_ADMIN_REFUND 14002`, `PAYMENT_ADMIN_CREATE_QR 14003` |
 | Return (khách) | `RETURN_CREATE 15000`, `RETURN_VIEW 15001` |
 | Return admin | `RETURN_ADMIN_VIEW 16000`, `RETURN_ADMIN_PROCESS 16001` |
+| Review (khách) | `REVIEW_CREATE 17000`, `REVIEW_VIEW 17001`, `REVIEW_VOTE 17002` |
+| Review admin | `REVIEW_ADMIN_VIEW 18000`, `REVIEW_ADMIN_MODERATE 18001`, `REVIEW_ADMIN_REPLY 18002` |
 
-`DEFAULT_USER_PERMISSIONS` (gán cho user mới đăng nhập lần đầu, role `user`): `AUTH_ME`, `AUTH_REFRESH`, toàn bộ nhóm Cart, Order (khách), Payment (khách), Return (khách), Address, Wishlist. Admin không cần khai báo.
+`DEFAULT_USER_PERMISSIONS` (gán cho user mới đăng nhập lần đầu, role `user`): `AUTH_ME`, `AUTH_REFRESH`, toàn bộ nhóm Cart, Order (khách), Payment (khách), Return (khách), Review (khách), Address, Wishlist. Admin không cần khai báo.
 
 ### 4.5 Phân trang / sort / search / response chuẩn cho API list
 
@@ -162,9 +164,10 @@ Format `[MM][EE]` (4 chữ số). `throwAppError(errorCode, message?, statusCode
 | 13xx | Order | `EOrderErrorCode` | 1301–1307 |
 | 14xx | User | `EUserErrorCode` | 1401–1402 |
 | 15xx | Site config | `ESiteConfigErrorCode` | 1501–1503 |
-| 16xx | Media | `EMediaErrorCode` | 1601–1606 |
+| 16xx | Media | `EMediaErrorCode` | 1601–1607 |
 | 17xx | Payment | `EPaymentErrorCode` | 1701–1714 |
 | 18xx | Return | `EReturnErrorCode` | 1801–1805 |
+| 19xx | Review | `EReviewErrorCode` | 1901–1908 |
 | 90xx | Permission | `EPermissionErrorCode` | 9001 `PERMISSION_DENIED`, 9002 `NO_PERMISSION_DEFINED` |
 
 Chi tiết từng mã nằm ở mục Error code của module tương ứng.
@@ -222,6 +225,8 @@ Entity **không** extends `BaseEntity` (tự khai báo id nanoid16): `Wishlist` 
 | `1791879846109-AddRefunds` | `orders.payment_status` thêm `refunded` (CHECK, và `CK_orders_paid_at` tính cả `refunded`); bảng `refunds` (CHECK, FK RESTRICT/SET NULL, UNIQUE từng phần một yêu cầu đang chờ mỗi đơn và một `bank_reference`); idempotent, `down` đưa `refunded` về `paid` và bỏ bảng |
 | `1791884003973-AddReturns` | `orders.delivered_at` (+ CHECK, điền `updated_at` cho đơn đã giao), bảng `return_requests`, `return_request_items`, `refunds.return_request_id` + lý do `RETURN` (CHECK), cấp `RETURN_CREATE`/`RETURN_VIEW` cho user hiện có `ORDER_CREATE`/`ORDER_VIEW_DETAIL`; idempotent, `down` từ chối nếu đã có khoản hoàn `RETURN` |
 | `1791895935291-AddPaymentAttemptCreatedBy` | `payment_attempts.created_by` (FK users SET NULL, index): admin tạo mã QR cho đơn; idempotent |
+| `1791966947507-AddReviewFeatures` | `reviews`: `order_item_id` (FK order_items SET NULL, UNIQUE), `size`, `color`, `fit`, `status`, `helpful_count`, `edited_at`, kiểm duyệt (`moderation_note`, `moderated_by/at`), phản hồi (`reply`, `replied_by/at`) + CHECK/FK/index; bảng `review_votes`; cấp `REVIEW_CREATE`/`REVIEW_VIEW`/`REVIEW_VOTE` cho user hiện có `ORDER_CREATE`; idempotent, `down` từ chối nếu đã có đánh giá của khách |
+| `1791968077807-AddReviewImagesAndProductRating` | `media_files.purpose` (`LIBRARY`/`REVIEW`, CHECK) + `uploaded_by` (FK users SET NULL, index); `reviews.images` (jsonb, CHECK mảng ≤ 5 phần tử); `products.rating_average`/`rating_count` (CHECK, index) điền lại từ đánh giá `PUBLISHED`; idempotent, `down` từ chối nếu đã có ảnh đánh giá |
 
 ### 4.10 Biến môi trường (chỉ tên)
 

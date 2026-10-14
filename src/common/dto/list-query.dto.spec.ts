@@ -9,7 +9,7 @@ const pipe = new ValidationPipe({ transform: true, whitelist: true, forbidNonWhi
 const run = (metatype: new () => object, query: unknown) => pipe.transform(query, { type: 'query', metatype });
 
 // Query DTO KHÔNG phải API list (không phân trang) — thêm vào đây phải có lý do rõ ràng
-const NOT_LIST_DTO_FILES = ['product-autocomplete-query.dto.ts', 'public-site-config-query.dto.ts'];
+const NOT_LIST_DTO_FILES = ['product-autocomplete-query.dto.ts', 'public-site-config-query.dto.ts', 'my-review-votes-query.dto.ts'];
 
 // Mọi file *-query.dto.ts trong modules/*/dtos là DTO của API list → phải theo chuẩn chung (xem CLAUDE.md "List API Standards")
 const modulesDir = path.join(__dirname, '..', '..', 'modules');

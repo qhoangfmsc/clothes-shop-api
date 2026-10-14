@@ -6,10 +6,16 @@ import { EMediaErrorCode } from '@common/exceptions/error-codes';
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { MediaFileDto } from './dtos/media-file.dto';
 import { MediaQueryDto } from './dtos/media-query.dto';
-import { MEDIA_ALLOWED_MIME_TYPES, MEDIA_KEY_PREFIX_LENGTH, MediaMimeType } from './media.constant';
+import {
+  MEDIA_ALLOWED_MIME_TYPES,
+  MEDIA_KEY_PREFIX_LENGTH,
+  MediaMimeType,
+  MediaPurpose,
+  REVIEW_UPLOAD_LIMIT_PER_DAY,
+} from './media.constant';
 import { MediaFile } from './media-file.entity';
 
 /** Phần cấu hình đủ để dựng URL công khai (không cần service key) */
@@ -59,7 +65,8 @@ export class MediaService {
     // Chỉ đọc DB và dựng URL công khai — cần SUPABASE_URL + bucket, không cần service key.
     // Kiểm tra 1 lần ở đầu để kết quả không phụ thuộc việc có file hay không.
     const publicConfig = this.getPublicConfig();
-    const qb = this.mediaRepo.createQueryBuilder('m');
+    // Thư viện admin chỉ gồm ảnh LIBRARY; ảnh khách đính vào đánh giá không hiện ở đây
+    const qb = this.mediaRepo.createQueryBuilder('m').andWhere('m.purpose = :purpose', { purpose: 'LIBRARY' });
     const { items, total, page, limit } = await typeormListQuery(qb, 'm', query, { searchableColumns: ['name'] });
 
     return paginated(
@@ -70,7 +77,14 @@ export class MediaService {
     );
   }
 
-  async upload(file?: Express.Multer.File) {
+  /**
+   * Upload 1 ảnh. `owner` mặc định là thư viện admin (`LIBRARY`); với `REVIEW` ảnh gắn với `uploadedBy` và mỗi user chỉ upload tối đa
+   * `REVIEW_UPLOAD_LIMIT_PER_DAY` ảnh trong 24 giờ (chặn lạm dụng dung lượng).
+   */
+  async upload(
+    file?: Express.Multer.File,
+    owner: { purpose: MediaPurpose; uploadedBy: string | null } = { purpose: 'LIBRARY', uploadedBy: null },
+  ) {
     const config = this.getConfig();
 
     if (!file?.buffer?.length) {
@@ -81,6 +95,19 @@ export class MediaService {
     const mimeType = this.sniffImageMime(file.buffer);
     if (!mimeType) {
       throwAppError(EMediaErrorCode.MEDIA_INVALID_TYPE);
+    }
+
+    if (owner.purpose === 'REVIEW' && owner.uploadedBy) {
+      const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const recent = await this.mediaRepo
+        .createQueryBuilder('m')
+        .where('m.uploadedBy = :userId', { userId: owner.uploadedBy })
+        .andWhere('m.purpose = :purpose', { purpose: 'REVIEW' })
+        .andWhere('m.createdAt >= :since', { since })
+        .getCount();
+      if (recent >= REVIEW_UPLOAD_LIMIT_PER_DAY) {
+        throwAppError(EMediaErrorCode.MEDIA_UPLOAD_LIMIT_REACHED, undefined, HttpStatus.TOO_MANY_REQUESTS);
+      }
     }
 
     const key = `${randomBytes(MEDIA_KEY_PREFIX_LENGTH / 2).toString('hex')}-${this.sanitizeName(file.originalname, mimeType)}`;
@@ -95,7 +122,14 @@ export class MediaService {
     let media: MediaFile;
     try {
       media = await this.mediaRepo.save(
-        this.mediaRepo.create({ name: this.displayName(file.originalname), storageKey: key, mimeType, size: file.size }),
+        this.mediaRepo.create({
+          name: this.displayName(file.originalname),
+          storageKey: key,
+          mimeType,
+          size: file.size,
+          purpose: owner.purpose,
+          uploadedBy: owner.uploadedBy,
+        }),
       );
     } catch (err) {
       // Không để lại object mồ côi trên storage khi ghi DB lỗi
@@ -109,7 +143,8 @@ export class MediaService {
   async delete(fileId: string) {
     const config = this.getConfig();
 
-    const media = await this.mediaRepo.findOne({ where: { id: fileId } });
+    // Chỉ xoá được file thư viện; ảnh đánh giá của khách không xoá qua đây
+    const media = await this.mediaRepo.findOne({ where: { id: fileId, purpose: 'LIBRARY' } });
     if (!media) {
       throwAppError(EMediaErrorCode.MEDIA_FILE_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
     }
@@ -120,6 +155,31 @@ export class MediaService {
     await this.mediaRepo.delete({ id: media.id });
 
     return { ok: true };
+  }
+
+  /**
+   * Xác nhận mọi URL là ảnh REVIEW do chính `userId` upload và trả URL chuẩn hoá (dựng lại từ storage key, theo đúng thứ tự gửi lên).
+   * Trả `null` nếu có URL không thuộc bucket này, không phải ảnh của user, hoặc không phải ảnh đánh giá.
+   */
+  async resolveReviewImageUrls(userId: string, urls: string[]): Promise<string[] | null> {
+    if (urls.length === 0) return [];
+    const config = this.getPublicConfig();
+    const prefix = `${config.baseUrl}/storage/v1/object/public/${encodeURIComponent(config.bucket)}/`;
+
+    const keys: string[] = [];
+    for (const url of urls) {
+      if (!url.startsWith(prefix)) return null;
+      try {
+        keys.push(decodeURIComponent(url.slice(prefix.length)));
+      } catch {
+        return null;
+      }
+    }
+
+    const owned = await this.mediaRepo.find({ where: { storageKey: In(keys), purpose: 'REVIEW', uploadedBy: userId } });
+    const ownedKeys = new Set(owned.map((m) => m.storageKey));
+    if (!keys.every((key) => ownedKeys.has(key))) return null;
+    return keys.map((key) => this.publicUrl(config, key));
   }
 
   // ============================================

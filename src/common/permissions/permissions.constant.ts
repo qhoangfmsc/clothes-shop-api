@@ -119,6 +119,16 @@ export enum Permission {
   RETURN_VIEW = 15001,
   RETURN_ADMIN_VIEW = 16000,
   RETURN_ADMIN_PROCESS = 16001,
+
+  // ============================================
+  // REVIEW (170xx) + REVIEW ADMIN (180xx)
+  // ============================================
+  REVIEW_CREATE = 17000,
+  REVIEW_VIEW = 17001,
+  REVIEW_VOTE = 17002,
+  REVIEW_ADMIN_VIEW = 18000,
+  REVIEW_ADMIN_MODERATE = 18001,
+  REVIEW_ADMIN_REPLY = 18002,
 }
 
 /**
@@ -145,6 +155,10 @@ export const DEFAULT_USER_PERMISSIONS: Permission[] = [
 
   Permission.RETURN_CREATE,
   Permission.RETURN_VIEW,
+
+  Permission.REVIEW_CREATE,
+  Permission.REVIEW_VIEW,
+  Permission.REVIEW_VOTE,
 
   Permission.ADDRESS_VIEW,
   Permission.ADDRESS_CREATE,

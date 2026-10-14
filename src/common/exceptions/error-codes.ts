@@ -81,6 +81,7 @@ export enum EMediaErrorCode {
   MEDIA_FILE_NOT_FOUND = 1604,
   MEDIA_STORAGE_ERROR = 1605,
   MEDIA_FILE_TOO_LARGE = 1606,
+  MEDIA_UPLOAD_LIMIT_REACHED = 1607,
 }
 
 // ============================================
@@ -112,6 +113,20 @@ export enum EReturnErrorCode {
   RETURN_ITEM_INVALID = 1803,
   RETURN_INVALID_STATE = 1804,
   RETURN_RECEIVE_INVALID = 1805,
+}
+
+// ============================================
+// REVIEW MODULE ERRORS (19xx)
+// ============================================
+export enum EReviewErrorCode {
+  REVIEW_NOT_FOUND = 1901,
+  REVIEW_NOT_ALLOWED = 1902,
+  REVIEW_ALREADY_EXISTS = 1903,
+  REVIEW_EDIT_NOT_ALLOWED = 1904,
+  REVIEW_CONTENT_NOT_ALLOWED = 1905,
+  REVIEW_INVALID_STATE = 1906,
+  REVIEW_VOTE_OWN = 1907,
+  REVIEW_IMAGE_INVALID = 1908,
 }
 
 // ============================================
@@ -161,6 +176,7 @@ export const ErrorMessages: Record<number, string> = {
   [EMediaErrorCode.MEDIA_FILE_NOT_FOUND]: 'Media file not found',
   [EMediaErrorCode.MEDIA_STORAGE_ERROR]: 'Media storage request failed',
   [EMediaErrorCode.MEDIA_FILE_TOO_LARGE]: 'File is too large for media storage',
+  [EMediaErrorCode.MEDIA_UPLOAD_LIMIT_REACHED]: 'Too many uploads in the last 24 hours — please try again later',
   [EPaymentErrorCode.PAYMENT_NOT_CONFIGURED]: 'Payment is not configured',
   [EPaymentErrorCode.PAYMENT_ORDER_NOT_PAYABLE]: 'Order cannot be paid (already paid or cancelled)',
   [EPaymentErrorCode.PAYMENT_ATTEMPT_NOT_FOUND]: 'No payment session for this order',
@@ -180,4 +196,12 @@ export const ErrorMessages: Record<number, string> = {
   [EReturnErrorCode.RETURN_ITEM_INVALID]: 'Invalid items in the return request',
   [EReturnErrorCode.RETURN_INVALID_STATE]: 'This action is not allowed for the current status of the return request',
   [EReturnErrorCode.RETURN_RECEIVE_INVALID]: 'Invalid data to confirm the received goods',
+  [EReviewErrorCode.REVIEW_NOT_FOUND]: 'Review not found',
+  [EReviewErrorCode.REVIEW_NOT_ALLOWED]: 'This order item cannot be reviewed',
+  [EReviewErrorCode.REVIEW_ALREADY_EXISTS]: 'This order item has already been reviewed',
+  [EReviewErrorCode.REVIEW_EDIT_NOT_ALLOWED]: 'This review can no longer be edited',
+  [EReviewErrorCode.REVIEW_CONTENT_NOT_ALLOWED]: 'Reviews cannot contain links',
+  [EReviewErrorCode.REVIEW_INVALID_STATE]: 'This action is not allowed for the current status of the review',
+  [EReviewErrorCode.REVIEW_VOTE_OWN]: 'You cannot vote on your own review',
+  [EReviewErrorCode.REVIEW_IMAGE_INVALID]: 'Review images must be images you uploaded through the review upload endpoint',
 };

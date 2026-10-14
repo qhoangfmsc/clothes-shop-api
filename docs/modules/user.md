@@ -1,6 +1,6 @@
 # user (`src/modules/user`)
 
-> Cập nhật lần cuối: 2026-10-12
+> Cập nhật lần cuối: 2026-10-14
 
 ## 1. Tổng quan
 
@@ -79,7 +79,7 @@ Bảng `users` (entity `User extends BaseEntity`):
 | `status` | varchar(20) | default `active`; `CK_users_status` ∈ (`active`,`disabled`) |
 | `created_at`, `updated_at` | timestamptz | |
 
-Các bảng khác trỏ tới `users`: `addresses`, `wishlists`, `carts` (ON DELETE CASCADE), `orders`, `reviews` (ON DELETE SET NULL).
+Các bảng khác trỏ tới `users`: `addresses`, `wishlists`, `carts` (ON DELETE CASCADE), `orders`, `reviews` (ON DELETE SET NULL; cả `reviews.moderated_by`/`replied_by`), `review_votes` (ON DELETE CASCADE).
 
 ### 4.3 Validation (3 tầng)
 

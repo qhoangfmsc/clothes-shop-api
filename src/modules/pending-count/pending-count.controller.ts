@@ -21,14 +21,15 @@ export class PendingCountController {
       '- `payments` (PAYMENT_ADMIN_VIEW): giao dịch UNMATCHED/AMOUNT_MISMATCH/LATE/NOT_PAYABLE chưa gắn đơn, hoặc gắn vào đơn chưa thanh toán và chưa huỷ. Danh sách: GET /api/admin/payments/transactions?needsReview=true',
       '- `refunds` (PAYMENT_ADMIN_VIEW): khoản hoàn REQUESTED. Danh sách: GET /api/admin/refunds?status=REQUESTED',
       '- `returns` (RETURN_ADMIN_VIEW): yêu cầu trả hàng REQUESTED (chờ duyệt; APPROVED không tính). Danh sách: GET /api/admin/returns?status=REQUESTED',
+      '- `reviews` (REVIEW_ADMIN_VIEW): đánh giá đang hiển thị (PUBLISHED) mà cửa hàng chưa phản hồi. Danh sách: GET /api/admin/reviews?status=PUBLISHED&replied=false',
     ].join('\n'),
   })
   @ApiOkResponse({
     schema: {
-      example: { data: { orders: 3, payments: 2, refunds: 1, returns: 4 } },
+      example: { data: { orders: 3, payments: 2, refunds: 1, returns: 4, reviews: 9 } },
     },
   })
-  @Permissions(Permission.ORDER_ADMIN_VIEW, Permission.PAYMENT_ADMIN_VIEW, Permission.RETURN_ADMIN_VIEW)
+  @Permissions(Permission.ORDER_ADMIN_VIEW, Permission.PAYMENT_ADMIN_VIEW, Permission.RETURN_ADMIN_VIEW, Permission.REVIEW_ADMIN_VIEW)
   get(@CurrentUser() user: User) {
     return this.pendingCountService.get(user);
   }

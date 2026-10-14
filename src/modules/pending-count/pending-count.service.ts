@@ -4,9 +4,10 @@ import { OrderService } from '../order/order.service';
 import { PaymentService } from '../payment/payment.service';
 import { RefundService } from '../payment/refund.service';
 import { ReturnService } from '../return/return.service';
+import { ReviewService } from '../review/review.service';
 import { User } from '../user/user.entity';
 
-export type PendingCounts = Partial<Record<'orders' | 'payments' | 'refunds' | 'returns', number>>;
+export type PendingCounts = Partial<Record<'orders' | 'payments' | 'refunds' | 'returns' | 'reviews', number>>;
 
 /**
  * Số việc đang chờ admin xử lý, hiện thành badge ở menu admin. Mỗi số là một COUNT chạy trên điều kiện DÙNG CHUNG với bộ lọc danh sách
@@ -19,6 +20,7 @@ export class PendingCountService {
     private readonly paymentService: PaymentService,
     private readonly refundService: RefundService,
     private readonly returnService: ReturnService,
+    private readonly reviewService: ReviewService,
   ) {}
 
   async get(user: Pick<User, 'role' | 'permissions'>): Promise<{ data: PendingCounts }> {
@@ -33,6 +35,7 @@ export class PendingCountService {
       jobs.push(['refunds', () => this.refundService.countRequested()]);
     }
     if (can(Permission.RETURN_ADMIN_VIEW)) jobs.push(['returns', () => this.returnService.countRequested()]);
+    if (can(Permission.REVIEW_ADMIN_VIEW)) jobs.push(['reviews', () => this.reviewService.countAwaitingReply()]);
 
     const values = await Promise.all(jobs.map(([, run]) => run()));
     const data: PendingCounts = {};

@@ -1,6 +1,6 @@
 # order (`src/modules/order`)
 
-> Cập nhật lần cuối: 2026-10-13
+> Cập nhật lần cuối: 2026-10-14
 
 ## 1. Tổng quan
 
@@ -148,7 +148,7 @@ Bảng `orders` (entity `Order extends BaseEntity`):
 | `shipping_address` | jsonb | default `{}`; snapshot đủ `{ fullName, phone, addressLine1, addressLine2, city, province, postalCode, country }`, hoặc chỉ `{ fullName, phone }` với đơn `store-pickup` dùng `pickupContact` (các key còn lại vắng mặt) |
 | `note` | varchar(500) | default `''` |
 | `payment_status` | varchar(10) | default `unpaid`; `CK_orders_payment_status` ∈ `unpaid`, `paid`, `refunded`; webhook SePay hợp lệ hoặc admin xác nhận thủ công đổi sang `paid`, admin hoàn tiền xong đổi sang `refunded` (module [payment](payment.md)) |
-| `delivered_at` | timestamptz | nullable; lúc admin chuyển đơn sang `delivered` (mốc tính hạn đổi trả của module [return](return.md)); `CK_orders_delivered_at`: đơn `delivered`/`completed` phải có giá trị; đơn đã giao từ trước khi có cột này được điền bằng `updated_at` |
+| `delivered_at` | timestamptz | nullable; lúc admin chuyển đơn sang `delivered` (mốc tính hạn đổi trả của module [return](return.md) và hạn viết đánh giá của module [review](review.md)); `CK_orders_delivered_at`: đơn `delivered`/`completed` phải có giá trị; đơn đã giao từ trước khi có cột này được điền bằng `updated_at` |
 | `paid_at` | timestamptz | nullable; `CK_orders_paid_at`: `(payment_status IN ('paid', 'refunded')) = (paid_at IS NOT NULL)` (đơn đã hoàn vẫn giữ thời điểm đã trả) |
 | `created_at`, `updated_at` | timestamptz | |
 
@@ -255,6 +255,7 @@ Phía khách các lỗi còn lại là HTTP thô: `NotFoundException` (`Order no
 - Checkout không đọc hay ghi `payment_status`; khi thanh toán thành công, module [payment](payment.md) đặt `payment_status = 'paid'` và tự chuyển đơn `pending` sang `confirmed` (đơn đã `confirmed` trở đi giữ nguyên). `orders.status` là trạng thái xử lý đơn (`pending` = chờ cửa hàng xác nhận), tách khỏi `payment_status`. Đơn `cancelled` không còn tạo được QR và tiền chuyển vào đơn đã huỷ chỉ được ghi nhận để đối soát.
 - `ORDER_STATUSES` được khai báo trong `dtos/admin-order.dto.ts` (cùng kiểu `OrderStatus`), không nằm trong `enum-values.constant.ts`.
 - Trả hàng sau khi giao do module [return](return.md) xử lý; module này chỉ ghi `delivered_at` khi đơn sang `delivered`.
+- Đánh giá sản phẩm do module [review](review.md) xử lý: nó đọc `orders` (`status`, `payment_status`, `delivered_at`) và `order_items` để cho khách đánh giá từng dòng hàng; `reviews.order_item_id` trỏ tới `order_items(id)` ON DELETE SET NULL nên xoá đơn không xoá đánh giá. Module này không đổi.
 - Khách chỉ huỷ được đơn chưa thanh toán còn `pending` (bằng API riêng); đơn đã thanh toán do admin chuyển `pending`/`confirmed` sang `cancelled` qua API trạng thái. Cả hai cách đều đổi các mã chuyển khoản `PENDING` của đơn sang `CANCELLED`; riêng đơn đã thanh toán (chỉ qua admin) tạo thêm yêu cầu hoàn tiền trong cùng transaction.
 - Mọi phương thức giao (kể cả `store-pickup`) đều thanh toán bằng cùng luồng QR/chuyển khoản của module [payment](payment.md); không có cách ghi nhận thanh toán tiền mặt. Admin có thể tạo mã QR cho đơn (`POST /api/admin/payments/orders/:orderId/qr`, xem [payment](payment.md)) để khách chuyển khoản ngay tại cửa hàng. Đơn không được thanh toán (webhook hoặc admin xác nhận thủ công một khoản chuyển khoản) giữ `payment_status = unpaid` dù đã giao. Hệ thống không tự chuyển tiền trả khách: admin chuyển khoản bên ngoài rồi ghi nhận ở `/api/admin/refunds` ([payment](payment.md)).
 - Kích thước `size`/`color` của dòng đơn được sao chép từ giỏ nguyên văn.

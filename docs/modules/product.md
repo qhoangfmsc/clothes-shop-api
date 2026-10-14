@@ -1,6 +1,6 @@
 # product (`src/modules/product`)
 
-> Cập nhật lần cuối: 2026-10-12
+> Cập nhật lần cuối: 2026-10-14
 
 ## 1. Tổng quan
 
@@ -52,9 +52,10 @@ Module sản phẩm: API công khai để duyệt/tìm/xem chi tiết sản ph�
 | `minPrice`, `maxPrice` | int | `≥ 0`; `price >= minPrice`, `price <= maxPrice` |
 | `sizes` | string | ≤ 255; danh sách phẩy `S,M,L`; khớp nếu sản phẩm có ít nhất 1 size trong danh sách |
 | `colors` | string | ≤ 255; danh sách phẩy tên màu `Red,Blue`; khớp theo `colors[].name` |
-| `sort` | string | whitelist `price`, `name`, `createdAt` (+ `-field`); mặc định `-createdAt` |
+| `minRating` | int | 1–5 (`@Type(() => Number)`, `IsInt`, `Min(1)`, `Max(5)`); chỉ lấy sản phẩm có `ratingAverage >= minRating` (sản phẩm chưa có đánh giá bị loại) |
+| `sort` | string | whitelist `price`, `name`, `createdAt`, `ratingAverage`, `ratingCount` (+ `-field`); mặc định `-createdAt`. Sản phẩm chưa có đánh giá (`ratingAverage` NULL) luôn xếp cuối, cả khi tăng dần; thứ tự phụ `id` ASC |
 
-Luôn chỉ lấy `status = 'active'`. Response `paginated(...)`, mỗi phần tử là entity `Product` kèm `category` và `subcategory`.
+Luôn chỉ lấy `status = 'active'`. Response `paginated(...)`, mỗi phần tử là entity `Product` kèm `category`, `subcategory`, `ratingAverage` (number 1.0–5.0 hoặc `null`) và `ratingCount` (xem 4.2).
 
 **GET `/api/products/autocomplete`** — `ProductAutocompleteQueryDto`: `q` (string, 2–255 ký tự, bắt buộc), `limit` (int, tuỳ chọn, mặc định 8, 1–10; vượt → 400). Khớp "chứa" `ILIKE '%q%'` trên `name` hoặc `slug` (ký tự `%`, `_`, `\` trong `q` được escape nên khớp theo nghĩa đen), chỉ `active`. Sắp xếp: tên bắt đầu bằng `q` lên trước, rồi `name` ASC. Response `{ data: [{ id, name, slug, price, image, badge }] }` (`price` là number, `image` là ảnh đầu tiên hoặc `null`, `badge` là `new`/`sale`/`bestseller`/`sold_out`/`limited`/`custom_order` hoặc `null`). `limit` nằm riêng trong DTO này (không kế thừa `PaginationQueryDto`), không phân trang; DTO nằm trong `NOT_LIST_DTO_FILES`.
 
@@ -68,7 +69,8 @@ Luôn chỉ lấy `status = 'active'`. Response `paginated(...)`, mỗi phần t
 | `status` | `IsIn(ACTIVE_STATUSES)` |
 | `category` | slug category (≤ 255). Slug không tồn tại → trả list rỗng |
 | `badge` | `IsIn(PRODUCT_BADGES)` |
-| `sort` | whitelist `price`, `createdAt`, `name`; mặc định `-createdAt` |
+| `minRating` | int 1–5, cùng ý nghĩa như list công khai |
+| `sort` | whitelist `price`, `createdAt`, `name`, `ratingAverage`, `ratingCount`; mặc định `-createdAt` (sản phẩm chưa có đánh giá xếp cuối, thứ tự phụ `id` ASC) |
 
 Kèm `category`, `subcategory` trong mỗi phần tử.
 
@@ -122,6 +124,8 @@ Bảng `products` (entity `Product extends BaseEntity`):
 | `sizes` | jsonb | default `[]`; `CK_products_sizes_not_empty` |
 | `colors` | jsonb | default `[]` (`[{name, hex}]`); `CK_products_colors_not_empty` |
 | `tags` | jsonb | default `[]` |
+| `rating_average` | numeric(2,1) | nullable; điểm trung bình của đánh giá `PUBLISHED` (1 chữ số thập phân); `CK_products_rating_average` NULL hoặc 1–5; index `IDX_products_rating_average`. Entity trả về dạng number |
+| `rating_count` | integer | NOT NULL default 0; `CK_products_rating_count >= 0`; `CK_products_rating_pair`: `(rating_count = 0) = (rating_average IS NULL)` |
 | `created_at`, `updated_at` | timestamptz | |
 
 Tham chiếu tới `products`: `reviews`, `wishlists`, `cart_items`, `collection_products` (ON DELETE CASCADE) và `order_items.product_id` (ON DELETE SET NULL).
@@ -134,7 +138,8 @@ Tham chiếu tới `products`: `reviews`, `wishlists`, `cart_items`, `collection
   - `originalPrice >= price` (create và update, tính trên giá trị cuối cùng).
   - `categoryId`, `subcategoryId` phải tồn tại.
   - Subcategory phải thuộc category (`validateSubcategoryBelongsToCategory`).
-- **DB**: UNIQUE `slug`/`sku`, CHECK giá/status/badge/mảng không rỗng, FK RESTRICT cho category/subcategory (xem 4.2).
+- **DB**: UNIQUE `slug`/`sku`, CHECK giá/status/badge/mảng không rỗng/điểm đánh giá, FK RESTRICT cho category/subcategory (xem 4.2).
+- `rating_average`/`rating_count` không nằm trong `CreateProductDto`/`UpdateProductDto` (field lạ bị từ chối): chỉ module [review](review.md) ghi chúng.
 
 ### 4.4 Luồng xử lý & quy tắc nghiệp vụ
 
@@ -148,7 +153,9 @@ Tham chiếu tới `products`: `reviews`, `wishlists`, `cart_items`, `collection
 
 **List công khai**: dùng QueryBuilder join `category` (`cat`) và `subcategory` (`sub`); filter size/màu dùng `EXISTS` trên `jsonb_array_elements(_text)`; sort bằng `parseSort(sort, '-createdAt')` rồi `orderBy('p.<field>')`.
 
-**List admin**: dùng `findAndCount` với `where` dạng mảng OR cho search (mỗi nhánh kèm filter status/badge/category).
+**List admin**: dùng `findAndCount` với `where` dạng mảng OR cho search (mỗi nhánh kèm filter status/badge/category/`minRating`); sort theo `ratingAverage` dùng `nulls: 'LAST'`, thứ tự phụ `id` ASC.
+
+**Điểm đánh giá**: `ratingAverage`/`ratingCount` do [review](review.md) tính lại trong mỗi thao tác đánh giá (tạo, sửa sao, ẩn, hiện lại) và điền lại cho dữ liệu cũ bởi migration `AddReviewImagesAndProductRating`; module này chỉ đọc, sort và lọc theo chúng.
 
 ### 4.5 Error code
 
@@ -171,7 +178,7 @@ Sizes/colors/images rỗng không có error code riêng: bị chặn ở DTO (`A
 
 ### 4.7 Test
 
-Chưa có spec riêng cho service. `PublicProductQueryDto` và `AdminProductQueryDto` được `list-query.dto.spec.ts` kiểm tra tự động; `ProductAutocompleteQueryDto` nằm trong danh sách DTO không phải list.
+`product.service.spec.ts` — lọc `minRating` và sort theo `ratingAverage`/`ratingCount` (public: điều kiện, `NULLS LAST`, thứ tự phụ; admin: `where`/`order`, kết hợp với search). Các phần còn lại của service chưa có spec riêng. `PublicProductQueryDto` và `AdminProductQueryDto` được `list-query.dto.spec.ts` kiểm tra tự động; `ProductAutocompleteQueryDto` nằm trong danh sách DTO không phải list.
 
 ### 4.8 Lưu ý hiện trạng
 

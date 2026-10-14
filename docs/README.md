@@ -4,7 +4,7 @@ Thư mục này là tài liệu thực tế của backend: mỗi module một fi
 
 Quy tắc viết: `.claude/rules/module-docs.md` · Quy trình: skill `module-docs` · Template: `.claude/skills/module-docs/TEMPLATE.md`.
 
-Cập nhật lần cuối: 2026-10-13
+Cập nhật lần cuối: 2026-10-14
 
 ## Hệ thống
 
@@ -22,15 +22,15 @@ Toàn bộ module được khai báo trong `src/main.module.ts`. Hai guard toàn
 | [product](modules/product.md) | `src/modules/product` | `/api/products`, `/api/admin/products` | DB | Sản phẩm: list/detail/autocomplete, CRUD admin |
 | [category](modules/category.md) | `src/modules/category` | `/api/categories`, `/api/admin/categories` | DB | Danh mục + subcategory, thứ hạng `priority` |
 | [collection](modules/collection.md) | `src/modules/collection` | `/api/collections`, `/api/admin/collections` | DB | Bộ sưu tập gom sản phẩm |
-| [review](modules/review.md) | `src/modules/review` | `/api/reviews` | DB | Đánh giá sản phẩm (chỉ đọc) |
+| [review](modules/review.md) | `src/modules/review` | `/api/reviews`, `/api/my-reviews`, `/api/admin/reviews` | DB | Đánh giá sản phẩm: khách đã nhận hàng viết/sửa đánh giá kèm ảnh, "hữu ích", tổng hợp sao/fit, giữ điểm trung bình trên sản phẩm; admin ẩn/hiện và phản hồi |
 | [wishlist](modules/wishlist.md) | `src/modules/wishlist` | `/api/wishlist` | DB | Sản phẩm yêu thích của user |
 | [cart](modules/cart.md) | `src/modules/cart` | `/api/cart` | DB | Giỏ hàng của user |
 | [address](modules/address.md) | `src/modules/address` | `/api/addresses` | DB | Sổ địa chỉ giao hàng |
 | [order](modules/order.md) | `src/modules/order` | `/api/orders`, `/api/admin/orders` | DB | Checkout từ giỏ, lịch sử đơn, quản trị trạng thái đơn |
-| [pending-count](modules/pending-count.md) | `src/modules/pending-count` | `/api/admin/pending-counts` | DB (qua các module khác) | Số việc chờ admin xử lý cho badge menu: đơn, giao dịch, hoàn tiền, trả hàng |
+| [pending-count](modules/pending-count.md) | `src/modules/pending-count` | `/api/admin/pending-counts` | DB (qua các module khác) | Số việc chờ admin xử lý cho badge menu: đơn, giao dịch, hoàn tiền, trả hàng, đánh giá chờ phản hồi |
 | [return](modules/return.md) | `src/modules/return` | `/api/returns`, `/api/admin/returns` | DB | Trả hàng sau khi giao: yêu cầu của khách, duyệt/nhận hàng của admin, sinh khoản hoàn tiền |
 | [payment](modules/payment.md) | `src/modules/payment` | `/api/payments`, `/api/webhooks/sepay`, `/api/admin/payments`, `/api/admin/refunds` | DB + SePay webhook | Thanh toán VietQR: phiên QR, webhook SePay (HMAC), đối soát giao dịch, theo dõi hoàn tiền |
-| [media](modules/media.md) | `src/modules/media` | `/api/admin/media` | DB + Supabase Storage | Upload/list/xoá ảnh |
+| [media](modules/media.md) | `src/modules/media` | `/api/admin/media` | DB + Supabase Storage | Upload/list/xoá ảnh thư viện; lưu và xác nhận ảnh khách đính vào đánh giá |
 | [site-config](modules/site-config.md) | `src/modules/site-config` | `/api/site-config`, `/api/admin/site-config` | DB | Cấu hình theo key: banner nội dung trang, phí ship (`SHIPPING_CONFIG`) |
 | [shipping](modules/shipping.md) | `src/modules/shipping` | `/api/shipping` | Config (site_configs) + dữ liệu tĩnh | Phương thức vận chuyển và phí/ngưỡng miễn phí (admin chỉnh được), chính sách đổi trả |
 | [size-guide](modules/size-guide.md) | `src/modules/size-guide` | `/api/size-guides` | Dữ liệu tĩnh | Bảng size theo danh mục |
@@ -41,7 +41,7 @@ Toàn bộ module được khai báo trong `src/main.module.ts`. Hai guard toàn
 auth ──► user (users)
 product ──► category (categories, subcategories)
 collection ──► product (collection_products)
-review ──► product, user
+review ──► product, user, order, media   (đọc `Order`/`OrderItem` qua EntityManager/QueryBuilder để xác định dòng hàng đã mua; ghi `products.rating_average`/`rating_count`; ảnh đánh giá qua `MediaService`)
 wishlist ──► product, user
 cart ──► product, user
 address ──► user
@@ -49,7 +49,7 @@ order ──► cart, address, product, user   (checkout đọc Cart/CartItem/Ad
 order ──► shipping ──► site-config   (phí ship/ngưỡng miễn phí đọc từ dòng SHIPPING_CONFIG)
 payment ──► order   (đọc/khoá/cập nhật `orders.payment_status` qua EntityManager)
 return ──► order, payment, shipping   (đọc đơn/dòng hàng qua EntityManager; `RefundService` tạo khoản hoàn; `returnPolicy.days` từ shipping)
-pending-count ──► order, payment, return   (gọi `countNeedsAction`/`countNeedsReview`/`countRequested` của từng service)
+pending-count ──► order, payment, return, review   (gọi `countNeedsAction`/`countNeedsReview`/`countRequested`/`countAwaitingReply` của từng service)
 payment ──► return   (chỉ entity `ReturnRequest`/`ReturnRequestItem`: cập nhật trạng thái khi khoản hoàn xong hoặc bị từ chối)
 media ──► Supabase Storage (độc lập, ảnh được tham chiếu bằng URL chuỗi ở product/collection/category/site-config)
 ```

@@ -4,7 +4,7 @@ import { throwAppError } from '@common/exceptions/app.exception';
 import { EProductErrorCode } from '@common/exceptions/error-codes';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { FindOptionsOrder, FindOptionsWhere, ILike, Not, Repository } from 'typeorm';
+import { FindOptionsOrder, FindOptionsWhere, ILike, MoreThanOrEqual, Not, Repository } from 'typeorm';
 import { Category } from '../category/category.entity';
 import { SubCategory } from '../category/sub-category.entity';
 import { AdminProductQueryDto } from './dtos/admin-product-query.dto';
@@ -72,7 +72,7 @@ export class ProductService {
   // ============================================
 
   async findAllPublic(query: PublicProductQueryDto) {
-    const { search, category, subcategory, badge, sort, minPrice, maxPrice, sizes, colors } = query;
+    const { search, category, subcategory, badge, sort, minPrice, maxPrice, minRating, sizes, colors } = query;
     const { page, limit } = getPaging(query);
 
     const qb = this.productRepo
@@ -109,6 +109,11 @@ export class ProductService {
       qb.andWhere('p.price <= :maxPrice', { maxPrice: Number(maxPrice) });
     }
 
+    // Filter by average rating (sản phẩm chưa có đánh giá có rating_average NULL nên bị loại)
+    if (minRating != null) {
+      qb.andWhere('p.ratingAverage >= :minRating', { minRating: Number(minRating) });
+    }
+
     // Filter by sizes — JSONB array, use jsonb_array_elements_text for containment
     if (sizes) {
       const sizeArr = sizes
@@ -132,8 +137,9 @@ export class ProductService {
     }
 
     // Sort: `field` = ASC, `-field` = DESC
+    // Sản phẩm chưa có đánh giá (rating_average NULL) luôn xếp cuối, kể cả khi sort tăng dần; `id` làm thứ tự phụ để phân trang ổn định
     const { field, direction } = parseSort(sort, '-createdAt');
-    qb.orderBy(`p.${field}`, direction);
+    qb.orderBy(`p.${field}`, direction, 'NULLS LAST').addOrderBy('p.id', 'ASC');
 
     // Pagination
     qb.skip((page - 1) * limit).take(limit);
@@ -199,13 +205,14 @@ export class ProductService {
   // ============================================
 
   async findAllAdmin(query: AdminProductQueryDto) {
-    const { search, status, category, badge, sort } = query;
+    const { search, status, category, badge, sort, minRating } = query;
     const { page, limit } = getPaging(query);
 
     // Build base conditions (non-search filters)
     const baseConditions: FindOptionsWhere<Product> = {};
     if (status) baseConditions.status = status;
     if (badge) baseConditions.badge = badge;
+    if (minRating != null) baseConditions.ratingAverage = MoreThanOrEqual(Number(minRating));
 
     // Resolve category slug → ID
     if (category) {
@@ -233,7 +240,7 @@ export class ProductService {
 
     // Sort: `field` = ASC, `-field` = DESC
     const { field, direction } = parseSort(sort, '-createdAt');
-    const order: FindOptionsOrder<Product> = { [field]: direction };
+    const order: FindOptionsOrder<Product> = { [field]: { direction, nulls: 'LAST' }, id: 'ASC' };
 
     const [data, total] = await this.productRepo.findAndCount({
       where,

@@ -1,5 +1,6 @@
 import { BaseEntity } from '@common/base/base.entity';
 import { Column, Entity } from 'typeorm';
+import { MediaPurpose } from './media.constant';
 
 /**
  * Metadata của file đã upload lên Supabase Storage. Bytes nằm trên storage,
@@ -21,4 +22,12 @@ export class MediaFile extends BaseEntity {
   /** bytes */
   @Column({ type: 'integer' })
   size: number;
+
+  /** LIBRARY: thư viện admin; REVIEW: ảnh khách đính vào đánh giá (không hiện ở list/xoá của admin) */
+  @Column({ type: 'varchar', length: 10, default: 'LIBRARY' })
+  purpose: MediaPurpose;
+
+  /** User đã upload ảnh `REVIEW`; `null` với ảnh thư viện admin */
+  @Column({ type: 'varchar', length: 16, name: 'uploaded_by', nullable: true })
+  uploadedBy: string | null;
 }

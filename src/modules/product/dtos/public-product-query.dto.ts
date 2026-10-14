@@ -4,7 +4,7 @@ import { SortField } from '@common/decorator/sort-field.decorator';
 import { PaginationQueryDto } from '@common/dto/pagination-query.dto';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
 export class PublicProductQueryDto extends PaginationQueryDto {
   @SearchField('Search product name, slug, or description')
@@ -28,8 +28,21 @@ export class PublicProductQueryDto extends PaginationQueryDto {
   @IsIn(PRODUCT_BADGES)
   badge?: string;
 
-  @SortField(['price', 'name', 'createdAt'], '-createdAt')
+  @SortField(['price', 'name', 'createdAt', 'ratingAverage', 'ratingCount'], '-createdAt')
   sort?: string;
+
+  @ApiPropertyOptional({
+    type: Number,
+    minimum: 1,
+    maximum: 5,
+    description: 'Only products whose average rating is at least this many stars',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(5)
+  minRating?: number;
 
   @ApiPropertyOptional({ type: Number, minimum: 0 })
   @IsOptional()

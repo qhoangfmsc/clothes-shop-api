@@ -39,25 +39,27 @@ describe('PendingCountService — permissions decide which keys exist and which 
     const paymentService: any = { countNeedsReview: jest.fn(async () => 2) };
     const refundService: any = { countRequested: jest.fn(async () => 1) };
     const returnService: any = { countRequested: jest.fn(async () => 4) };
+    const reviewService: any = { countAwaitingReply: jest.fn(async () => 6) };
     return {
-      service: new PendingCountService(orderService, paymentService, refundService, returnService),
+      service: new PendingCountService(orderService, paymentService, refundService, returnService, reviewService),
       orderService,
       paymentService,
       refundService,
       returnService,
+      reviewService,
     };
   };
   const user = (permissions: number[], role = 'user') => ({ role, permissions });
 
-  it('an admin gets all four numbers', async () => {
+  it('an admin gets all five numbers', async () => {
     const { service } = make();
-    expect(await service.get(user([], 'admin'))).toEqual({ data: { orders: 3, payments: 2, refunds: 1, returns: 4 } });
+    expect(await service.get(user([], 'admin'))).toEqual({ data: { orders: 3, payments: 2, refunds: 1, returns: 4, reviews: 6 } });
   });
 
-  it('a user with every view permission gets all four numbers', async () => {
+  it('a user with every view permission gets all five numbers', async () => {
     const { service } = make();
-    const all = [Permission.ORDER_ADMIN_VIEW, Permission.PAYMENT_ADMIN_VIEW, Permission.RETURN_ADMIN_VIEW];
-    expect((await service.get(user(all))).data).toEqual({ orders: 3, payments: 2, refunds: 1, returns: 4 });
+    const all = [Permission.ORDER_ADMIN_VIEW, Permission.PAYMENT_ADMIN_VIEW, Permission.RETURN_ADMIN_VIEW, Permission.REVIEW_ADMIN_VIEW];
+    expect((await service.get(user(all))).data).toEqual({ orders: 3, payments: 2, refunds: 1, returns: 4, reviews: 6 });
   });
 
   it('only RETURN_ADMIN_VIEW → only `returns`; the other COUNTs are never run', async () => {
@@ -66,6 +68,14 @@ describe('PendingCountService — permissions decide which keys exist and which 
     expect(h.orderService.countNeedsAction).not.toHaveBeenCalled();
     expect(h.paymentService.countNeedsReview).not.toHaveBeenCalled();
     expect(h.refundService.countRequested).not.toHaveBeenCalled();
+    expect(h.reviewService.countAwaitingReply).not.toHaveBeenCalled();
+  });
+
+  it('only REVIEW_ADMIN_VIEW → only `reviews`', async () => {
+    const h = make();
+    expect(await h.service.get(user([Permission.REVIEW_ADMIN_VIEW]))).toEqual({ data: { reviews: 6 } });
+    expect(h.orderService.countNeedsAction).not.toHaveBeenCalled();
+    expect(h.returnService.countRequested).not.toHaveBeenCalled();
   });
 
   it('PAYMENT_ADMIN_VIEW → `payments` and `refunds`', async () => {
@@ -105,9 +115,10 @@ describe('PendingCountService — permissions decide which keys exist and which 
     h.paymentService.countNeedsReview = slow('payments', 2);
     h.refundService.countRequested = slow('refunds', 3);
     h.returnService.countRequested = slow('returns', 4);
+    h.reviewService.countAwaitingReply = slow('reviews', 5);
     const run = h.service.get(user([], 'admin'));
-    expect(started).toEqual(['orders', 'payments', 'refunds', 'returns']);
-    expect((await run).data).toEqual({ orders: 1, payments: 2, refunds: 3, returns: 4 });
+    expect(started).toEqual(['orders', 'payments', 'refunds', 'returns', 'reviews']);
+    expect((await run).data).toEqual({ orders: 1, payments: 2, refunds: 3, returns: 4, reviews: 5 });
   });
 });
 

@@ -54,4 +54,19 @@ export class Product extends BaseEntity {
 
   @Column({ type: 'jsonb', default: [] })
   tags: string[];
+
+  /** Điểm trung bình (1 chữ số thập phân) của các đánh giá `PUBLISHED`; `null` khi chưa có. Do module review cập nhật */
+  @Column({
+    type: 'decimal',
+    precision: 2,
+    scale: 1,
+    nullable: true,
+    name: 'rating_average',
+    transformer: { to: (value: number | null) => value, from: (value: string | null) => (value === null ? null : Number(value)) },
+  })
+  ratingAverage: number | null;
+
+  /** Số đánh giá `PUBLISHED` */
+  @Column({ type: 'int', default: 0, name: 'rating_count' })
+  ratingCount: number;
 }
