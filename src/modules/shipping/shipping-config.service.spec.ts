@@ -7,7 +7,11 @@ const make = (stored: string | null) => {
   const siteConfig: any = { findValue: jest.fn(async () => stored) };
   return { service: new ShippingConfigService(siteConfig), siteConfig };
 };
-const custom = { freeShippingThreshold: 300, methods: DEFAULT_SHIPPING_CONFIG.methods.map((m) => ({ ...m, price: m.price + 1 })) };
+const RATE = 25_000;
+const custom = {
+  freeShippingThresholdVnd: 3_000_000,
+  methods: DEFAULT_SHIPPING_CONFIG.methods.map((m) => ({ ...m, priceVnd: m.priceVnd + 1000 })),
+};
 
 describe('ShippingConfigService.get', () => {
   beforeAll(() => Logger.overrideLogger(false));
@@ -25,27 +29,29 @@ describe('ShippingConfigService.get', () => {
 
   it.each([
     ['broken JSON', '{nope'],
-    ['wrong shape', '{"freeShippingThreshold":-1,"methods":[]}'],
+    ['wrong shape', '{"freeShippingThresholdVnd":-1,"methods":[]}'],
   ])('falls back to defaults on %s, so checkout keeps working', async (_n, stored) => {
     await expect(make(stored).service.get()).resolves.toEqual(DEFAULT_SHIPPING_CONFIG);
   });
 
   it('returns a copy, so callers cannot mutate the defaults', async () => {
     const config = await make(null).service.get();
-    config.methods[0].price = 999;
-    expect(DEFAULT_SHIPPING_CONFIG.methods[0].price).toBe(8);
+    config.methods[0].priceVnd = 999;
+    expect(DEFAULT_SHIPPING_CONFIG.methods[0].priceVnd).toBe(30_000);
   });
 });
 
 describe('ShippingController.getShippingInfo', () => {
-  const info = async (stored: string | null) => (await new ShippingController(make(stored).service).getShippingInfo()).data;
+  const currency: any = { getVndPerUsd: async () => RATE };
+  const info = async (stored: string | null) => (await new ShippingController(make(stored).service, currency).getShippingInfo()).data;
 
   it('with the default config returns the configured methods, threshold and return policy', async () => {
     const data = await info(null);
     expect(data).toEqual({
-      methods: DEFAULT_SHIPPING_CONFIG.methods,
+      methods: DEFAULT_SHIPPING_CONFIG.methods.map(({ priceVnd, ...method }) => ({ ...method, priceVnd, priceUsd: priceVnd / RATE })),
       returnPolicy: DEFAULT_SHIPPING_CONFIG.returnPolicy,
-      freeShippingThreshold: 150,
+      freeShippingThresholdVnd: 1_500_000,
+      freeShippingThresholdUsd: 60,
     });
     expect(data.methods.every((m) => !('freeAbove' in m))).toBe(true);
     expect(data.returnPolicy.days).toBe(30);
@@ -58,8 +64,10 @@ describe('ShippingController.getShippingInfo', () => {
 
   it('reflects admin changes (prices, threshold) from the same source as checkout', async () => {
     const data = await info(JSON.stringify(custom));
-    expect(data.freeShippingThreshold).toBe(300);
-    expect(data.methods.map((m) => m.price)).toEqual([9, 16, 1]);
+    expect(data).toMatchObject({ freeShippingThresholdVnd: 3_000_000, freeShippingThresholdUsd: 120 });
+    expect(data.methods.map((m) => m.priceVnd)).toEqual([31_000, 51_000, 1000]);
+    expect(data.methods.map((m) => m.priceUsd)).toEqual([1.24, 2.04, 0.04]);
+    expect(data.methods[0]).not.toHaveProperty('price');
     // cấu hình lưu trước khi có returnPolicy → dùng chính sách mặc định
     expect(data.returnPolicy).toEqual(DEFAULT_SHIPPING_CONFIG.returnPolicy);
   });
@@ -70,8 +78,9 @@ describe('ShippingController.getShippingInfo', () => {
     expect(data.returnPolicy).toEqual(returnPolicy);
   });
 
-  it('keeps freeShippingThreshold = null as null', async () => {
-    const data = await info(JSON.stringify({ ...custom, freeShippingThreshold: null }));
-    expect(data.freeShippingThreshold).toBeNull();
+  it('keeps freeShippingThreshold = null as null in both currencies', async () => {
+    const data = await info(JSON.stringify({ ...custom, freeShippingThresholdVnd: null }));
+    expect(data.freeShippingThresholdVnd).toBeNull();
+    expect(data.freeShippingThresholdUsd).toBeNull();
   });
 });

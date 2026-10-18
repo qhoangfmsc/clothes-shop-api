@@ -5,7 +5,9 @@ import { ECollectionErrorCode } from '@common/exceptions/error-codes';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { FindOptionsOrder, FindOptionsWhere, ILike, In, Repository } from 'typeorm';
+import { CurrencyService } from '../currency/currency.service';
 import { Product } from '../product/product.entity';
+import { presentProduct } from '../product/product.presenter';
 import { Collection } from './collection.entity';
 import { AdminCollectionQueryDto } from './dtos/admin-collection-query.dto';
 import { CreateCollectionDto, UpdateCollectionDto } from './dtos/collection.dto';
@@ -18,15 +20,8 @@ export class CollectionService {
     private readonly collectionRepo: Repository<Collection>,
     @InjectRepository(Product)
     private readonly productRepo: Repository<Product>,
+    private readonly currencyService: CurrencyService,
   ) {}
-
-  async findAll() {
-    const data = await this.collectionRepo.find({
-      relations: ['products'],
-      order: { createdAt: 'ASC' },
-    });
-    return { data, total: data.length };
-  }
 
   async findAllPublic(query: PublicCollectionQueryDto) {
     const { search, sort } = query;
@@ -62,7 +57,13 @@ export class CollectionService {
       }
     }
 
-    return paginated(data, total, page, limit);
+    const rate = await this.currencyService.getVndPerUsd();
+    return paginated(
+      data.map((collection) => this.present(collection, rate)),
+      total,
+      page,
+      limit,
+    );
   }
 
   async findBySlug(slug: string) {
@@ -74,7 +75,9 @@ export class CollectionService {
       throwAppError(ECollectionErrorCode.COLLECTION_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
     }
 
-    return { data: collection, products: collection.products };
+    const rate = await this.currencyService.getVndPerUsd();
+    const presented = this.present(collection, rate);
+    return { data: presented, products: presented.products };
   }
 
   // ============================================
@@ -113,7 +116,13 @@ export class CollectionService {
       take: limit,
     });
 
-    return paginated(data, total, page, limit);
+    const rate = await this.currencyService.getVndPerUsd();
+    return paginated(
+      data.map((collection) => this.present(collection, rate)),
+      total,
+      page,
+      limit,
+    );
   }
 
   async create(dto: CreateCollectionDto) {
@@ -134,7 +143,7 @@ export class CollectionService {
       season: dto.season,
       products,
     });
-    return { data: await this.collectionRepo.save(collection) };
+    return { data: this.present(await this.collectionRepo.save(collection), await this.currencyService.getVndPerUsd()) };
   }
 
   async update(id: string, dto: UpdateCollectionDto) {
@@ -158,7 +167,7 @@ export class CollectionService {
     const { productIds, ...rest } = dto;
     Object.assign(collection, rest);
 
-    return { data: await this.collectionRepo.save(collection) };
+    return { data: this.present(await this.collectionRepo.save(collection), await this.currencyService.getVndPerUsd()) };
   }
 
   async delete(id: string) {
@@ -173,6 +182,11 @@ export class CollectionService {
   // ============================================
   // PRIVATE HELPERS
   // ============================================
+
+  /** Sản phẩm trong bộ sưu tập trả ra với giá VND/USD (xem `presentProduct`) */
+  private present(collection: Collection, vndPerUsd: number) {
+    return { ...collection, products: (collection.products ?? []).map((product) => presentProduct(product, vndPerUsd)) };
+  }
 
   private async ensureSlugUnique(slug: string) {
     const existing = await this.collectionRepo.findOne({ where: { slug } });

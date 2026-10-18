@@ -1,6 +1,6 @@
 # order (`src/modules/order`)
 
-> Cập nhật lần cuối: 2026-10-14
+> Cập nhật lần cuối: 2026-10-16
 
 ## 1. Tổng quan
 
@@ -11,14 +11,14 @@ Module đơn hàng: khách checkout từ giỏ hàng, xem lịch sử/chi tiết
 | Thư mục | `src/modules/order` |
 | Route prefix | `/api/orders` (khách), `/api/admin/orders` (admin) |
 | Bảng DB | `orders`, `order_items` |
-| Module phụ thuộc | `cart` (entity `Cart`, `CartItem`), `address` (entity `Address`) — đọc trực tiếp qua `EntityManager` trong transaction; `product` (qua quan hệ của `CartItem`); `shipping` (`ShippingConfigService` — phí ship và ngưỡng miễn phí); `payment` (`PaymentConfigService`, `convertToVnd` — quy đổi VND cho báo giá; `PaymentService.listAttemptsForCustomer`/`cancelPendingAttempts` — các phiên thanh toán của đơn; `RefundService.listForCustomer`/`createForCancelledOrder` — hoàn tiền) |
+| Module phụ thuộc | `cart` (entity `Cart`, `CartItem`), `address` (entity `Address`) — đọc trực tiếp qua `EntityManager` trong transaction; `product` (qua quan hệ của `CartItem`); `shipping` (`ShippingConfigService` — phí ship và ngưỡng miễn phí); `currency` (`CurrencyService.getVndPerUsd` — tỷ giá chốt lúc đặt và dùng cho báo giá, xem [currency](currency.md)); `payment` (`PaymentService.listAttemptsForCustomer`/`cancelPendingAttempts` — các phiên thanh toán của đơn; `RefundService.listForCustomer`/`createForCancelledOrder` — hoàn tiền) |
 | Export | `OrderService` (module [pending-count](pending-count.md) dùng `countNeedsAction`) |
 
 Thanh toán (VietQR/SePay) và hoàn tiền của đơn do module [payment](payment.md) xử lý; module này chỉ giữ hai cột `payment_status`, `paid_at` trên bảng `orders` và tạo yêu cầu hoàn tiền khi đơn đã trả bị huỷ.
 
 ## 2. Mục đích & nghiệp vụ phục vụ
 
-- Biến giỏ hàng (toàn bộ hoặc các dòng được chọn) thành một đơn hàng với snapshot sản phẩm, địa chỉ, phí ship.
+- Biến giỏ hàng (toàn bộ hoặc các dòng được chọn) thành một đơn hàng với snapshot sản phẩm, địa chỉ, phí ship và tỷ giá VND/USD lúc đặt. Mọi tiền của đơn là VND nguyên; USD chỉ là giá trị suy ra theo tỷ giá chốt trên đơn.
 - Cho khách theo dõi đơn của mình và huỷ khi cửa hàng chưa giao cho vận chuyển (đơn đã trả thì có yêu cầu hoàn tiền).
 - Cho admin vận hành đơn: tìm theo mã/SĐT/tên, lọc trạng thái/khách, và đẩy trạng thái qua các bước giao hàng.
 
@@ -44,6 +44,8 @@ Thanh toán (VietQR/SePay) và hoàn tiền của đơn do module [payment](paym
 | GET | `/api/admin/orders/:orderId` | `ORDER_ADMIN_VIEW` | Chi tiết bất kỳ đơn |
 | PATCH | `/api/admin/orders/:orderId/status` | `ORDER_ADMIN_UPDATE_STATUS` | Đổi trạng thái |
 
+**Field tiền của đơn** (khách và admin, ở list, chi tiết, checkout, huỷ, đổi trạng thái): `subtotalVnd/subtotalUsd`, `shippingFeeVnd/shippingFeeUsd`, `totalVnd/totalUsd`, mỗi dòng `items[].priceVnd/priceUsd`, và `exchangeRate` (số VND cho 1 USD lúc đặt đơn). Không còn field `subtotal`/`shippingFee`/`total`/`items[].price`. `...Usd` = `round(…Vnd / exchangeRate, 2)` nên không đổi khi admin đổi tỷ giá sau đó.
+
 **GET `/api/orders`** — `PublicOrderQueryDto` (extends `PaginationQueryDto`): `status` (`IsIn(ORDER_STATUSES)`), `sort` (whitelist `createdAt`; mặc định `-createdAt`). Response `paginated(...)`, mỗi đơn kèm `items`.
 
 **GET `/api/orders/:orderId`** → `{ data: Order(+items) + paymentAttempts + refunds }`; đơn không thuộc user hoặc không có → `404 Order not found` (khi đó không truy vấn phiên thanh toán).
@@ -52,14 +54,14 @@ Thanh toán (VietQR/SePay) và hoàn tiền của đơn do module [payment](paym
 
 ```json
 "paymentAttempts": [
-  { "transferCode": "DHzAwdO9GeCxt8Dm3y", "amount": 3375000, "status": "EXPIRED", "createdAt": "...", "expiresAt": "...", "paidAt": null, "transactionRef": null }
+  { "transferCode": "DHzAwdO9GeCxt8Dm3y", "amountVnd": 3375000, "amountUsd": 135, "status": "EXPIRED", "createdAt": "...", "expiresAt": "...", "paidAt": null, "transactionRef": null }
 ]
 ```
 
 | Field | Nội dung |
 |---|---|
 | `transferCode` | Nội dung chuyển khoản của phiên (`PAYMENT_TRANSFER_PREFIX` + 8 ký tự ngẫu nhiên, vd `DHG29JR5A8`); mỗi phiên một mã khác nhau và mọi mã đã cấp (kể cả đã hết hạn) đều nằm trong danh sách |
-| `amount` | Số tiền VND của phiên |
+| `amountVnd`, `amountUsd` | Số tiền VND của phiên (bằng `totalVnd` của đơn lúc tạo phiên) và giá trị USD theo tỷ giá của đơn |
 | `status` | `PENDING` \| `PAID` \| `EXPIRED` \| `CANCELLED`, suy ra khi đọc cùng quy tắc với `GET /api/payments/:orderId/status`: phiên `PENDING` của đơn đã huỷ → `CANCELLED`, phiên `PENDING` quá `expiresAt` → `EXPIRED` |
 | `createdAt`, `expiresAt`, `paidAt` | Thời điểm tạo, hết hạn, đã trả (`null` nếu chưa) |
 | `transactionRef` | Chỉ phiên `PAID`: `provider_transaction_id` của giao dịch đã khớp (webhook `MATCHED` hoặc xác nhận thủ công `MANUALLY_CONFIRMED`), đúng giá trị lưu trong DB và admin thấy; phiên khác `null` |
@@ -70,7 +72,7 @@ Không trả số tài khoản nhận, `raw_payload`, id nội bộ hay id đơn
 
 ```json
 "refunds": [
-  { "amount": 3375000, "status": "COMPLETED", "reason": "ADMIN_CANCELLED", "createdAt": "...", "processedAt": "...", "bankReference": "FT26287123456" }
+  { "amountVnd": 3375000, "amountUsd": 135, "status": "COMPLETED", "reason": "ADMIN_CANCELLED", "createdAt": "...", "processedAt": "...", "bankReference": "FT26287123456" }
 ]
 ```
 
@@ -86,10 +88,10 @@ Không trả số tài khoản nhận, `raw_payload`, id nội bộ hay id đơn
 Response **HTTP 200** (không phải 201, vì không tạo gì):
 
 ```json
-{ "data": { "shippingMethod": "express", "subtotal": 120, "shippingFee": 15, "total": 135, "freeShipping": false, "freeShippingThreshold": 150, "vndPerUnit": 25000, "amountVnd": 3375000 } }
+{ "data": { "shippingMethod": "express", "subtotalVnd": 3000000, "subtotalUsd": 120, "shippingFeeVnd": 50000, "shippingFeeUsd": 2, "totalVnd": 3050000, "totalUsd": 122, "freeShipping": false, "freeShippingThresholdVnd": 3500000, "freeShippingThresholdUsd": 140, "exchangeRate": 25000 } }
 ```
 
-`freeShipping` = `true` khi subtotal đạt ngưỡng miễn phí (phí ship về 0 nhờ ngưỡng); `store-pickup` có `price = 0` nhưng dưới ngưỡng vẫn là `freeShipping: false`. `freeShippingThreshold` là `null` khi admin tắt miễn phí ship. `amountVnd` = `round(total × vndPerUnit)` là số VND khách sẽ phải chuyển ở trang QR (cùng hàm quy đổi với phiên thanh toán, nên bằng `amount` của QR nếu tỷ giá không đổi giữa hai lần); `vndPerUnit` là tỷ giá `PAYMENT_VND_PER_UNIT`. Cả hai là `null` (quote vẫn trả 200) khi biến này chưa cấu hình. Kiểm tra giỏ giống checkout: id không thuộc giỏ hoặc giỏ rỗng → `400`, sản phẩm không còn bán → `400`, `sold_out`/`custom_order` → `ORDER_PRODUCT_NOT_ORDERABLE (1303)`. Không ghi DB, không xoá giỏ.
+`freeShipping` = `true` khi subtotal đạt ngưỡng miễn phí (phí ship về 0 nhờ ngưỡng); `store-pickup` có `price = 0` nhưng dưới ngưỡng vẫn là `freeShipping: false`. `freeShippingThresholdVnd/Usd` là `null` khi admin tắt miễn phí ship. `totalVnd` chính là số VND khách sẽ phải chuyển ở trang QR (phiên thanh toán dùng đúng `orders.total`, không có bước quy đổi); `...Usd` suy ra theo `exchangeRate` — tỷ giá **hiện tại** của [currency](currency.md) (đơn thật chốt tỷ giá tại lúc checkout). Kiểm tra giỏ giống checkout: id không thuộc giỏ hoặc giỏ rỗng → `400`, sản phẩm không còn bán → `400`, `sold_out`/`custom_order` → `ORDER_PRODUCT_NOT_ORDERABLE (1303)`. Không ghi DB, không xoá giỏ.
 
 **POST `/api/orders`** — `CreateOrderDto extends QuoteOrderDto` (`shippingMethod`, `cartItemIds` như trên):
 
@@ -141,9 +143,10 @@ Bảng `orders` (entity `Order extends BaseEntity`):
 | `id` | varchar(16) PK | nanoid16 (cũng là mã đơn) |
 | `user_id` | varchar(16) | nullable; FK `FK_orders_user` → `users(id)` ON DELETE SET NULL; index `IDX_orders_user_id` |
 | `status` | varchar(20) | default `pending`; `CK_orders_status` ∈ 6 trạng thái; index `IDX_orders_status` |
-| `subtotal` | decimal(10,2) | default 0; `CK_orders_subtotal >= 0` |
-| `shipping_fee` | decimal(10,2) | default 0; `CK_orders_shipping_fee >= 0` |
-| `total` | decimal(10,2) | default 0; `CK_orders_total >= 0` |
+| `subtotal` | bigint | VND, default 0; `CK_orders_subtotal >= 0` (entity ép về number) |
+| `shipping_fee` | bigint | VND, default 0; `CK_orders_shipping_fee >= 0` |
+| `total` | bigint | VND, default 0; `CK_orders_total >= 0`; bằng `subtotal + shipping_fee` |
+| `exchange_rate` | numeric(12,2) | NOT NULL, không default; tỷ giá VND/USD lúc đặt đơn; `CK_orders_exchange_rate > 0`; đơn có từ trước migration `VndBaseCurrency` được điền tỷ giá seed |
 | `shipping_method` | varchar(100) | default `''` |
 | `shipping_address` | jsonb | default `{}`; snapshot đủ `{ fullName, phone, addressLine1, addressLine2, city, province, postalCode, country }`, hoặc chỉ `{ fullName, phone }` với đơn `store-pickup` dùng `pickupContact` (các key còn lại vắng mặt) |
 | `note` | varchar(500) | default `''` |
@@ -161,7 +164,7 @@ Bảng `order_items` (entity `OrderItem`, không extends `BaseEntity`, chỉ có
 | `product_id` | varchar(16) | nullable; FK → `products(id)` ON DELETE SET NULL; index `IDX_order_items_product_id` |
 | `product_name` | varchar(255) | snapshot |
 | `product_image` | varchar(500) | snapshot (ảnh đầu tiên), default `''` |
-| `price` | decimal(10,2) | snapshot; `CK_order_items_price >= 0` và `CK_order_items_price_positive > 0` |
+| `price` | bigint | snapshot đơn giá VND; `CK_order_items_price >= 0` và `CK_order_items_price_positive > 0` |
 | `quantity` | int | default 1; `CK_order_items_quantity >= 1` |
 | `size` | varchar(50) | default `''` |
 | `color` | varchar(100) | default `''` |
@@ -171,11 +174,11 @@ Bảng `order_items` (entity `OrderItem`, không extends `BaseEntity`, chỉ có
 
 - **DTO**: như 4.1 (`@IsIn` phương thức giao hàng và trạng thái; `@ArrayUnique`, `@ArrayNotEmpty`, `@ArrayMaxSize(100)` cho `cartItemIds`; `@ValidateNested` + `@Type` cho `pickupContact`).
 - **Service**: giỏ không rỗng; mọi `cartItemIds` phải thuộc giỏ của user; sản phẩm tồn tại và `active`; không thuộc badge `NON_ORDERABLE_BADGES`; tổ hợp `shippingMethod`/`addressId`/`pickupContact` hợp lệ (bảng ở 4.1); địa chỉ thuộc user; chuyển trạng thái theo bảng `VALID_TRANSITIONS`; khách chỉ huỷ đơn của mình, theo bảng quy tắc huỷ ở 4.4.
-- **DB**: CHECK status, payment_status (`unpaid`/`paid`/`refunded`), paid_at, subtotal/shipping_fee/total ≥ 0, price > 0, quantity ≥ 1; FK như 4.2.
+- **DB**: CHECK status, payment_status (`unpaid`/`paid`/`refunded`), paid_at, subtotal/shipping_fee/total ≥ 0, exchange_rate > 0, price > 0, quantity ≥ 1; FK như 4.2.
 
 ### 4.4 Luồng xử lý & quy tắc nghiệp vụ
 
-**Quote (`quote`)** — dùng chung `loadSelectedItems` (bước 1–5 của checkout) và `calculateTotals` (bước 7) với checkout, không mở transaction, không ghi gì; trả `{ shippingMethod, subtotal, shippingFee, total, freeShipping, freeShippingThreshold, vndPerUnit, amountVnd }` (hai trường cuối từ `PaymentConfigService.getVndPerUnit()` và `convertToVnd` của module [payment](payment.md)).
+**Quote (`quote`)** — dùng chung `loadSelectedItems` (bước 1–5 của checkout) và `calculateTotals` (bước 7) với checkout, không mở transaction, không ghi gì; trả `{ shippingMethod, subtotalVnd/Usd, shippingFeeVnd/Usd, totalVnd/Usd, freeShipping, freeShippingThresholdVnd/Usd, exchangeRate }`; `exchangeRate` và các `...Usd` lấy từ `CurrencyService.getVndPerUsd()`.
 
 **Checkout (`checkout`)** — trước khi mở transaction, `resolveDelivery` kiểm tra tổ hợp phương thức/địa chỉ/người nhận (bảng ở 4.1). Phần còn lại nằm trong một transaction (`DataSource.transaction`), lỗi bất kỳ bước nào sẽ rollback:
 
@@ -185,9 +188,9 @@ Bảng `order_items` (entity `OrderItem`, không extends `BaseEntity`, chỉ có
 4. Dòng có sản phẩm bị xoá hoặc `status !== 'active'` → `400 Some products are no longer available: <tên>`.
 5. Dòng có badge `sold_out` / `custom_order` → `ORDER_PRODUCT_NOT_ORDERABLE (1303)` kèm danh sách tên.
 6. Có `addressId`: nạp địa chỉ theo `addressId` và `userId`, không có → `404 Address not found`, snapshot đủ địa chỉ. Dùng `pickupContact`: không tra bảng địa chỉ, snapshot `{ fullName, phone }`.
-7. Tính tiền: `subtotal = Σ price × quantity` trên **các dòng đã chọn**; cấu hình ship lấy từ `ShippingConfigService.get()` ([shipping](shipping.md), admin chỉnh được, đọc mỗi lần checkout): `shippingFee = 0` nếu ngưỡng miễn phí không `null` và `subtotal >= ngưỡng`, ngược lại `price` của phương thức đã chọn (mặc định `standard 8`, `express 15`, `store-pickup 0`; không tìm thấy phương thức thì dùng `price` của `standard`); `total = subtotal + shippingFee`; `subtotal` và `total` được làm tròn 2 chữ số thập phân (như cột `decimal(10,2)`), nên báo giá, số lưu trong DB và số VND của QR không lệch do nhiễu dấu phẩy động.
-8. Tạo `Order` với `status = 'pending'`, `shippingMethod` (mặc định `standard`), `shippingAddress` (snapshot ở bước 6), `note` (mặc định `''`).
-9. Tạo `OrderItem` cho từng dòng với snapshot `productName`, `productImage` (ảnh đầu hoặc `''`), `price`, `quantity`, `size`, `color`, `productId`.
+7. Tính tiền (VND nguyên, không có bước làm tròn): `subtotal = Σ price × quantity` trên **các dòng đã chọn**; cấu hình ship lấy từ `ShippingConfigService.get()` ([shipping](shipping.md), admin chỉnh được, đọc mỗi lần checkout): `shippingFee = 0` nếu ngưỡng miễn phí (`freeShippingThresholdVnd`) không `null` và `subtotal >= ngưỡng`, ngược lại `priceVnd` của phương thức đã chọn (mặc định `standard 30000`, `express 50000`, `store-pickup 0`; không tìm thấy phương thức thì dùng `priceVnd` của `standard`); `total = subtotal + shippingFee`. Báo giá, số lưu trong DB và số tiền của QR dùng cùng một con số.
+8. Tạo `Order` với `status = 'pending'`, `exchangeRate` = tỷ giá hiện tại (`CurrencyService.getVndPerUsd()`, chốt từ đây), `shippingMethod` (mặc định `standard`), `shippingAddress` (snapshot ở bước 6), `note` (mặc định `''`).
+9. Tạo `OrderItem` cho từng dòng với snapshot `productName`, `productImage` (ảnh đầu hoặc `''`), `price` (VND), `quantity`, `size`, `color`, `productId`.
 10. Xoá khỏi giỏ **chỉ các dòng đã đặt** (đặt cả giỏ thì giỏ trống; chọn một phần thì các dòng còn lại giữ nguyên).
 11. Đọc lại đơn (kèm `items`) trong transaction và trả về.
 
@@ -233,12 +236,13 @@ Phía khách các lỗi còn lại là HTTP thô: `NotFoundException` (`Order no
 
 - `TypeOrmModule.forFeature([Order, OrderItem])`; `OrderService` inject thêm `DataSource`, đọc `Cart`, `CartItem`, `Address` qua `manager`; huỷ/đổi trạng thái đơn chạy trong `DataSource.transaction` và gọi `PaymentService`, `RefundService` (từ `PaymentModule`) với cùng `manager`.
 - Phí ship và ngưỡng miễn phí không còn là hằng số trong module này: lấy từ `SHIPPING_CONFIG` qua `ShippingConfigService` (`OrderModule` import `ShippingModule`). `CreateOrderDto.shippingMethod` dùng `SHIPPING_METHOD_IDS` từ `shipping/shipping-config.ts`.
+- Tỷ giá lấy từ `CurrencyService` (`OrderModule` import `CurrencyModule`); `order.presenter.ts` (`presentOrder`, `presentOrderItem`) đổi field tiền của entity thành cặp `...Vnd`/`...Usd`.
 - Không có biến môi trường.
 
 ### 4.7 Test
 
 - `order.service.spec.ts` — `OrderService.checkout`: đặt theo `cartItemIds` (chỉ xoá dòng đã đặt), đặt cả giỏ khi bỏ `cartItemIds`, gửi đủ id, miễn phí ship tính theo subtotal các dòng đã chọn (không theo cả giỏ) và áp dụng khi subtotal đã chọn đạt ngưỡng, phí theo từng phương thức lấy từ shipping config (mặc định, giá cấu hình, ngưỡng cấu hình, ngưỡng `null` không bao giờ miễn phí, config được đọc trong checkout), từ chối sản phẩm inactive, bỏ qua sản phẩm inactive/`sold_out`/`custom_order` không được chọn, từ chối giỏ có `sold_out`, giỏ rỗng.
-- `order.service.spec.ts` (tiếp) — tổ hợp phương thức/địa chỉ/`pickupContact` (tạo được, snapshot `{ fullName, phone }`, không tra địa chỉ, các tổ hợp bị từ chối với 1304/1305/1306 và không ghi gì), tổng tiền từng phương thức dưới/đạt ngưỡng và ngưỡng `null`, `quote` (số liệu, mặc định, `cartItemIds`, `freeShipping`, trùng kết quả checkout, không tác dụng phụ, kiểm tra giỏ như checkout), `amountVnd`/`vndPerUnit` của quote (làm tròn, `null` khi thiếu tỷ giá, bằng số tiền QR tạo cho đơn cùng đầu vào), và số tiền QR của đơn `express` = `(subtotal + phí express) × PAYMENT_VND_PER_UNIT` (qua `PaymentService.createQr`).
+- `order.service.spec.ts` (tiếp) — tổ hợp phương thức/địa chỉ/`pickupContact` (tạo được, snapshot `{ fullName, phone }`, không tra địa chỉ, các tổ hợp bị từ chối với 1304/1305/1306 và không ghi gì), tổng tiền từng phương thức dưới/đạt ngưỡng và ngưỡng `null`, cộng VND nguyên, `quote` (số liệu VND/USD, mặc định, `cartItemIds`, `freeShipping`, ngưỡng `null`, trùng kết quả checkout, USD theo tỷ giá hiện tại, không còn `vndPerUnit`/`amountVnd`, không tác dụng phụ, kiểm tra giỏ như checkout, `totalVnd` bằng số tiền QR tạo cho đơn cùng đầu vào), checkout chốt `exchangeRate` và trả đủ field `...Vnd`/`...Usd`, và số tiền QR của đơn `express` = `subtotal + phí express` (qua `PaymentService.createQr`).
 - `order.service.spec.ts` (tiếp) — luật huỷ với thanh toán: khách huỷ đơn chưa trả thì các mã chờ bị huỷ theo, đơn đã trả (mọi trạng thái) → 1307 và không đổi gì, đơn đã `confirmed` chưa trả vẫn lỗi thường, admin chuyển `cancelled` thì huỷ các mã chờ còn các chuyển khác thì không.
 - `order.service.spec.ts` (tiếp) — `findOne`/`cancel` kèm `paymentAttempts`: trả đúng thứ tự do payment cung cấp, `[]` khi chưa có phiên, đơn của người khác/không tồn tại → 404 và không truy vấn phiên, `cancel` trả cùng shape.
 - `order.service.spec.ts` (tiếp) — luật huỷ với hoàn tiền (dùng `RefundService` thật trên manager giả): khách huỷ đơn chưa trả (không có hoàn tiền, mã chờ → `CANCELLED`), khách không huỷ được đơn đã trả ở bất kỳ trạng thái nào (1307, không tạo hoàn), đơn đã huỷ không tạo hoàn lần hai, đơn của người khác → 404, admin huỷ đơn đã trả không có phiên `PAID` → 1712 và trạng thái giữ nguyên, admin huỷ đơn đã trả (`ADMIN_CANCELLED`, `requested_by` admin), admin huỷ đơn chưa trả, chuyển trạng thái khác không đụng thanh toán, bước chuyển sai (huỷ từ `shipping`) → 1302 không tạo hoàn, đơn lạ → 1301.
@@ -246,12 +250,13 @@ Phía khách các lỗi còn lại là HTTP thô: `NotFoundException` (`Order no
 
 ### 4.8 Lưu ý hiện trạng
 
-- Ngưỡng miễn phí ship áp cho mọi phương thức giao hàng. Phí và ngưỡng chỉ có một nguồn (`SHIPPING_CONFIG`), tính ở một hàm duy nhất (`calculateTotals`) dùng cho cả quote và checkout; đơn đã tạo giữ nguyên `shipping_fee`/`total` khi admin đổi config.
+- Ngưỡng miễn phí ship áp cho mọi phương thức giao hàng. Phí và ngưỡng chỉ có một nguồn (`SHIPPING_CONFIG`), tính ở một hàm duy nhất (`calculateTotals`) dùng cho cả quote và checkout; đơn đã tạo giữ nguyên `shipping_fee`/`total`/`exchange_rate` khi admin đổi config hoặc tỷ giá.
+- Báo giá (`quote`) dùng tỷ giá hiện tại cho `...Usd`; đơn thật chốt tỷ giá lúc checkout, nên `totalUsd` của đơn có thể khác `totalUsd` của báo giá nếu admin đổi tỷ giá giữa hai lần. `totalVnd` thì luôn giống nhau.
 - `orders.shipping_method` có default `''` và không có CHECK; dữ liệu hiện có chỉ chứa `standard` (đã kiểm tra), checkout luôn ghi một trong ba id nên không có migration backfill.
 - Đơn `store-pickup` dùng `pickupContact` có `shipping_address` chỉ gồm `fullName`, `phone`; list/chi tiết trả `shippingAddress` thiếu các key địa chỉ. Tìm kiếm admin theo `phone`/`fullName` vẫn hoạt động.
 - Không có trạng thái riêng cho đơn nhận tại cửa hàng; luồng `status` giữ nguyên.
 - Không có tồn kho: checkout không trừ số lượng và huỷ đơn không hoàn lại gì; khả năng đặt hàng chỉ dựa vào `status` và badge.
-- `total` chỉ là `subtotal + shippingFee`. Đơn tạo ra luôn `payment_status = 'unpaid'`; thanh toán xử lý ở module [payment](payment.md). Response đơn (khách và admin) có thêm `paymentStatus`, `paidAt`.
+- `total` chỉ là `subtotal + shippingFee` (VND). Đơn tạo ra luôn `payment_status = 'unpaid'`; thanh toán xử lý ở module [payment](payment.md). Response đơn (khách và admin) có thêm `paymentStatus`, `paidAt`.
 - Checkout không đọc hay ghi `payment_status`; khi thanh toán thành công, module [payment](payment.md) đặt `payment_status = 'paid'` và tự chuyển đơn `pending` sang `confirmed` (đơn đã `confirmed` trở đi giữ nguyên). `orders.status` là trạng thái xử lý đơn (`pending` = chờ cửa hàng xác nhận), tách khỏi `payment_status`. Đơn `cancelled` không còn tạo được QR và tiền chuyển vào đơn đã huỷ chỉ được ghi nhận để đối soát.
 - `ORDER_STATUSES` được khai báo trong `dtos/admin-order.dto.ts` (cùng kiểu `OrderStatus`), không nằm trong `enum-values.constant.ts`.
 - Trả hàng sau khi giao do module [return](return.md) xử lý; module này chỉ ghi `delivered_at` khi đơn sang `delivered`.

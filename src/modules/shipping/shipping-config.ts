@@ -1,5 +1,6 @@
 import { throwAppError } from '@common/exceptions/app.exception';
 import { ESiteConfigErrorCode } from '@common/exceptions/error-codes';
+import { MAX_MONEY_VND } from '@common/utils/money.util';
 import { plainToInstance, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -8,7 +9,6 @@ import {
   IsIn,
   IsInt,
   IsNotEmpty,
-  IsNumber,
   IsOptional,
   IsString,
   Max,
@@ -29,7 +29,8 @@ export interface ShippingMethodConfig {
   name: string;
   description: string;
   estimatedDays: string;
-  price: number;
+  /** Phí ship (VND, số nguyên) */
+  priceVnd: number;
   icon: (typeof SHIPPING_METHOD_ICONS)[number];
 }
 
@@ -41,22 +42,22 @@ export interface ReturnPolicyConfig {
 }
 
 export interface ShippingConfig {
-  /** Subtotal đạt ngưỡng này thì miễn phí ship (mọi phương thức); `null` = không có miễn phí ship */
-  freeShippingThreshold: number | null;
+  /** Subtotal (VND) đạt ngưỡng này thì miễn phí ship (mọi phương thức); `null` = không có miễn phí ship */
+  freeShippingThresholdVnd: number | null;
   methods: ShippingMethodConfig[];
   returnPolicy: ReturnPolicyConfig;
 }
 
 /** Giá trị mặc định: dùng khi chưa có dòng `SHIPPING_CONFIG` hoặc giá trị lưu trong DB không hợp lệ; cũng là giá trị seed của migration */
 export const DEFAULT_SHIPPING_CONFIG: ShippingConfig = {
-  freeShippingThreshold: 150,
+  freeShippingThresholdVnd: 1_500_000,
   methods: [
     {
       id: 'standard',
       name: 'Standard Shipping',
       description: 'Delivered in eco-friendly packaging',
       estimatedDays: '5-7 business days',
-      price: 8,
+      priceVnd: 30_000,
       icon: 'truck',
     },
     {
@@ -64,7 +65,7 @@ export const DEFAULT_SHIPPING_CONFIG: ShippingConfig = {
       name: 'Express Shipping',
       description: 'Priority handling and faster delivery',
       estimatedDays: '2-3 business days',
-      price: 15,
+      priceVnd: 50_000,
       icon: 'express',
     },
     {
@@ -72,7 +73,7 @@ export const DEFAULT_SHIPPING_CONFIG: ShippingConfig = {
       name: 'Store Pickup',
       description: 'Pick up at our flagship store',
       estimatedDays: '1-2 business days',
-      price: 0,
+      priceVnd: 0,
       icon: 'store',
     },
   ],
@@ -87,8 +88,6 @@ export const DEFAULT_SHIPPING_CONFIG: ShippingConfig = {
     ],
   },
 };
-
-const MAX_MONEY = 99_999_999;
 
 class ShippingMethodConfigDto implements ShippingMethodConfig {
   @IsIn(SHIPPING_METHOD_IDS)
@@ -108,10 +107,10 @@ class ShippingMethodConfigDto implements ShippingMethodConfig {
   @MaxLength(100)
   estimatedDays: string;
 
-  @IsNumber({ maxDecimalPlaces: 2 })
+  @IsInt()
   @Min(0)
-  @Max(MAX_MONEY)
-  price: number;
+  @Max(MAX_MONEY_VND)
+  priceVnd: number;
 
   @IsIn(SHIPPING_METHOD_ICONS)
   icon: ShippingMethodConfig['icon'];
@@ -138,10 +137,10 @@ class ReturnPolicyConfigDto implements ReturnPolicyConfig {
 class ShippingConfigDto {
   // null = tắt miễn phí ship
   @ValidateIf((_o, value) => value !== null)
-  @IsNumber({ maxDecimalPlaces: 2 })
-  @Min(0.01)
-  @Max(MAX_MONEY)
-  freeShippingThreshold: number | null;
+  @IsInt()
+  @Min(1)
+  @Max(MAX_MONEY_VND)
+  freeShippingThresholdVnd: number | null;
 
   @IsArray()
   @ArrayMinSize(SHIPPING_METHOD_IDS.length)
@@ -191,7 +190,7 @@ export function parseShippingConfig(value: string): ParsedShippingConfig {
   return {
     ok: true,
     config: {
-      freeShippingThreshold: instance.freeShippingThreshold,
+      freeShippingThresholdVnd: instance.freeShippingThresholdVnd,
       returnPolicy: instance.returnPolicy
         ? {
             days: instance.returnPolicy.days,
@@ -200,8 +199,8 @@ export function parseShippingConfig(value: string): ParsedShippingConfig {
           }
         : structuredClone(DEFAULT_SHIPPING_CONFIG.returnPolicy),
       methods: SHIPPING_METHOD_IDS.map((id) => {
-        const { name, description, estimatedDays, price, icon } = instance.methods.find((method) => method.id === id)!;
-        return { id, name, description, estimatedDays, price, icon };
+        const { name, description, estimatedDays, priceVnd, icon } = instance.methods.find((method) => method.id === id)!;
+        return { id, name, description, estimatedDays, priceVnd, icon };
       }),
     },
   };

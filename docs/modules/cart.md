@@ -1,6 +1,6 @@
 # cart (`src/modules/cart`)
 
-> Cập nhật lần cuối: 2026-10-12
+> Cập nhật lần cuối: 2026-10-16
 
 ## 1. Tổng quan
 
@@ -11,7 +11,7 @@ Module giỏ hàng của người dùng đã đăng nhập. Mỗi user có tối
 | Thư mục | `src/modules/cart` |
 | Route prefix | `/api/cart` |
 | Bảng DB | `carts`, `cart_items` |
-| Module phụ thuộc | `product` (entity `Product`) |
+| Module phụ thuộc | `product` (entity `Product`, `presentProduct`); `currency` (`CurrencyService.getVndPerUsd`, xem [currency](currency.md)) |
 | Export | `CartService` |
 
 ## 2. Mục đích & nghiệp vụ phục vụ
@@ -54,13 +54,14 @@ Response của `GET`, `POST`, `PATCH`, `DELETE items/:itemId`:
 ```json
 { "data": {
     "id": "<cartId>",
-    "items": [{ "id", "productId", "product": {Product}, "quantity", "size", "color", "lineTotal" }],
-    "subtotal": 0,
+    "items": [{ "id", "productId", "product": {Product}, "quantity", "size", "color", "lineTotalVnd", "lineTotalUsd" }],
+    "subtotalVnd": 0,
+    "subtotalUsd": 0,
     "itemCount": 0
 } }
 ```
 
-`lineTotal = price hiện tại của sản phẩm × quantity`; `subtotal` = tổng `lineTotal`; `itemCount` = tổng `quantity`. Chưa có giỏ (hoặc sau `clear`) → `{ data: { items: [], subtotal: 0, itemCount: 0 } }`.
+`lineTotalVnd = price hiện tại của sản phẩm (VND) × quantity`; `subtotalVnd` = tổng `lineTotalVnd`; `...Usd` suy ra từ tổng VND theo tỷ giá hiện tại (không phải tổng các USD đã làm tròn); `itemCount` = tổng `quantity`. `product` có dạng sản phẩm của [product](product.md) (`priceVnd`, `priceUsd`, `originalPriceVnd`, `originalPriceUsd`). Chưa có giỏ (hoặc sau `clear`) → `{ data: { items: [], itemCount: 0, subtotalVnd: 0, subtotalUsd: 0 } }`.
 
 ### 4.2 Dữ liệu
 
@@ -116,13 +117,13 @@ Các lỗi khác là HTTP thô: `NotFoundException` (`Cart not found`, `Cart ite
 
 ### 4.6 Phụ thuộc & cấu hình
 
-- `TypeOrmModule.forFeature([Cart, CartItem, Product])`.
+- `TypeOrmModule.forFeature([Cart, CartItem, Product])`; `CurrencyModule`.
 - Dùng `NON_ORDERABLE_BADGES` từ `@common/constants/enum-values.constant`.
 - Không có biến môi trường.
 
 ### 4.7 Test
 
-`cart.service.spec.ts` — `CartService.addItem`: sản phẩm badge `sold_out` / `custom_order` bị từ chối với `errorCode 1303` (HTTP 400, message chứa tên sản phẩm) và không lưu gì; sản phẩm không badge hoặc badge `new`/`sale`/`bestseller`/`limited` vẫn được thêm.
+`cart.service.spec.ts` — `CartService.addItem` (service dựng với stub `CurrencyService`): sản phẩm badge `sold_out` / `custom_order` bị từ chối với `errorCode 1303` (HTTP 400, message chứa tên sản phẩm) và không lưu gì; sản phẩm không badge hoặc badge `new`/`sale`/`bestseller`/`limited` vẫn được thêm.
 
 ### 4.8 Lưu ý hiện trạng
 

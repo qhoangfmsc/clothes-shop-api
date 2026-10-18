@@ -1,6 +1,6 @@
 # collection (`src/modules/collection`)
 
-> Cập nhật lần cuối: 2026-10-12
+> Cập nhật lần cuối: 2026-10-16
 
 ## 1. Tổng quan
 
@@ -11,7 +11,7 @@ Module bộ sưu tập: nhóm các sản phẩm theo chủ đề/mùa (ví dụ 
 | Thư mục | `src/modules/collection` |
 | Route prefix | `/api/collections` (public), `/api/admin/collections` (admin) |
 | Bảng DB | `collections`, `collection_products` (bảng nối) |
-| Module phụ thuộc | `product` (entity `Product`) |
+| Module phụ thuộc | `product` (entity `Product`, `presentProduct`); `currency` (`CurrencyService.getVndPerUsd`, xem [currency](currency.md)) |
 | Export | `CollectionService` |
 
 ## 2. Mục đích & nghiệp vụ phục vụ
@@ -46,7 +46,7 @@ Module bộ sưu tập: nhóm các sản phẩm theo chủ đề/mùa (ví dụ 
 | `search` | ≤ 255; `ILIKE` trên `name`, `slug` |
 | `sort` | whitelist `name`, `createdAt`; mặc định `-createdAt` |
 
-Response list `paginated(...)`: mỗi phần tử là entity `Collection` kèm mảng `products` (không kèm category/subcategory của sản phẩm).
+Response list `paginated(...)`: mỗi phần tử là entity `Collection` kèm mảng `products` (không kèm category/subcategory của sản phẩm). Mọi sản phẩm trong response collection (public, admin, create/update) có dạng sản phẩm của [product](product.md): `priceVnd`, `priceUsd`, `originalPriceVnd`, `originalPriceUsd`, USD theo tỷ giá hiện tại.
 
 **GET `/api/admin/collections`** — `AdminCollectionQueryDto`: `search` (≤ 255; `ILIKE` trên `slug`, `name`), `season` (string ≤ 100, lọc bằng so sánh bằng), `sort` (whitelist `name`, `createdAt`; mặc định `-createdAt`). Phần tử kèm `products`.
 
@@ -107,7 +107,7 @@ Bảng nối `collection_products` (`@ManyToMany` + `@JoinTable`): `collection_i
 
 ### 4.6 Phụ thuộc & cấu hình
 
-- `TypeOrmModule.forFeature([Collection, Product])`.
+- `TypeOrmModule.forFeature([Collection, Product])`; `CurrencyModule`.
 - Không có biến môi trường riêng.
 
 ### 4.7 Test
@@ -120,4 +120,3 @@ Chưa có spec riêng. `PublicCollectionQueryDto` và `AdminCollectionQueryDto` 
 - `resolveProducts` giữ thứ tự theo `productIds` ở bộ nhớ khi trả về, nhưng bảng nối không lưu thứ tự nên thứ tự đọc lại từ DB không được đảm bảo.
 - `productIds` có phần tử trùng làm số sản phẩm tìm được nhỏ hơn số id gửi lên, nên bị trả `COLLECTION_PRODUCT_NOT_FOUND` với danh sách id thiếu rỗng.
 - Public không có filter `season` (chỉ admin có).
-- `CollectionService.findAll()` còn trong service nhưng không có nơi nào gọi.

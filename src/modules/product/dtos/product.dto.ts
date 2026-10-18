@@ -1,7 +1,8 @@
 import { ACTIVE_STATUSES, PRODUCT_BADGES } from '@common/constants/enum-values.constant';
+import { MAX_MONEY_VND } from '@common/utils/money.util';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { ArrayMinSize, IsArray, IsIn, IsNotEmpty, IsNumber, IsOptional, IsString, MaxLength, Min, ValidateNested } from 'class-validator';
+import { ArrayMinSize, IsArray, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 
 class ColorDto {
   @ApiProperty({ example: 'Red' })
@@ -34,16 +35,18 @@ export class CreateProductDto {
   @MaxLength(255)
   name: string;
 
-  @ApiProperty({ example: 350000 })
-  @IsNumber()
-  @Min(0.01)
-  price: number;
+  @ApiProperty({ example: 350000, description: 'Giá bán (VND, số nguyên)' })
+  @IsInt()
+  @Min(1)
+  @Max(MAX_MONEY_VND)
+  priceVnd: number;
 
-  @ApiPropertyOptional({ example: 500000 })
-  @IsNumber()
+  @ApiPropertyOptional({ example: 500000, description: 'Giá gốc (VND, số nguyên), phải >= giá bán' })
+  @IsInt()
   @IsOptional()
-  @Min(0)
-  originalPrice?: number;
+  @Min(1)
+  @Max(MAX_MONEY_VND)
+  originalPriceVnd?: number;
 
   @ApiProperty({ example: ['https://example.com/image1.jpg'] })
   @IsArray()
@@ -128,17 +131,19 @@ export class UpdateProductDto {
   @MaxLength(255)
   name?: string;
 
-  @ApiPropertyOptional()
-  @IsNumber()
+  @ApiPropertyOptional({ description: 'Giá bán (VND, số nguyên)' })
+  @IsInt()
   @IsOptional()
-  @Min(0.01)
-  price?: number;
+  @Min(1)
+  @Max(MAX_MONEY_VND)
+  priceVnd?: number;
 
-  @ApiPropertyOptional()
-  @IsNumber()
+  @ApiPropertyOptional({ description: 'Giá gốc (VND, số nguyên), phải >= giá bán' })
+  @IsInt()
   @IsOptional()
-  @Min(0)
-  originalPrice?: number;
+  @Min(1)
+  @Max(MAX_MONEY_VND)
+  originalPriceVnd?: number;
 
   @ApiPropertyOptional()
   @IsArray()

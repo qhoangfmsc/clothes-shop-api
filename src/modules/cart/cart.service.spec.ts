@@ -8,7 +8,8 @@ function setup(product: any) {
   };
   const cartItemRepo: any = { findOne: jest.fn(async () => null), create: jest.fn((d: any) => d), save: jest.fn() };
   const productRepo: any = { findOne: jest.fn(async () => product) };
-  return { service: new CartService(cartRepo, cartItemRepo, productRepo), cartItemRepo };
+  const currencyService: any = { getVndPerUsd: jest.fn(async () => 25000) };
+  return { service: new CartService(cartRepo, cartItemRepo, productRepo, currencyService), cartItemRepo };
 }
 
 const product = (badge: string | null) => ({ id: 'p1', name: 'Áo A', status: 'active', badge });

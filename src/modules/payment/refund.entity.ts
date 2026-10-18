@@ -1,8 +1,9 @@
 import { BaseEntity } from '@common/base/base.entity';
+import { bigintTransformer } from '@common/base/column-transformers';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { Order } from '../order/order.entity';
 import { RefundReason, RefundStatus } from './payment.constant';
-import { bigintTransformer, PaymentAttempt } from './payment-attempt.entity';
+import { PaymentAttempt } from './payment-attempt.entity';
 
 /**
  * Yêu cầu hoàn tiền cho đơn đã thanh toán. Hệ thống không tự chuyển tiền: admin chuyển khoản trả khách bằng ngân hàng

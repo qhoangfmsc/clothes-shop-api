@@ -28,7 +28,14 @@ function setup(attempts: any[], transactions: any[] = []) {
   const dataSource: any = { query: jest.fn(async () => undefined) };
   const attemptRepo: any = { createQueryBuilder: jest.fn(() => qb) };
   const transactionRepo: any = { find: jest.fn(async () => transactions) };
-  const service = new PaymentService(dataSource, {} as any, attemptRepo, transactionRepo, {} as any);
+  const service = new PaymentService(
+    dataSource,
+    {} as any,
+    attemptRepo,
+    transactionRepo,
+    {} as any,
+    { getVndPerUsd: async () => 25000 } as any,
+  );
   return { service, qb, calls, dataSource, transactionRepo };
 }
 
@@ -37,7 +44,8 @@ const order = (over: Record<string, any> = {}) => ({
   userId: 'u1',
   status: 'pending',
   paymentStatus: 'unpaid',
-  total: '0.52',
+  total: 13_000,
+  exchangeRate: 26_000,
   shippingAddress: { fullName: 'Nguyen A', phone: '0901' },
   ...over,
 });
@@ -77,12 +85,23 @@ describe('PaymentService.findAttemptsAdmin — look a transfer content up', () =
     expect(res.data[0]).toMatchObject({
       id: 'a1',
       transferCode: 'DHG29JR5A8',
-      amount: 13_000,
+      amountVnd: 13_000,
+      amountUsd: 0.5, // theo tỷ giá 26 000 chốt trên đơn
       status: 'EXPIRED', // PENDING quá hạn
-      order: { id: 'o1', status: 'pending', paymentStatus: 'unpaid', customer: { fullName: 'Nguyen A', phone: '0901' } },
-      transactions: [{ id: 't1', providerTransactionId: '92704', verificationStatus: 'LATE' }],
+      order: {
+        id: 'o1',
+        status: 'pending',
+        paymentStatus: 'unpaid',
+        totalVnd: 13_000,
+        totalUsd: 0.5,
+        exchangeRate: 26_000,
+        customer: { fullName: 'Nguyen A', phone: '0901' },
+      },
+      transactions: [{ id: 't1', providerTransactionId: '92704', verificationStatus: 'LATE', amountVnd: 13_000, amountUsd: 0.5 }],
     });
     expect(JSON.stringify(res.data[0])).not.toMatch(/rawPayload|secret|bankAccount/);
+    expect(res.data[0]).not.toHaveProperty('amount');
+    expect(res.data[0].order).not.toHaveProperty('total');
   });
 
   it('shows a PENDING session of a cancelled order as CANCELLED and keeps PAID as PAID', async () => {

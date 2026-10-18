@@ -1,6 +1,6 @@
 # payment (`src/modules/payment`)
 
-> Cập nhật lần cuối: 2026-10-13
+> Cập nhật lần cuối: 2026-10-17
 
 ## 1. Tổng quan
 
@@ -11,12 +11,12 @@ Module thanh toán chuyển khoản VietQR qua SePay: tạo phiên thanh toán Q
 | Thư mục | `src/modules/payment` |
 | Route prefix | `/api/payments` (khách), `/api/webhooks/sepay` (SePay gọi), `/api/admin/payments`, `/api/admin/refunds` (admin) |
 | Bảng DB | `payment_attempts`, `payment_transactions`, `refunds`; thêm cột `payment_status`, `paid_at` vào `orders` (entity thuộc [order](order.md)) |
-| Module phụ thuộc | `order` (entity `Order`, đọc/khoá/cập nhật qua `EntityManager`); `return` (chỉ entity `ReturnRequest`, `ReturnRequestItem`: cập nhật trạng thái khi khoản hoàn từ trả hàng xong/bị từ chối); dịch vụ ngoài: SePay (chỉ nhận webhook, không gọi API SePay) |
+| Module phụ thuộc | `order` (entity `Order`, đọc/khoá/cập nhật qua `EntityManager`); `return` (chỉ entity `ReturnRequest`, `ReturnRequestItem`: cập nhật trạng thái khi khoản hoàn từ trả hàng xong/bị từ chối); `currency` ([currency](currency.md): tỷ giá hiện tại cho USD của giao dịch chưa khớp đơn nào); dịch vụ ngoài: SePay (chỉ nhận webhook, không gọi API SePay) |
 | Export | `PaymentConfigService`, `PaymentService`, `RefundService` (module [order](order.md) và [return](return.md) dùng) |
 
 ## 2. Mục đích & nghiệp vụ phục vụ
 
-- Khách bấm thanh toán một đơn của mình → nhận QR chứa ngân hàng, số tài khoản, số tiền VND và mã chuyển khoản `DH...`.
+- Khách bấm thanh toán một đơn của mình → nhận QR chứa ngân hàng, số tài khoản, số tiền VND (đúng bằng tổng đơn, tiền gốc của hệ thống) và mã chuyển khoản `DH...`; response kèm giá trị USD tương ứng chỉ để hiển thị.
 - Khách chuyển khoản; SePay phát hiện tiền vào và gọi webhook; backend xác thực chữ ký rồi tự xác nhận đơn. Trạng thái `PAID` chỉ do webhook hợp lệ đặt, không do FE.
 - Mọi giao dịch SePay gửi tới (kể cả không khớp đơn, sai tiền, đến trễ, trả trùng) đều được lưu để admin đối soát.
 - Hàng khách trả lại ([return](return.md)): khi cửa hàng xác nhận đã nhận hàng, tạo yêu cầu hoàn `REQUESTED` (lý do `RETURN`) cho phần giá trị hàng được chấp nhận; khoản hoàn xong thì yêu cầu trả hàng thành `REFUNDED`.
@@ -53,14 +53,14 @@ Module thanh toán chuyển khoản VietQR qua SePay: tạo phiên thanh toán Q
 **POST `/api/payments/qr`** — body `CreateQrPaymentDto`: `orderId` (string, not empty, ≤ 16). Số tiền không nhận từ client (field lạ bị `ValidationPipe` từ chối). Response `201`:
 
 ```json
-{ "data": { "orderId", "paymentId", "qrUrl", "amount", "bankName", "accountNumber", "accountName", "transferContent", "status", "expiresAt" } }
+{ "data": { "orderId", "paymentId", "qrUrl", "amountVnd", "amountUsd", "exchangeRate", "bankName", "accountNumber", "accountName", "transferContent", "status", "expiresAt" } }
 ```
 
 - `qrUrl` = `https://vietqr.app/img?acc=<số tài khoản>&bank=<SEPAY_RECEIVING_BANK_CODE>&amount=<VND>&des=<mã chuyển khoản>` (tham số được URL-encode).
-- `amount` là số tiền VND nguyên; `transferContent` là nội dung chuyển khoản = `PAYMENT_TRANSFER_PREFIX` + 8 ký tự ngẫu nhiên, vd `DHG29JR5A8`, duy nhất cho từng phiên; `status` luôn là `PENDING` ở response này.
+- `amountVnd` là số tiền VND nguyên (bằng `orders.total`, cũng là `amount` trong `qrUrl`); `amountUsd` là giá trị USD tương ứng theo tỷ giá chốt trên đơn và `exchangeRate` là tỷ giá đó (`orders.exchange_rate`), chỉ để hiển thị; riêng `qrUrl` (ảnh VietQR) chỉ mang số tiền VND vì chuẩn VietQR/ngân hàng chỉ nhận VND; `transferContent` là nội dung chuyển khoản = `PAYMENT_TRANSFER_PREFIX` + 8 ký tự ngẫu nhiên, vd `DHG29JR5A8`, duy nhất cho từng phiên; `status` luôn là `PENDING` ở response này.
 - Lỗi: đơn không thuộc user / không tồn tại → `404` `ORDER_NOT_FOUND (1301)`; đơn đã trả hoặc đã huỷ → `400` `PAYMENT_ORDER_NOT_PAYABLE (1702)`; thiếu cấu hình → `503` `PAYMENT_NOT_CONFIGURED (1701)`.
 
-**GET `/api/payments/:orderId/status`** → `{ data: { orderId, status } }` với `status` ∈ `PENDING | PAID | EXPIRED | CANCELLED`. Đơn không thuộc user → `404` `ORDER_NOT_FOUND`; đơn chưa từng tạo phiên → `404` `PAYMENT_ATTEMPT_NOT_FOUND (1703)`. Quy tắc suy ra trạng thái ở 4.4.
+**GET `/api/payments/:orderId/status`** → `{ data: { orderId, status, amountVnd, amountUsd, exchangeRate } }` (số tiền = tổng đơn `orders.total` và USD theo tỷ giá chốt trên đơn, để trang thanh toán vẫn hiển thị số tiền khi đang hỏi trạng thái) với `status` ∈ `PENDING | PAID | EXPIRED | CANCELLED`. Đơn không thuộc user → `404` `ORDER_NOT_FOUND`; đơn chưa từng tạo phiên → `404` `PAYMENT_ATTEMPT_NOT_FOUND (1703)`. Quy tắc suy ra trạng thái ở 4.4.
 
 **POST `/api/webhooks/sepay`**:
 
@@ -89,7 +89,7 @@ Body JSON của SePay, các field backend dùng: `id` (số hoặc chuỗi, ≤ 
 | `needsReview` | boolean tuỳ chọn (chỉ `true`/`false`, giá trị khác → 400): `true` = chỉ giao dịch cần admin xử lý — `verification_status` ∈ `UNMATCHED`, `AMOUNT_MISMATCH`, `LATE`, `NOT_PAYABLE` mà chưa gắn phiên nào hoặc gắn vào phiên của đơn còn `unpaid` và chưa `cancelled`; `false`/bỏ trống = không lọc. Cùng điều kiện (`TRANSACTION_NEEDS_REVIEW_SQL`) với con số `payments` của [pending-count](pending-count.md); kết hợp được với các bộ lọc khác |
 | `sort` | whitelist `receivedAt`, `amount`; mặc định `-receivedAt` |
 
-Response `paginated(...)`; mỗi phần tử là giao dịch kèm `paymentAttempt` (null nếu không khớp phiên nào). Khi có phiên, `paymentAttempt.order` chứa tóm tắt đơn `{ id, status, paymentStatus, total, userId }` (không kèm địa chỉ/sản phẩm).
+Response `paginated(...)`; mỗi phần tử là giao dịch kèm `paymentAttempt` (null nếu không khớp phiên nào). Khi có phiên, `paymentAttempt.order` chứa tóm tắt đơn `{ id, status, paymentStatus, totalVnd, totalUsd, exchangeRate, userId }` (không kèm địa chỉ/sản phẩm). Mọi số tiền là cặp `...Vnd`/`...Usd`: `amountVnd/amountUsd` của giao dịch và của `paymentAttempt` (không còn field `amount`/`total`); USD theo tỷ giá chốt trên đơn của phiên khớp, giao dịch chưa khớp phiên nào dùng tỷ giá hiện tại.
 
 **GET `/api/admin/payments/attempts`** — `AdminPaymentAttemptQueryDto` (extends `PaginationQueryDto`). Gõ đúng nội dung chuyển khoản trên sao kê (vd `DHG29JR5A8`) là biết mã thuộc đơn nào, của khách nào, đã hết hạn chưa:
 
@@ -100,15 +100,15 @@ Response `paginated(...)`; mỗi phần tử là giao dịch kèm `paymentAttemp
 | `status` | `IsIn(PAYMENT_ATTEMPT_STATUSES)`, lọc theo trạng thái **hiệu lực** (cùng quy tắc `resolveAttemptStatus`, viết lại bằng SQL `CASE`) |
 | `sort` | whitelist `createdAt`, `expiresAt`, `amount`; mặc định `-createdAt` |
 
-Response `paginated(...)`; mỗi phần tử: `{ id, transferCode, amount, status, createdAt, expiresAt, paidAt, order: { id, status, paymentStatus, total, userId, customer: { fullName, phone } }, transactions: [{ id, provider, providerTransactionId, amount, verificationStatus, transferContent, receivedAt }] }` (không trả `raw_payload`, số tài khoản nhận). Trước khi truy vấn, các phiên `PENDING` đã quá hạn của đơn chưa huỷ được ghi `EXPIRED` vào DB để DB phản ánh đúng thực tế.
+Response `paginated(...)`; mỗi phần tử: `{ id, transferCode, amountVnd, amountUsd, status, createdAt, expiresAt, paidAt, order: { id, status, paymentStatus, totalVnd, totalUsd, exchangeRate, userId, customer: { fullName, phone } }, transactions: [{ id, provider, providerTransactionId, amountVnd, amountUsd, verificationStatus, transferContent, receivedAt }] }` (không trả `raw_payload`, số tài khoản nhận). Trước khi truy vấn, các phiên `PENDING` đã quá hạn của đơn chưa huỷ được ghi `EXPIRED` vào DB để DB phản ánh đúng thực tế.
 
 **GET `/api/admin/payments/orders/:orderId`** → `{ data: { order, attempts, transactions } }`:
 
 | Field | Nội dung |
 |---|---|
-| `order` | `{ id, userId, status, paymentStatus, paidAt, subtotal, shippingFee, total, shippingMethod, customer: { fullName, phone }, createdAt }`; `customer` lấy từ snapshot địa chỉ, là `null` từng field nếu snapshot không có |
-| `attempts` | Mọi phiên thanh toán của đơn, mới nhất trước (`created_at DESC`) |
-| `transactions` | Mọi giao dịch đã gắn vào các phiên đó, mới nhất trước (`received_at DESC`), gồm cả giao dịch xác nhận thủ công |
+| `order` | `{ id, userId, status, paymentStatus, paidAt, subtotalVnd/Usd, shippingFeeVnd/Usd, totalVnd/Usd, exchangeRate, shippingMethod, customer: { fullName, phone }, createdAt }`; `customer` lấy từ snapshot địa chỉ, là `null` từng field nếu snapshot không có |
+| `attempts` | Mọi phiên thanh toán của đơn, mới nhất trước (`created_at DESC`); `amount` được thay bằng `amountVnd`/`amountUsd` |
+| `transactions` | Mọi giao dịch đã gắn vào các phiên đó, mới nhất trước (`received_at DESC`), gồm cả giao dịch xác nhận thủ công; `amount` được thay bằng `amountVnd`/`amountUsd` |
 
 `attempts[].status` là trạng thái hiệu lực (phiên `PENDING` quá hạn hiện `EXPIRED`, đơn đã huỷ hiện `CANCELLED`), giống khách thấy. Đơn không tồn tại → `404` `ORDER_NOT_FOUND (1301)`. Giao dịch chưa khớp phiên nào (`UNMATCHED`) không có trong danh sách này; tìm ở `GET /api/admin/payments/transactions`.
 
@@ -119,9 +119,9 @@ Response `paginated(...)`; mỗi phần tử: `{ id, transferCode, amount, statu
 | Cách | Field | Dùng khi |
 |---|---|---|
 | Gắn giao dịch có sẵn | `transactionId` (string ≤ 16, id trong `payment_transactions`) | Webhook đã tới nhưng không tự khớp (`UNMATCHED`, `AMOUNT_MISMATCH`, `LATE`, `NOT_PAYABLE`) |
-| Ghi giao dịch mới | `amount` (số nguyên VND ≥ 1) + `reference` (string ≤ 64, trim) và/hoặc `transferCode`; tuỳ chọn `provider` (`sepay` khi có `reference`, `manual` khi chỉ có `transferCode`) và `transferContent` (trim, ≤ 500) | Webhook không tới: admin đối chiếu trên dashboard SePay hoặc sao kê ngân hàng. `reference` là mã giao dịch SePay (provider `sepay`) hoặc mã tham chiếu trên sao kê (provider `manual`); bỏ `reference` thì mã giao dịch được ghi chính là `transferCode` (provider `manual`); `transferContent` là nội dung chuyển khoản đúng như sao kê |
+| Ghi giao dịch mới | `amountVnd` (số nguyên VND ≥ 1) + `reference` (string ≤ 64, trim) và/hoặc `transferCode`; tuỳ chọn `provider` (`sepay` khi có `reference`, `manual` khi chỉ có `transferCode`) và `transferContent` (trim, ≤ 500) | Webhook không tới: admin đối chiếu trên dashboard SePay hoặc sao kê ngân hàng. `reference` là mã giao dịch SePay (provider `sepay`) hoặc mã tham chiếu trên sao kê (provider `manual`); bỏ `reference` thì mã giao dịch được ghi chính là `transferCode` (provider `manual`); `transferContent` là nội dung chuyển khoản đúng như sao kê |
 
-Field chung: `transferCode` (tuỳ chọn, trim, tự viết hoa, ≤ 32 — nội dung chuyển khoản khách đã dùng, vd `DHG29JR5A8`: đánh dấu đã trả đúng phiên mang mã đó kể cả phiên đã hết hạn; bỏ trống thì dùng phiên của giao dịch đã gắn, hoặc phiên mới nhất của đơn), `note` (bắt buộc, trim, ≤ 500 — lý do/bằng chứng), `acceptAmountMismatch` (boolean, mặc định `false`). Field lạ bị từ chối. Response `201`: `{ data: { orderId, paymentStatus: 'paid', paidAt, attemptId, transaction } }`.
+Field chung: `transferCode` (tuỳ chọn, trim, tự viết hoa, ≤ 32 — nội dung chuyển khoản khách đã dùng, vd `DHG29JR5A8`: đánh dấu đã trả đúng phiên mang mã đó kể cả phiên đã hết hạn; bỏ trống thì dùng phiên của giao dịch đã gắn, hoặc phiên mới nhất của đơn), `note` (bắt buộc, trim, ≤ 500 — lý do/bằng chứng), `acceptAmountMismatch` (boolean, mặc định `false`). Field lạ bị từ chối. Response `201`: `{ data: { orderId, paymentStatus: 'paid', paidAt, attemptId, transaction } }` (`transaction.amount` được thay bằng `amountVnd`/`amountUsd`).
 
 **GET `/api/admin/refunds`** — `AdminRefundQueryDto` (extends `PaginationQueryDto`):
 
@@ -132,7 +132,7 @@ Field chung: `transferCode` (tuỳ chọn, trim, tự viết hoa, ≤ 32 — n�
 | `search` | ≤ 255; `ILIKE` trên `refunds.order_id`, `bank_reference`, `payment_attempts.transfer_code` (nội dung chuyển khoản khách đã dùng), `shipping_address->>'phone'`, `shipping_address->>'fullName'` |
 | `sort` | whitelist `createdAt`, `processedAt`, `amount`; mặc định `-createdAt` |
 
-Response `paginated(...)`; mỗi phần tử: `{ id, orderId, status, reason, returnRequestId, amount, createdAt, requestedBy, processedBy, processedAt, bankReference, note, order: { id, status, paymentStatus, total, userId, customer: { fullName, phone } }, payment: { transferCode, paidAmount, paidAt, provider, transactionRef, transferContent } }`. `payment` cho admin biết khoản tiền đã nhận để hoàn về đúng nguồn (`paidAmount` là số ngân hàng thực nhận): mã chuyển khoản của phiên, mã giao dịch (`provider_transaction_id`) và nội dung chuyển khoản của giao dịch đã khớp (`MATCHED` hoặc `MANUALLY_CONFIRMED`; `null` nếu không có). Không trả số tài khoản nhận hay `raw_payload`.
+Response `paginated(...)`; mỗi phần tử: `{ id, orderId, status, reason, returnRequestId, amountVnd, amountUsd, createdAt, requestedBy, processedBy, processedAt, bankReference, note, order: { id, status, paymentStatus, totalVnd, totalUsd, exchangeRate, userId, customer: { fullName, phone } }, payment: { transferCode, paidAmountVnd, paidAmountUsd, paidAt, provider, transactionRef, transferContent } }`. `payment` cho admin biết khoản tiền đã nhận để hoàn về đúng nguồn (`paidAmountVnd` là số ngân hàng thực nhận): mã chuyển khoản của phiên, mã giao dịch (`provider_transaction_id`) và nội dung chuyển khoản của giao dịch đã khớp (`MATCHED` hoặc `MANUALLY_CONFIRMED`; `null` nếu không có). Không trả số tài khoản nhận hay `raw_payload`.
 
 **POST `/api/admin/refunds`** — `CreateRefundDto`: `orderId` (string, not empty, ≤ 16). Chỉ cho đơn `cancelled` **và** `payment_status = paid` chưa có yêu cầu `REQUESTED` và chưa hoàn đủ; dùng cho đơn huỷ trước khi có luồng hoàn tiền hoặc khi yêu cầu cũ bị từ chối (`reason = ADMIN_CANCELLED`). Response `201` `{ data: <như phần tử list> }`.
 
@@ -218,14 +218,14 @@ Migration `AddPayments` idempotent: nếu DB còn schema thanh toán cũ (`order
 2. Khoá dòng đơn (`pessimistic_write`) theo `id` + `userId`.
 3. Đơn `paymentStatus = 'paid'` hoặc `status = 'cancelled'` → `PAYMENT_ORDER_NOT_PAYABLE`.
 4. Có phiên `PENDING` của đơn: còn hạn → dùng lại nguyên phiên đó (giữ mã, số tiền, `expiresAt`); hết hạn → chuyển `EXPIRED` rồi tạo phiên mới.
-5. Tạo phiên mới: `amount = convertToVnd(orders.total, PAYMENT_VND_PER_UNIT)` = `round(Number(orders.total) × PAYMENT_VND_PER_UNIT)` (VND nguyên, phải > 0; hàm `convertToVnd` trong `payment-amount.util.ts` cũng được `POST /api/orders/quote` dùng để trả `amountVnd`), mã chuyển khoản `transfer_code` = `PAYMENT_TRANSFER_PREFIX` + 8 ký tự từ bảng `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` (bỏ I, O, 0, 1), `bank_account` = `SEPAY_RECEIVING_ACCOUNT`, `expires_at` = bây giờ + 30 phút. Mã đã từng tồn tại (kể cả phiên cũ, đã hết hạn) không được cấp lại. Phiên hết hạn rồi tạo lại có `paymentId` và mã **mới**; phiên cũ và mã cũ vẫn được giữ nguyên trong DB để biết khách có thể đã chuyển theo mã nào. Mã giống hệt ở `qrUrl` (tham số `des`), response của khách, DB và màn admin.
+5. Tạo phiên mới: `amount = orders.total` (VND, tiền gốc của đơn nên không có bước quy đổi; phải là số nguyên an toàn > 0, nếu không → `PAYMENT_ORDER_NOT_PAYABLE`; bằng `totalVnd` của `POST /api/orders/quote`), mã chuyển khoản `transfer_code` = `PAYMENT_TRANSFER_PREFIX` + 8 ký tự từ bảng `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` (bỏ I, O, 0, 1), `bank_account` = `SEPAY_RECEIVING_ACCOUNT`, `expires_at` = bây giờ + 30 phút. Mã đã từng tồn tại (kể cả phiên cũ, đã hết hạn) không được cấp lại. Phiên hết hạn rồi tạo lại có `paymentId` và mã **mới**; phiên cũ và mã cũ vẫn được giữ nguyên trong DB để biết khách có thể đã chuyển theo mã nào. Mã giống hệt ở `qrUrl` (tham số `des`), response của khách, DB và màn admin.
 6. Trả `{ data: { ...QR } }`.
 
 **Admin tạo mã (`createQrAdmin`)** — trong một transaction: đọc cấu hình QR; khoá dòng đơn (không lọc theo `userId`); đơn `paymentStatus ≠ unpaid` hoặc `cancelled` → `PAYMENT_ORDER_NOT_PAYABLE`; mọi phiên `PENDING` của đơn → `EXPIRED` và `expires_at` = lúc đó (trả về mã của chúng ở `supersededTransferCodes`); tạo phiên mới như bước 5 của `createQr` kèm `created_by` = admin. Vì mỗi đơn chỉ có tối đa một phiên `PENDING` (UNIQUE từng phần), sau thao tác đơn có đúng một mã còn hiệu lực; mã cũ (đã `EXPIRED`/`CANCELLED`/`PAID`) giữ nguyên. Khách bấm tạo QR sau đó sẽ nhận lại mã của admin nếu còn hạn. Tiền chuyển vào mã đã bị thay được ghi `LATE` (xem bảng đối chiếu), không tự xác nhận đơn: admin xác nhận đúng mã đó bằng `transferCode` ở API confirm.
 
 **Trạng thái (`getStatus`)** — chỉ đọc DB, không gọi SePay: đơn `paid` → `PAID`; ngược lại lấy phiên mới nhất theo `created_at` và áp `resolveAttemptStatus` (`payment-attempt-status.util.ts`): phiên `PENDING` mà đơn đã `cancelled` → `CANCELLED`; phiên `PENDING` quá `expires_at` → `EXPIRED`; còn lại trả `status` của phiên. Trạng thái `EXPIRED`/`CANCELLED` ở đây có thể được suy ra khi đọc, chưa chắc đã ghi vào DB.
 
-**Phiên thanh toán cho khách xem (`listAttemptsForCustomer`)** — không có endpoint riêng; `GET /api/orders/:orderId` của module [order](order.md) gọi hàm này sau khi đã kiểm tra đơn thuộc user. Lấy mọi phiên của đơn (`created_at DESC`), áp cùng `resolveAttemptStatus` cho từng phiên, và với phiên `PAID` tìm giao dịch gắn vào phiên có `verification_status` ∈ `MATCHED`, `MANUALLY_CONFIRMED` để lấy `transactionRef` = `provider_transaction_id` (đúng giá trị lưu trong DB và admin thấy); giao dịch `DUPLICATE_PAYMENT`/`LATE`... cùng gắn vào phiên không được dùng. Mỗi phần tử chỉ gồm `transferCode`, `amount`, `status`, `createdAt`, `expiresAt`, `paidAt`, `transactionRef` (không có số tài khoản nhận, `raw_payload`, id nội bộ).
+**Phiên thanh toán cho khách xem (`listAttemptsForCustomer`)** — không có endpoint riêng; `GET /api/orders/:orderId` của module [order](order.md) gọi hàm này sau khi đã kiểm tra đơn thuộc user. Lấy mọi phiên của đơn (`created_at DESC`), áp cùng `resolveAttemptStatus` cho từng phiên, và với phiên `PAID` tìm giao dịch gắn vào phiên có `verification_status` ∈ `MATCHED`, `MANUALLY_CONFIRMED` để lấy `transactionRef` = `provider_transaction_id` (đúng giá trị lưu trong DB và admin thấy); giao dịch `DUPLICATE_PAYMENT`/`LATE`... cùng gắn vào phiên không được dùng. Mỗi phần tử chỉ gồm `transferCode`, `amountVnd`, `amountUsd`, `status`, `createdAt`, `expiresAt`, `paidAt`, `transactionRef` (không có số tài khoản nhận, `raw_payload`, id nội bộ).
 
 **Webhook (`SepayWebhookService.handle`)**:
 
@@ -259,12 +259,12 @@ Thứ tự đối chiếu (`reconcile`):
 
 **Xác nhận thủ công (`confirmPaymentAdmin`)** — trong một transaction, khoá theo thứ tự `orders` → `payment_transactions` (nếu dùng `transactionId`) → `payment_attempts` (cùng thứ tự với webhook):
 
-1. Kiểm tra input đúng một cách (`transactionId`, hoặc `reference` + `amount`), nếu không → `PAYMENT_CONFIRM_INPUT_INVALID`, chưa chạm DB.
+1. Kiểm tra input đúng một cách (`transactionId`, hoặc `reference` + `amountVnd`), nếu không → `PAYMENT_CONFIRM_INPUT_INVALID`, chưa chạm DB.
 2. Đơn không tồn tại → `ORDER_NOT_FOUND` (404); đơn đã `paid` hoặc `cancelled` → `PAYMENT_ORDER_NOT_PAYABLE` (nên bấm lần hai không trả được hai lần).
 3. Có `transactionId`: không tìm thấy → `PAYMENT_TRANSACTION_NOT_FOUND` (404); `verification_status` không thuộc `UNMATCHED`, `AMOUNT_MISMATCH`, `LATE`, `NOT_PAYABLE` (tức đã `MATCHED`, `MANUALLY_CONFIRMED`, `DUPLICATE_PAYMENT`, `ACCOUNT_MISMATCH` — tiền không vào tài khoản của mình —, hoặc `IGNORED`) → `PAYMENT_TRANSACTION_NOT_CONFIRMABLE`.
 4. Có `reference`: mã giao dịch lưu **nguyên văn** là `reference` cùng `provider` (`sepay` hoặc `manual`); cặp (`provider`, `reference`) đã tồn tại → `PAYMENT_TRANSACTION_NOT_CONFIRMABLE` (dùng `transactionId` của nó). Cùng một chuỗi ở hai provider khác nhau là hai giao dịch khác nhau.
 5. Chọn phiên thanh toán: phiên mà giao dịch đã gắn (phải thuộc đúng đơn này, nếu không → `NOT_CONFIRMABLE`); giao dịch chưa gắn phiên, hoặc giao dịch mới, thì lấy phiên mới nhất của đơn; đơn chưa từng có phiên → `PAYMENT_ATTEMPT_NOT_FOUND` (404).
-6. Số tiền thực nhận (của giao dịch hoặc `amount`) khác `payment_attempts.amount` và không có `acceptAmountMismatch: true` → `PAYMENT_AMOUNT_MISMATCH`.
+6. Số tiền thực nhận (của giao dịch hoặc `amountVnd`) khác `payment_attempts.amount` và không có `acceptAmountMismatch: true` → `PAYMENT_AMOUNT_MISMATCH`.
 7. Ghi: phiên → `PAID` + `paid_at`; `applyOrderPaid` (đơn → `paid`, `pending` → `confirmed`, các phiên `PENDING` khác → `CANCELLED`, như webhook); giao dịch có sẵn → `verification_status = 'MANUALLY_CONFIRMED'`, `payment_attempt_id`, `confirmed_by` (id admin), `confirmed_at`, `confirm_note`; giao dịch mới được tạo cùng các giá trị đó (`transfer_content` = `transferContent` admin nhập, mặc định `transfer_code` của phiên; lý do nằm ở `confirm_note`, không lẫn vào nội dung chuyển khoản; `raw_payload = { source, reference, provider, confirmedBy }`).
 
 Dùng mã giao dịch SePay làm `reference` (provider `sepay`) thì khi SePay gửi lại webhook của chính giao dịch đó, webhook thấy cặp (`sepay`, `provider_transaction_id`) đã có và bỏ qua (idempotent), không sinh `DUPLICATE_PAYMENT`.
@@ -273,11 +273,11 @@ Dùng mã giao dịch SePay làm `reference` (provider `sepay`) thì khi SePay g
 
 0. Mọi cách tạo khoản hoàn chung `insertRequest`: tìm phiên `PAID` của đơn (không có → `REFUND_NOT_ALLOWED`), không cho khi đơn còn khoản `REQUESTED`, trừ tổng các khoản `COMPLETED` để ra phần còn lại, số tiền không vượt phần còn lại.
 1. **Tạo yêu cầu khi huỷ đơn** (`createForCancelledOrder`, gọi trong transaction huỷ đơn đã khoá dòng đơn; xem [order](order.md)): tìm phiên `PAID` của đơn (không có → `REFUND_NOT_ALLOWED`); đã có yêu cầu `REQUESTED` → `REFUND_NOT_ALLOWED`; số tiền = **số ngân hàng thực nhận** của phiên `PAID` trừ tổng các khoản `COMPLETED` (≤ 0 → `REFUND_NOT_ALLOWED`). "Số thực nhận" là `amount` của giao dịch đã khớp phiên (`MATCHED` hoặc `MANUALLY_CONFIRMED`), thường bằng `payment_attempts.amount`, khác khi admin xác nhận thủ công kèm `acceptAmountMismatch`; không có giao dịch thì dùng số của phiên; tạo `refunds` `REQUESTED` với `reason = ADMIN_CANCELLED` và `requested_by` = admin huỷ đơn (khách không tự huỷ đơn đã trả). Việc này được làm **trước** khi đơn bị đổi sang `cancelled`, nên không thể có đơn huỷ đã thu tiền mà thiếu yêu cầu hoàn.
-1b. **Tạo yêu cầu khi trả hàng** (`createForReturn`, gọi từ `ReturnService.receive` trong transaction đã khoá đơn): số tiền = `prorateRefundAmount(đã nhận, đã trả trước + lần này, orders.total) − prorateRefundAmount(đã nhận, đã trả trước, orders.total)` (giá trị tính bằng xu; "đã trả trước" là giá trị các lần trả hàng đã nhận trước của đơn) — theo tỷ lệ trên số tiền ngân hàng thực nhận, nên nhiều lần trả cộng lại đúng bằng số đã nhận (không lệch do làm tròn; hoàn đủ giá trị đơn thì đúng bằng số đã nhận), tối đa bằng phần còn lại; `reason = RETURN`, `return_request_id` gắn yêu cầu trả hàng; đơn vẫn `paid` sau khi hoàn một phần.
+1b. **Tạo yêu cầu khi trả hàng** (`createForReturn`, gọi từ `ReturnService.receive` trong transaction đã khoá đơn): số tiền = `prorateRefundAmount(đã nhận, đã trả trước + lần này, orders.total) − prorateRefundAmount(đã nhận, đã trả trước, orders.total)` (giá trị tính bằng VND nguyên: `orders.total`, giá dòng hàng, phí ship; "đã trả trước" là giá trị các lần trả hàng đã nhận trước của đơn) — theo tỷ lệ trên số tiền ngân hàng thực nhận, nên nhiều lần trả cộng lại đúng bằng số đã nhận (không lệch do làm tròn; hoàn đủ giá trị đơn thì đúng bằng số đã nhận), tối đa bằng phần còn lại; `reason = RETURN`, `return_request_id` gắn yêu cầu trả hàng; đơn vẫn `paid` sau khi hoàn một phần.
 2. **Tạo thủ công** (`createAdmin`): khoá đơn; đơn phải `cancelled` và `payment_status = paid`; sau đó như bước 1 với `reason = ADMIN_CANCELLED`.
 3. **Hoàn xong** (`completeAdmin`): khoá đơn rồi yêu cầu; yêu cầu phải `REQUESTED` (khác → `REFUND_NOT_PENDING`); `reference` đã có ở khoản hoàn khác → `REFUND_REFERENCE_DUPLICATE` (lỗi UNIQUE `23505` do hai khoản cùng ghi một mã đồng thời cũng báo mã này); tổng các khoản `COMPLETED` sau khoản này vượt số ngân hàng thực nhận → `REFUND_NOT_ALLOWED`. Ghi `status = COMPLETED`, `processed_by`, `processed_at`, `bank_reference`, `note`; khi tổng đã hoàn bằng đúng số ngân hàng thực nhận thì đơn → `payment_status = refunded` (`paid_at` giữ nguyên). Khoản hoàn có `return_request_id`: yêu cầu trả hàng `RECEIVED` → `REFUNDED`.
 4. **Từ chối** (`rejectAdmin`): yêu cầu phải `REQUESTED`; ghi `status = REJECTED`, `processed_by`, `processed_at`, `note`. Đơn giữ `paid`; admin có thể tạo lại yêu cầu bằng bước 2. Khoản hoàn có `return_request_id`: yêu cầu trả hàng `RECEIVED` quay về `APPROVED` (`received_at` null, `shipping_refunded` false, `accepted_quantity` của các dòng về null) để cửa hàng nhận lại và tạo khoản mới.
-5. **Khách xem** (`listForCustomer`): các khoản của đơn, mới nhất trước, chỉ gồm `amount`, `status`, `reason`, `returnId` (null nếu không từ trả hàng), `createdAt`, `processedAt`, `bankReference` (không có `note`, người xử lý hay id nội bộ).
+5. **Khách xem** (`listForCustomer`): các khoản của đơn, mới nhất trước, chỉ gồm `amountVnd`, `amountUsd` (theo tỷ giá chốt trên đơn), `status`, `reason`, `returnId` (null nếu không từ trả hàng), `createdAt`, `processedAt`, `bankReference` (không có `note`, người xử lý hay id nội bộ).
 
 Đơn `refunded` không bao giờ trả được nữa: tạo QR và xác nhận thủ công đều trả `PAYMENT_ORDER_NOT_PAYABLE`, webhook cho mã của đơn đó ghi `DUPLICATE_PAYMENT`, `getStatus` vẫn trả `PAID` (khoản thanh toán đã xảy ra; trạng thái hoàn nằm ở `orders.payment_status` và `refunds`).
 
@@ -286,15 +286,15 @@ Dùng mã giao dịch SePay làm `reference` (provider `sepay`) thì khi SePay g
 | Code | Tên | Khi nào |
 |---|---|---|
 | 1701 | `EPaymentErrorCode.PAYMENT_NOT_CONFIGURED` | Thiếu/sai biến môi trường thanh toán (HTTP 503, message nêu tên biến thiếu) |
-| 1702 | `PAYMENT_ORDER_NOT_PAYABLE` | Tạo QR cho đơn đã trả/đã huỷ, hoặc tổng tiền không quy đổi được thành VND > 0 |
+| 1702 | `PAYMENT_ORDER_NOT_PAYABLE` | Tạo QR cho đơn đã trả/đã huỷ, hoặc `orders.total` không phải số nguyên VND > 0 |
 | 1703 | `PAYMENT_ATTEMPT_NOT_FOUND` | Xem trạng thái đơn chưa có phiên; xác nhận thủ công với `transferCode` không thuộc đơn này, hoặc đơn chưa từng có phiên (HTTP 404) |
 | 1704 | `PAYMENT_INVALID_SIGNATURE` | Webhook sai chữ ký/timestamp (HTTP 401) |
 | 1705 | `PAYMENT_INVALID_PAYLOAD` | Webhook đúng chữ ký nhưng payload sai cấu trúc |
 | 1706 | `PAYMENT_CODE_GENERATION_FAILED` | Sau 5 lần vẫn không sinh được mã chưa tồn tại (HTTP 500) |
-| 1707 | `PAYMENT_CONFIRM_INPUT_INVALID` | Xác nhận thủ công không gửi đúng một trong `transactionId` hoặc `reference` + `amount` |
+| 1707 | `PAYMENT_CONFIRM_INPUT_INVALID` | Xác nhận thủ công không gửi đúng một trong `transactionId` hoặc `reference` + `amountVnd` |
 | 1708 | `PAYMENT_TRANSACTION_NOT_FOUND` | `transactionId` không tồn tại (HTTP 404) |
 | 1709 | `PAYMENT_TRANSACTION_NOT_CONFIRMABLE` | Giao dịch ở trạng thái không xác nhận được, thuộc phiên của đơn khác, hoặc `reference` đã được ghi |
-| 1710 | `PAYMENT_AMOUNT_MISMATCH` | Số tiền thực nhận khác số tiền của phiên mà không có `acceptAmountMismatch: true` (message nêu cả hai số) |
+| 1710 | `PAYMENT_AMOUNT_MISMATCH` | Số tiền thực nhận khác số tiền của phiên mà không có `acceptAmountMismatch: true` (message nêu số nhận được và số của phiên, mỗi số kèm cả VND và USD theo tỷ giá chốt trên đơn) |
 | 1711 | `REFUND_NOT_FOUND` | `refundId` không tồn tại (HTTP 404) |
 | 1712 | `REFUND_NOT_ALLOWED` | Đơn không hoàn được (chưa huỷ khi tạo thủ công, chưa trả, không có phiên `PAID`, đã hoàn đủ, đã có yêu cầu đang chờ, hoặc tổng hoàn vượt số đã trả) |
 | 1713 | `REFUND_NOT_PENDING` | Hoàn/từ chối khoản đã `COMPLETED` hoặc `REJECTED` |
@@ -304,10 +304,10 @@ Dùng mã giao dịch SePay làm `reference` (provider `sepay`) thì khi SePay g
 
 ### 4.6 Phụ thuộc & cấu hình
 
-- `PaymentModule` export `PaymentConfigService` (module order dùng); `TypeOrmModule.forFeature([Order, PaymentAttempt, PaymentTransaction])`; `ConfigService` (qua `PaymentConfigService`) đọc env; `DataSource` cho transaction.
+- `PaymentModule` export `PaymentConfigService` (module order dùng); `TypeOrmModule.forFeature([Order, PaymentAttempt, PaymentTransaction, Refund])`; `CurrencyModule` (`CurrencyService`); `ConfigService` (qua `PaymentConfigService`) đọc env; `DataSource` cho transaction.
 - `main.ts` giữ `req.rawBody` cho đường dẫn `/api/webhooks/` (xem [common](common.md)).
 - Thư viện `@nestjs/schedule` (`ScheduleModule.forRoot()` trong `PaymentModule`) chạy `PaymentExpiryScheduler`.
-- Biến môi trường (chỉ tên): `SEPAY_RECEIVING_BANK_CODE` (mã ngắn ngân hàng của `vietqr.app/banks.json`, đưa vào `bank=`), `SEPAY_RECEIVING_BANK_NAME`, `SEPAY_RECEIVING_ACCOUNT`, `SEPAY_RECEIVING_ACCOUNT_NAME`, `SEPAY_WEBHOOK_SECRET`, `PAYMENT_TRANSFER_PREFIX` (mặc định `DH`, 2–8 ký tự `A-Z0-9`, tự chuyển chữ hoa; tiền tố của nội dung chuyển khoản, phải khớp tiền tố cấu hình trên SePay), `PAYMENT_VND_PER_UNIT` (số dương: số VND cho mỗi 1 đơn vị tiền của `orders.total`; cũng được báo giá của [order](order.md) đọc qua `PaymentConfigService.getVndPerUnit()`, thiếu thì báo giá trả `amountVnd: null` chứ không lỗi). Tạo QR cần cả bảy; webhook cần `SEPAY_WEBHOOK_SECRET`, `SEPAY_RECEIVING_ACCOUNT`, `PAYMENT_TRANSFER_PREFIX`.
+- Biến môi trường (chỉ tên): `SEPAY_RECEIVING_BANK_CODE` (mã ngắn ngân hàng của `vietqr.app/banks.json`, đưa vào `bank=`), `SEPAY_RECEIVING_BANK_NAME`, `SEPAY_RECEIVING_ACCOUNT`, `SEPAY_RECEIVING_ACCOUNT_NAME`, `SEPAY_WEBHOOK_SECRET`, `PAYMENT_TRANSFER_PREFIX` (mặc định `DH`, 2–8 ký tự `A-Z0-9`, tự chuyển chữ hoa; tiền tố của nội dung chuyển khoản, phải khớp tiền tố cấu hình trên SePay). Tỷ giá không còn là biến môi trường: nằm ở dòng `EXCHANGE_RATE` của site-config ([currency](currency.md)). Tạo QR cần cả sáu; webhook cần `SEPAY_WEBHOOK_SECRET`, `SEPAY_RECEIVING_ACCOUNT`, `PAYMENT_TRANSFER_PREFIX`.
 - `PaymentService.countNeedsReview()` và `RefundService.countRequested()` cung cấp số đếm cho [pending-count](pending-count.md) (cùng điều kiện với bộ lọc `needsReview` và `status=REQUESTED` của hai danh sách).
 - Quyền tạo QR cho đơn: `PAYMENT_ADMIN_CREATE_QR` (không nằm trong `DEFAULT_USER_PERMISSIONS`, admin tự có).
 - Quyền hoàn tiền: `PAYMENT_ADMIN_VIEW` (list), `PAYMENT_ADMIN_REFUND` (tạo, hoàn xong, từ chối); không nằm trong `DEFAULT_USER_PERMISSIONS`, admin tự có. Không có biến môi trường mới.
@@ -318,7 +318,7 @@ Dùng mã giao dịch SePay làm `reference` (provider `sepay`) thì khi SePay g
 
 - `sepay-signature.util.spec.ts` — chữ ký hợp lệ, body bị sửa, sai secret, chữ ký không ràng buộc timestamp, thiếu header/secret, sai prefix/độ dài/không phải hex, timestamp không phải số, cửa sổ ±300 giây (gồm biên), header dạng mảng.
 - `sepay-payload.util.spec.ts` — `parseSepayPayload` (hợp lệ, `code` null, các payload sai), `extractTransferCodes` (mã trong `code`, trong nội dung, viết hoa/thường, chữ dính sau mã, `code` bị cắt, nhiều ứng viên, escape prefix), `normalizeAccountNumber`.
-- `payment.service.spec.ts` — `createQr` (quy đổi VND, mã `DH` + 8 ký tự và giống hệt ở response/URL QR/DB, theo `PAYMENT_TRANSFER_PREFIX`, làm tròn, khoá dòng đơn, tái sử dụng phiên, hết hạn → phiên cũ giữ nguyên + mã mới không trùng, đơn người khác/không tồn tại, đơn đã trả/đã huỷ) và `getStatus` (PAID/PENDING/EXPIRED/CANCELLED, 404, không gọi mạng).
+- `payment.service.spec.ts` — `createQr` (số tiền VND = tổng đơn và USD theo tỷ giá chốt trên đơn, tổng đơn 0/âm/lẻ bị từ chối với 1702, mã `DH` + 8 ký tự và giống hệt ở response/URL QR/DB, theo `PAYMENT_TRANSFER_PREFIX`, khoá dòng đơn, tái sử dụng phiên, hết hạn → phiên cũ giữ nguyên + mã mới không trùng, đơn người khác/không tồn tại, đơn đã trả/đã huỷ) và `getStatus` (PAID/PENDING/EXPIRED/CANCELLED, 404, không gọi mạng).
 - `sepay-webhook.service.spec.ts` — chữ ký sai/body bị sửa/timestamp cũ/không có raw body không chạm DB, payload sai → 400, khớp đơn → PAID, không lưu chữ ký/secret, huỷ phiên PENDING khác, tìm mã trong nội dung, từng trạng thái không khớp (`AMOUNT_MISMATCH`, `ACCOUNT_MISMATCH`, `UNMATCHED`, `IGNORED`, `LATE`, `NOT_PAYABLE`, `DUPLICATE_PAYMENT`), webhook trùng id, lỗi UNIQUE đồng thời, lỗi DB được ném lại; đơn `pending` được trả → `confirmed` (đơn đã `shipping` giữ nguyên, tiền không được xác nhận thì không đổi gì), tiền chuyển theo mã CŨ đã hết hạn được ghi `LATE` gắn đúng phiên cũ đó (phiên mới không bị đụng), tiền theo mã mới → `MATCHED`, nội dung bị ngân hàng viết hoa/`code` bị cắt vẫn khớp.
 - `payment-attempts-admin.spec.ts` — `findAttemptsAdmin`: trả mã kèm đơn/khách/trạng thái hiệu lực/giao dịch đã gắn, không lộ `raw_payload`, PENDING của đơn huỷ → `CANCELLED`, bộ lọc `orderId`/`status`/`search`, sort và phân trang, ghi `EXPIRED` vào DB trước khi liệt kê (không đụng đơn đã huỷ).
 - `payment.service.spec.ts` (tiếp) — `listAttemptsForCustomer`: `[]` khi chưa có phiên, thứ tự mới nhất trước gồm phiên hết hạn, `transactionRef` của phiên `PAID` (đúng giá trị lưu, kể cả giao dịch `manual`), phiên khác `null`, trạng thái suy ra như `getStatus` (quá hạn → `EXPIRED`, đơn huỷ → `CANCELLED`, phiên `PAID` giữ nguyên), chỉ các field an toàn cho khách, nhất quán với `getStatus`.
@@ -326,13 +326,13 @@ Dùng mã giao dịch SePay làm `reference` (provider `sepay`) thì khi SePay g
 - `payment-expiry.spec.ts` — `expireOverdueAttempts` (SQL chỉ đổi `PENDING` quá hạn, không đụng đơn đã huỷ, trả số dòng), `cancelPendingAttempts`, `PaymentExpiryScheduler` (chạy đồng bộ, không bao giờ ném lỗi, có lịch).
 - `payment-confirm.spec.ts` — xác nhận thủ công cũng đổi `pending` → `confirmed` (đơn đã `shipping` giữ nguyên); xác nhận theo `transferCode` (chọn đúng phiên cũ đã hết hạn thay vì phiên mới nhất, không có `reference` thì mã giao dịch ghi là chính mã đó, mã của đơn khác/không tồn tại → 1703, sai số tiền → 1710, hai lần → 1702, giao dịch có sẵn kèm `transferCode` phải khớp phiên), `getOrderPaymentsAdmin` hiện trạng thái hiệu lực, và `confirmPaymentAdmin` (từng trạng thái xác nhận được/không được, gắn vào phiên mới nhất khi giao dịch chưa có phiên, huỷ phiên `PENDING` khác, thứ tự khoá, giao dịch của đơn khác, sai số tiền với và không có `acceptAmountMismatch`, ghi giao dịch mới với provider `sepay`/`manual` (mã lưu nguyên văn, nội dung chuyển khoản từ sao kê hoặc mã phiên), cùng chuỗi ở hai provider là hai giao dịch, `reference` trùng cùng provider, đơn chưa có phiên, các input sai, đơn đã trả/đã huỷ/không tồn tại, gửi hai lần), `getOrderPaymentsAdmin` và `ConfirmPaymentDto`.
 - `refund.service.spec.ts` — `completeAdmin` (ghi mã giao dịch, đơn → `refunded` và giữ `paid_at`, khoá order trước refund, view admin có thông tin khoản đã nhận, từng trạng thái không hoàn được → 1713, mã trùng → 1714 kể cả lỗi UNIQUE đồng thời, không hoàn quá số đã trả → 1712, hoàn từng phần giữ `paid` đến khi đủ), `rejectAdmin` (đơn giữ `paid`, tạo lại được), `createAdmin` (đơn đã huỷ + đã trả; đơn chưa huỷ/chưa trả/đã hoàn/đã có yêu cầu đang chờ → 1712; đơn lạ → 1301), `listForCustomer` (chỉ field an toàn, mới nhất trước), `findAdmin` (filter, search, sort, phân trang, không lộ tài khoản nhận/`raw_payload`), đơn `refunded` không tạo QR/không xác nhận thủ công được và `getStatus` vẫn `PAID`, và các DTO hoàn tiền.
-- `refund.service.spec.ts` (tiếp) — hoàn theo số tiền thực nhận khi admin xác nhận thủ công kèm chấp nhận lệch (khoản hoàn bằng số thực nhận, hoàn xong thì đơn `refunded`, khoản lớn hơn số thực nhận bị từ chối); `prorateRefundAmount`; khoản hoàn từ trả hàng: hoàn xong → yêu cầu trả hàng `REFUNDED` (đơn chỉ `refunded` khi đủ số đã trả), khoản không từ trả hàng không đụng yêu cầu trả hàng, từ chối → yêu cầu về `APPROVED` và xoá số lượng chấp nhận, `returnId`/`returnRequestId` trong view khách/admin.
+- `refund.service.spec.ts` (tiếp) — hoàn theo số tiền thực nhận khi admin xác nhận thủ công kèm chấp nhận lệch (khoản hoàn bằng số thực nhận, hoàn xong thì đơn `refunded`, khoản lớn hơn số thực nhận bị từ chối); `prorateRefundAmount` (giá trị VND); khoản hoàn từ trả hàng: hoàn xong → yêu cầu trả hàng `REFUNDED` (đơn chỉ `refunded` khi đủ số đã trả), khoản không từ trả hàng không đụng yêu cầu trả hàng, từ chối → yêu cầu về `APPROVED` và xoá số lượng chấp nhận, `returnId`/`returnRequestId` trong view khách/admin.
 - `payment.test-utils.ts` — `EntityManager` giả trong bộ nhớ dùng chung cho các spec trên (không phải test).
 - Các test trên dùng manager giả; hành vi với Postgres thật (migration, UNIQUE, khoá dòng, webhook trùng song song, huỷ/hoàn đồng thời) không có test tự động trong repo.
 
 ### 4.8 Lưu ý hiện trạng
 
-- Giá trong DB (`products.price`, `orders.total`, phí ship) là đơn vị cửa hàng (seed ở mức vài chục đến vài trăm), không phải VND; số tiền VND của phiên thanh toán là `orders.total × PAYMENT_VND_PER_UNIT`, được chốt lúc tạo phiên và webhook so với `payment_attempts.amount`, không so với `orders.total`.
+- Giá trong DB (`products.price`, `orders.total`, phí ship) và số tiền thanh toán/hoàn đều là VND nguyên; `payment_attempts.amount` bằng `orders.total` tại lúc tạo phiên và webhook so với `payment_attempts.amount` (không so với `orders.total`). USD trong response chỉ để hiển thị, suy ra từ `orders.exchange_rate` ([currency](currency.md)).
 - "PAID" là `orders.payment_status = 'paid'` (và `payment_attempts.status = 'PAID'`); sau khi hoàn đủ tiền đơn thành `refunded`, còn phiên giữ `PAID` làm lịch sử. Hai trục tách riêng: `payment_status` (đã trả chưa) và `orders.status` (cửa hàng xử lý tới đâu); thanh toán thành công tự đưa đơn `pending` sang `confirmed` nên khách không còn tự huỷ được đơn đã trả (xem [order](order.md)). Các bước sau (`shipping`, `delivered`, `completed`) vẫn do admin đổi.
 - Giao dịch đến sau khi QR hết hạn (`LATE`) và mọi giao dịch không khớp **không** tự xác nhận đơn; chỉ được lưu. Admin xem qua `GET /api/admin/payments/transactions` và gắn vào đơn bằng `POST /api/admin/payments/orders/:orderId/confirm`. Giao dịch `DUPLICATE_PAYMENT`/`ACCOUNT_MISMATCH` chỉ được ghi nhận: hoàn tiền (`refunds`) chỉ dành cho khoản của phiên `PAID`, tiền vào thừa/sai tài khoản được xử lý ngoài hệ thống.
 - Xác nhận thủ công cần đơn đã có ít nhất một phiên thanh toán (đơn chưa từng bấm tạo QR thì không xác nhận được); tác động lên đơn giống webhook (`applyOrderPaid`).

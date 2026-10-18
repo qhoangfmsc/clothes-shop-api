@@ -5,7 +5,7 @@ import { PaymentExpiryScheduler } from './payment-expiry.scheduler';
 describe('PaymentService.expireOverdueAttempts / cancelPendingAttempts', () => {
   it('flips overdue PENDING sessions to EXPIRED (never those of cancelled orders) and returns the count', async () => {
     const dataSource: any = { query: jest.fn(async () => [[], 3]) };
-    const service = new PaymentService(dataSource, {} as any, {} as any, {} as any, {} as any);
+    const service = new PaymentService(dataSource, {} as any, {} as any, {} as any, {} as any, { getVndPerUsd: async () => 25000 } as any);
 
     await expect(service.expireOverdueAttempts()).resolves.toBe(3);
 
@@ -16,13 +16,20 @@ describe('PaymentService.expireOverdueAttempts / cancelPendingAttempts', () => {
   });
 
   it('returns 0 when the driver gives no count', async () => {
-    const service = new PaymentService({ query: jest.fn(async () => undefined) } as any, {} as any, {} as any, {} as any, {} as any);
+    const service = new PaymentService(
+      { query: jest.fn(async () => undefined) } as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      { getVndPerUsd: async () => 25000 } as any,
+    );
     await expect(service.expireOverdueAttempts()).resolves.toBe(0);
   });
 
   it('cancelPendingAttempts only touches PENDING sessions of that order', async () => {
     const attemptRepo: any = { update: jest.fn(async () => undefined) };
-    const service = new PaymentService({} as any, {} as any, attemptRepo, {} as any, {} as any);
+    const service = new PaymentService({} as any, {} as any, attemptRepo, {} as any, {} as any, { getVndPerUsd: async () => 25000 } as any);
     await service.cancelPendingAttempts('o1');
     expect(attemptRepo.update).toHaveBeenCalledWith({ orderId: 'o1', status: 'PENDING' }, { status: 'CANCELLED' });
   });

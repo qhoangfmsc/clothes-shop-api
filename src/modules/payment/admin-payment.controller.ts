@@ -55,7 +55,7 @@ export class AdminPaymentController {
   @ApiOperation({
     summary: '[Admin] Xác nhận thủ công đơn đã thanh toán (khi webhook SePay không tới nhưng tiền đã về)',
     description:
-      'Gửi đúng một trong hai: `transactionId` (gắn giao dịch đã có trong danh sách đối soát) hoặc `reference` + `amount` (ghi giao dịch mới). `note` bắt buộc. Số tiền phải khớp phiên thanh toán, trừ khi `acceptAmountMismatch = true`.',
+      'Gửi đúng một trong hai: `transactionId` (gắn giao dịch đã có trong danh sách đối soát) hoặc `reference` + `amountVnd` (ghi giao dịch mới). `note` bắt buộc. Số tiền phải khớp phiên thanh toán, trừ khi `acceptAmountMismatch = true`.',
   })
   @Permissions(Permission.PAYMENT_ADMIN_CONFIRM)
   confirmPayment(@CurrentUser() admin: User, @Param('orderId') orderId: string, @Body() dto: ConfirmPaymentDto) {

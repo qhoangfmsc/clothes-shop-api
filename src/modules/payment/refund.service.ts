@@ -2,6 +2,7 @@ import { getPaging, paginated } from '@common/base/pagination.util';
 import { parseSort } from '@common/base/sort.util';
 import { throwAppError } from '@common/exceptions/app.exception';
 import { EOrderErrorCode, EPaymentErrorCode } from '@common/exceptions/error-codes';
+import { money } from '@common/utils/money.util';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, Repository } from 'typeorm';
@@ -20,19 +21,20 @@ import { Refund } from './refund.entity';
 const UNIQUE_VIOLATION = '23505';
 
 /**
- * Số VND hoàn cho một phần giá trị đơn, theo tỷ lệ trên số tiền khách ĐÃ trả (không quy đổi lại theo tỷ giá hiện tại):
- * trả hết giá trị đơn thì đúng bằng số đã trả, ngược lại làm tròn theo tỷ lệ. `valueCents`/`totalCents` là đơn vị cửa hàng × 100.
+ * Số VND hoàn cho một phần giá trị đơn, theo tỷ lệ trên số tiền khách ĐÃ trả: trả hết giá trị đơn thì đúng bằng số đã trả,
+ * ngược lại làm tròn theo tỷ lệ. `valueVnd`/`totalVnd` là giá trị VND (số nguyên) của phần được hoàn và của cả đơn (`orders.total`).
  */
-export function prorateRefundAmount(paidAmount: number, valueCents: number, totalCents: number): number {
-  if (totalCents <= 0 || valueCents <= 0) return 0;
-  if (valueCents >= totalCents) return paidAmount;
-  return Math.round((paidAmount * valueCents) / totalCents);
+export function prorateRefundAmount(paidAmount: number, valueVnd: number, totalVnd: number): number {
+  if (totalVnd <= 0 || valueVnd <= 0) return 0;
+  if (valueVnd >= totalVnd) return paidAmount;
+  return Math.round((paidAmount * valueVnd) / totalVnd);
 }
 
 /** Khoản hoàn như khách được xem (không lộ id nội bộ, người xử lý hay ghi chú nội bộ của admin) */
 export interface CustomerRefund {
-  /** VND */
-  amount: number;
+  /** Số tiền hoàn (VND) và giá trị USD tương ứng theo tỷ giá của đơn */
+  amountVnd: number;
+  amountUsd: number;
   status: RefundStatus;
   reason: RefundReason;
   /** Yêu cầu trả hàng sinh ra khoản hoàn này (chỉ khi `reason = RETURN`) */
@@ -65,22 +67,22 @@ export class RefundService {
    * Số tiền = số của phiên thanh toán `PAID` trừ các khoản đã hoàn xong.
    */
   async createForCancelledOrder(manager: EntityManager, orderId: string, requestedBy: string | null): Promise<Refund> {
-    return this.insertRequest(manager, { orderId, reason: 'ADMIN_CANCELLED', requestedBy, returnRequestId: null, valueCents: null });
+    return this.insertRequest(manager, { orderId, reason: 'ADMIN_CANCELLED', requestedBy, returnRequestId: null, valueVnd: null });
   }
 
   /**
    * Tạo yêu cầu hoàn cho hàng khách trả lại (module return, lúc cửa hàng nhận hàng). Phải gọi trong transaction đã khoá dòng đơn.
    * Số tiền = phần giá trị đơn được hoàn trên số tiền ngân hàng đã nhận, không vượt phần còn lại. Để nhiều lần trả hàng cộng lại
-   * đúng bằng số đã nhận (không lệch do làm tròn), mỗi lần = hoàn(đã trả trước + lần này) − hoàn(đã trả trước), theo `previousValueCents`.
+   * đúng bằng số đã nhận (không lệch do làm tròn), mỗi lần = hoàn(đã trả trước + lần này) − hoàn(đã trả trước), theo `previousValueVnd`.
    */
   async createForReturn(
     manager: EntityManager,
     params: {
       orderId: string;
       returnRequestId: string;
-      valueCents: number;
-      previousValueCents: number;
-      totalCents: number;
+      valueVnd: number;
+      previousValueVnd: number;
+      totalVnd: number;
       requestedBy: string;
     },
   ): Promise<Refund> {
@@ -94,11 +96,11 @@ export class RefundService {
       reason: RefundReason;
       requestedBy: string | null;
       returnRequestId: string | null;
-      /** `null` = hoàn toàn bộ phần còn lại; ngược lại hoàn theo tỷ lệ `valueCents / totalCents` */
-      valueCents: number | null;
-      /** Giá trị (xu) của các lần trả hàng đã nhận trước đó của đơn */
-      previousValueCents?: number;
-      totalCents?: number;
+      /** `null` = hoàn toàn bộ phần còn lại; ngược lại hoàn theo tỷ lệ `valueVnd / totalVnd` */
+      valueVnd: number | null;
+      /** Giá trị (VND) của các lần trả hàng đã nhận trước đó của đơn */
+      previousValueVnd?: number;
+      totalVnd?: number;
     },
   ): Promise<Refund> {
     const { orderId } = params;
@@ -113,12 +115,12 @@ export class RefundService {
     const remaining = paid - (await this.sumCompleted(manager, orderId));
     if (remaining <= 0) throwAppError(EPaymentErrorCode.REFUND_NOT_ALLOWED, 'This order has already been fully refunded');
 
-    const total = params.totalCents ?? 0;
-    const previous = params.previousValueCents ?? 0;
+    const total = params.totalVnd ?? 0;
+    const previous = params.previousValueVnd ?? 0;
     const wanted =
-      params.valueCents === null
+      params.valueVnd === null
         ? remaining
-        : prorateRefundAmount(paid, previous + params.valueCents, total) - prorateRefundAmount(paid, previous, total);
+        : prorateRefundAmount(paid, previous + params.valueVnd, total) - prorateRefundAmount(paid, previous, total);
     const amount = Math.min(wanted, remaining);
     if (amount <= 0) throwAppError(EPaymentErrorCode.REFUND_NOT_ALLOWED, 'There is nothing to refund');
 
@@ -145,10 +147,10 @@ export class RefundService {
   }
 
   /** Các khoản hoàn của một đơn cho khách xem, mới nhất trước (`[]` nếu chưa có). Quyền sở hữu đơn do nơi gọi kiểm tra */
-  async listForCustomer(orderId: string): Promise<CustomerRefund[]> {
-    const refunds = await this.refundRepo.find({ where: { orderId }, order: { createdAt: 'DESC' } });
+  async listForCustomer(order: { id: string; exchangeRate: number }): Promise<CustomerRefund[]> {
+    const refunds = await this.refundRepo.find({ where: { orderId: order.id }, order: { createdAt: 'DESC' } });
     return refunds.map((refund) => ({
-      amount: refund.amount,
+      ...money('amount', refund.amount, order.exchangeRate),
       status: refund.status,
       reason: refund.reason,
       returnId: refund.returnRequestId,
@@ -297,7 +299,7 @@ export class RefundService {
     return this.refundRepo
       .createQueryBuilder('r')
       .innerJoin('r.order', 'o')
-      .addSelect(['o.id', 'o.status', 'o.paymentStatus', 'o.total', 'o.userId', 'o.shippingAddress'])
+      .addSelect(['o.id', 'o.status', 'o.paymentStatus', 'o.total', 'o.exchangeRate', 'o.userId', 'o.shippingAddress'])
       .innerJoin('r.paymentAttempt', 'a')
       .addSelect(['a.id', 'a.transferCode', 'a.amount', 'a.paidAt']);
   }
@@ -329,7 +331,7 @@ export class RefundService {
         status: refund.status,
         reason: refund.reason,
         returnRequestId: refund.returnRequestId,
-        amount: refund.amount,
+        ...money('amount', refund.amount, refund.order.exchangeRate),
         createdAt: refund.createdAt,
         requestedBy: refund.requestedBy,
         processedBy: refund.processedBy,
@@ -340,13 +342,14 @@ export class RefundService {
           id: refund.order.id,
           status: refund.order.status,
           paymentStatus: refund.order.paymentStatus,
-          total: refund.order.total,
+          ...money('total', refund.order.total, refund.order.exchangeRate),
+          exchangeRate: refund.order.exchangeRate,
           userId: refund.order.userId,
           customer: { fullName: refund.order.shippingAddress?.fullName ?? null, phone: refund.order.shippingAddress?.phone ?? null },
         },
         payment: {
           transferCode: refund.paymentAttempt.transferCode,
-          paidAmount: tx?.amount ?? refund.paymentAttempt.amount,
+          ...money('paidAmount', tx?.amount ?? refund.paymentAttempt.amount, refund.order.exchangeRate),
           paidAt: refund.paymentAttempt.paidAt,
           provider: tx?.provider ?? null,
           transactionRef: tx?.providerTransactionId ?? null,

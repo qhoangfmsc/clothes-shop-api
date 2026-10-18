@@ -1,3 +1,4 @@
+import { bigintTransformer } from '@common/base/column-transformers';
 import { customAlphabet } from 'nanoid';
 import { BeforeInsert, Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryColumn } from 'typeorm';
 import { Product } from '../product/product.entity';
@@ -22,7 +23,8 @@ export class OrderItem {
   @Column({ type: 'varchar', length: 500, default: '', name: 'product_image' })
   productImage: string;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2 })
+  /** Đơn giá lúc đặt (VND, số nguyên) */
+  @Column({ type: 'bigint', transformer: bigintTransformer })
   price: number;
 
   @Column({ type: 'int', default: 1 })

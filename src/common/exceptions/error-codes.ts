@@ -183,7 +183,7 @@ export const ErrorMessages: Record<number, string> = {
   [EPaymentErrorCode.PAYMENT_INVALID_SIGNATURE]: 'Invalid webhook signature',
   [EPaymentErrorCode.PAYMENT_INVALID_PAYLOAD]: 'Invalid webhook payload',
   [EPaymentErrorCode.PAYMENT_CODE_GENERATION_FAILED]: 'Could not generate a unique transfer code',
-  [EPaymentErrorCode.PAYMENT_CONFIRM_INPUT_INVALID]: 'Send either transactionId, or reference + amount',
+  [EPaymentErrorCode.PAYMENT_CONFIRM_INPUT_INVALID]: 'Send either transactionId, or reference + amountVnd',
   [EPaymentErrorCode.PAYMENT_TRANSACTION_NOT_FOUND]: 'Payment transaction not found',
   [EPaymentErrorCode.PAYMENT_TRANSACTION_NOT_CONFIRMABLE]: 'This transaction cannot be used to confirm the payment',
   [EPaymentErrorCode.PAYMENT_AMOUNT_MISMATCH]: 'Transaction amount does not match the amount of the payment session',

@@ -13,13 +13,15 @@ import { Refund } from './refund.entity';
 import { prorateRefundAmount, RefundService } from './refund.service';
 
 const AMOUNT = 4_625_000;
+const ORDER_REF = { id: 'o1', exchangeRate: 25_000 };
 const order = (over: Record<string, any> = {}) => ({
   id: 'o1',
   userId: 'u1',
   status: 'cancelled',
   paymentStatus: 'paid',
   paidAt: new Date('2026-01-01'),
-  total: '185.00',
+  total: AMOUNT,
+  exchangeRate: 25_000,
   shippingAddress: { fullName: 'Nguyen Van A', phone: '0900000000' },
   ...over,
 });
@@ -134,12 +136,14 @@ describe('RefundService.completeAdmin', () => {
     expect(data).toMatchObject({
       id: 'r1',
       status: 'COMPLETED',
-      amount: AMOUNT,
+      amountVnd: AMOUNT,
+      amountUsd: 185,
       bankReference: 'FT26287123456',
       order: { id: 'o1', paymentStatus: 'refunded', customer: { fullName: 'Nguyen Van A', phone: '0900000000' } },
       payment: {
         transferCode: 'DH8K4T72M9',
-        paidAmount: AMOUNT,
+        paidAmountVnd: AMOUNT,
+        paidAmountUsd: 185,
         provider: 'sepay',
         transactionRef: '92704',
         transferContent: 'CK DH8K4T72M9',
@@ -236,7 +240,13 @@ describe('RefundService.rejectAdmin', () => {
     expect(h.rows(Order)[0].paymentStatus).toBe('paid');
 
     const created = await h.service.createAdmin('admin-1', { orderId: 'o1' });
-    expect(created.data).toMatchObject({ status: 'REQUESTED', reason: 'ADMIN_CANCELLED', amount: AMOUNT, requestedBy: 'admin-1' });
+    expect(created.data).toMatchObject({
+      status: 'REQUESTED',
+      reason: 'ADMIN_CANCELLED',
+      amountVnd: AMOUNT,
+      amountUsd: 185,
+      requestedBy: 'admin-1',
+    });
     expect(h.rows(Refund)).toHaveLength(2);
   });
 
@@ -254,7 +264,9 @@ describe('RefundService.createAdmin', () => {
   it('creates a request for a cancelled paid order that has none', async () => {
     const h = setup({});
     const { data } = await h.service.createAdmin('admin-1', { orderId: 'o1' });
-    expect(data).toMatchObject({ orderId: 'o1', status: 'REQUESTED', amount: AMOUNT, reason: 'ADMIN_CANCELLED' });
+    expect(data).toMatchObject({ orderId: 'o1', status: 'REQUESTED', amountVnd: AMOUNT, amountUsd: 185, reason: 'ADMIN_CANCELLED' });
+    expect(data).not.toHaveProperty('amount');
+    expect(data.order).toMatchObject({ totalVnd: AMOUNT, totalUsd: 185, exchangeRate: 25_000 });
     expect(h.rows(Refund)).toHaveLength(1);
   });
 
@@ -298,12 +310,21 @@ describe('RefundService.listForCustomer / findAdmin', () => {
         refund({ id: 'new', createdAt: new Date('2026-02-01') }),
       ],
     });
-    const list = await h.service.listForCustomer('o1');
+    const list = await h.service.listForCustomer(ORDER_REF);
     expect(list.map((r) => r.status)).toEqual(['REQUESTED', 'REJECTED']);
-    expect(Object.keys(list[0]).sort()).toEqual(['amount', 'bankReference', 'createdAt', 'processedAt', 'reason', 'returnId', 'status']);
+    expect(Object.keys(list[0]).sort()).toEqual([
+      'amountUsd',
+      'amountVnd',
+      'bankReference',
+      'createdAt',
+      'processedAt',
+      'reason',
+      'returnId',
+      'status',
+    ]);
     expect(JSON.stringify(list)).not.toContain('internal note');
     expect(JSON.stringify(list)).not.toContain('secret-admin');
-    expect(await h.service.listForCustomer('other-order')).toEqual([]);
+    expect(await h.service.listForCustomer({ id: 'other-order', exchangeRate: 25_000 })).toEqual([]);
   });
 
   it('admin list applies filters, search, sort and paging, and shows how to refund', async () => {
@@ -336,9 +357,9 @@ describe('a refunded order is never payable again', () => {
     const h = setup({ orders: [order({ paymentStatus, status: 'cancelled' })] });
     const orderRepo: any = { findOne: jest.fn(async () => h.rows(Order)[0]) };
     const config: any = {
-      getQrConfig: () => ({ prefix: 'DH', vndPerUnit: 25_000, account: '1', bankCode: 'VCB', bankName: 'VCB', accountName: 'N' }),
+      getQrConfig: () => ({ prefix: 'DH', account: '1', bankCode: 'VCB', bankName: 'VCB', accountName: 'N' }),
     };
-    return new PaymentService(h.dataSource, orderRepo, {} as any, {} as any, config);
+    return new PaymentService(h.dataSource, orderRepo, {} as any, {} as any, config, { getVndPerUsd: async () => 25000 } as any);
   };
 
   it('createQr → 1702', async () => {
@@ -346,13 +367,15 @@ describe('a refunded order is never payable again', () => {
   });
 
   it('confirmPaymentAdmin → 1702', async () => {
-    await expect(make('refunded').confirmPaymentAdmin('admin-1', 'o1', { amount: 1, reference: 'X', note: 'n' })).rejects.toMatchObject({
+    await expect(make('refunded').confirmPaymentAdmin('admin-1', 'o1', { amountVnd: 1, reference: 'X', note: 'n' })).rejects.toMatchObject({
       response: { errorCode: 1702 },
     });
   });
 
   it('getStatus still says PAID for the payment that happened', async () => {
-    expect(await make('refunded').getStatus('u1', 'o1')).toEqual({ data: { orderId: 'o1', status: 'PAID' } });
+    expect(await make('refunded').getStatus('u1', 'o1')).toEqual({
+      data: { orderId: 'o1', status: 'PAID', amountVnd: 4_625_000, amountUsd: 185, exchangeRate: 25_000 },
+    });
   });
 });
 
@@ -381,18 +404,18 @@ describe('refund DTOs', () => {
 
 describe('prorateRefundAmount', () => {
   it('the whole value (or more) is exactly what was paid', () => {
-    expect(prorateRefundAmount(4_625_000, 18_500, 18_500)).toBe(4_625_000);
-    expect(prorateRefundAmount(4_625_000, 20_000, 18_500)).toBe(4_625_000);
+    expect(prorateRefundAmount(4_625_000, 4_625_000, 4_625_000)).toBe(4_625_000);
+    expect(prorateRefundAmount(4_625_000, 5_000_000, 4_625_000)).toBe(4_625_000);
   });
 
   it('a part is the same share of what was really paid, rounded to whole dong', () => {
-    expect(prorateRefundAmount(4_625_000, 17_000, 18_500)).toBe(4_250_000);
+    expect(prorateRefundAmount(4_625_000, 4_250_000, 4_625_000)).toBe(4_250_000);
     expect(prorateRefundAmount(1_000_000, 1, 3)).toBe(333_333);
     expect(prorateRefundAmount(1_000_001, 2, 3)).toBe(666_667);
   });
 
   it('nothing to refund → 0', () => {
-    expect(prorateRefundAmount(4_625_000, 0, 18_500)).toBe(0);
+    expect(prorateRefundAmount(4_625_000, 0, 4_625_000)).toBe(0);
     expect(prorateRefundAmount(4_625_000, 100, 0)).toBe(0);
   });
 });
@@ -449,14 +472,14 @@ describe('refunds that come from a return request', () => {
 
   it('customer and admin views link the refund to its return', async () => {
     const h = setup(returnSeed());
-    expect((await h.service.listForCustomer('o1'))[0]).toMatchObject({ reason: 'RETURN', returnId: 'ret1' });
+    expect((await h.service.listForCustomer(ORDER_REF))[0]).toMatchObject({ reason: 'RETURN', returnId: 'ret1' });
     const { data } = await h.service.rejectAdmin('admin-1', 'r1', { note: 'n' });
     expect(data).toMatchObject({ reason: 'RETURN', returnRequestId: 'ret1' });
   });
 
   it('cancel-type refunds have no return link', async () => {
     const h = setup({ refunds: [refund()] });
-    expect((await h.service.listForCustomer('o1'))[0].returnId).toBeNull();
+    expect((await h.service.listForCustomer(ORDER_REF))[0].returnId).toBeNull();
   });
 });
 
@@ -470,8 +493,8 @@ describe('refunds are based on the money really received, not on the amount the 
   it('a refund for a cancelled order is exactly what the bank received', async () => {
     const h = setup(shortPaid());
     const { data } = await h.service.createAdmin('admin-1', { orderId: 'o1' });
-    expect(data.amount).toBe(4_000_000);
-    expect(data.payment.paidAmount).toBe(4_000_000);
+    expect(data.amountVnd).toBe(4_000_000);
+    expect(data.payment.paidAmountVnd).toBe(4_000_000);
   });
 
   it('completing it refunds the order (nothing is left to give back)', async () => {
@@ -490,6 +513,6 @@ describe('refunds are based on the money really received, not on the amount the 
 
   it('a normal webhook payment is unchanged (received = asked)', async () => {
     const h = setup({});
-    expect((await h.service.createAdmin('admin-1', { orderId: 'o1' })).data.amount).toBe(AMOUNT);
+    expect((await h.service.createAdmin('admin-1', { orderId: 'o1' })).data.amountVnd).toBe(AMOUNT);
   });
 });

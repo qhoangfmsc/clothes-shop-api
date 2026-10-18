@@ -3,15 +3,15 @@ import { parseSort } from '@common/base/sort.util';
 import { NON_ORDERABLE_BADGES } from '@common/constants/enum-values.constant';
 import { throwAppError } from '@common/exceptions/app.exception';
 import { EOrderErrorCode } from '@common/exceptions/error-codes';
+import { money, moneyOrNull } from '@common/utils/money.util';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, Repository } from 'typeorm';
 import { Address } from '../address/address.entity';
 import { Cart } from '../cart/cart.entity';
 import { CartItem } from '../cart/cart-item.entity';
+import { CurrencyService } from '../currency/currency.service';
 import { PaymentService } from '../payment/payment.service';
-import { convertToVnd } from '../payment/payment-amount.util';
-import { PaymentConfigService } from '../payment/payment-config.service';
 import { RefundService } from '../payment/refund.service';
 import { ShippingConfigService } from '../shipping/shipping-config.service';
 import { UpdateOrderStatusDto } from './dtos/admin-order.dto';
@@ -19,10 +19,9 @@ import { AdminOrderQueryDto } from './dtos/admin-order-query.dto';
 import { CreateOrderDto, PickupContactDto, QuoteOrderDto } from './dtos/order.dto';
 import { PublicOrderQueryDto } from './dtos/public-order-query.dto';
 import { Order } from './order.entity';
+import { presentOrder } from './order.presenter';
 import { OrderItem } from './order-item.entity';
 import { applyOrderNeedsActionFilter } from './order-needs-action.util';
-
-const roundMoney = (value: number) => Math.round(value * 100) / 100;
 
 /**
  * Luồng trạng thái hợp lệ
@@ -50,7 +49,7 @@ export class OrderService {
     @InjectDataSource()
     private readonly dataSource: DataSource,
     private readonly shippingConfigService: ShippingConfigService,
-    private readonly paymentConfigService: PaymentConfigService,
+    private readonly currencyService: CurrencyService,
     private readonly paymentService: PaymentService,
     private readonly refundService: RefundService,
   ) {}
@@ -74,7 +73,7 @@ export class OrderService {
 
     const [data, total] = await qb.getManyAndCount();
 
-    return paginated(data, total, page, limit);
+    return paginated(data.map(presentOrder), total, page, limit);
   }
 
   async findOne(userId: string, orderId: string) {
@@ -86,9 +85,9 @@ export class OrderService {
     // Kèm các nội dung chuyển khoản đã cấp cho đơn (kể cả đã hết hạn) để khách xem lại và đọc cho cửa hàng, và các khoản hoàn tiền
     const [paymentAttempts, refunds] = await Promise.all([
       this.paymentService.listAttemptsForCustomer(order),
-      this.refundService.listForCustomer(order.id),
+      this.refundService.listForCustomer(order),
     ]);
-    return { data: { ...order, paymentAttempts, refunds } };
+    return { data: { ...presentOrder(order), paymentAttempts, refunds } };
   }
 
   /**
@@ -98,14 +97,17 @@ export class OrderService {
     const shippingMethod = dto.shippingMethod || 'standard';
     const { selectedItems } = await this.loadSelectedItems(this.dataSource.manager, userId, dto.cartItemIds);
     const totals = await this.calculateTotals(selectedItems, shippingMethod);
-    // Cùng hàm quy đổi với phiên thanh toán QR → số VND ở checkout và ở trang QR luôn bằng nhau (khi tỷ giá không đổi giữa hai lần)
-    const vndPerUnit = this.paymentConfigService.getVndPerUnit();
+    // Tiền gốc là VND nên `totalVnd` chính là số khách sẽ chuyển ở trang QR; USD suy ra theo tỷ giá hiện tại
+    const rate = await this.currencyService.getVndPerUsd();
     return {
       data: {
         shippingMethod,
-        ...totals,
-        vndPerUnit,
-        amountVnd: vndPerUnit === null ? null : convertToVnd(totals.total, vndPerUnit),
+        ...money('subtotal', totals.subtotal, rate),
+        ...money('shippingFee', totals.shippingFee, rate),
+        ...money('total', totals.total, rate),
+        freeShipping: totals.freeShipping,
+        ...moneyOrNull('freeShippingThreshold', totals.freeShippingThresholdVnd, rate),
+        exchangeRate: rate,
       },
     };
   }
@@ -145,13 +147,14 @@ export class OrderService {
 
       const { subtotal, shippingFee, total } = await this.calculateTotals(selectedItems, shippingMethod);
 
-      // Create order
+      // Create order (chốt tỷ giá lúc đặt: USD của đơn này không đổi khi admin đổi tỷ giá sau đó)
       const order = manager.create(Order, {
         userId,
         status: 'pending',
         subtotal,
         shippingFee,
         total,
+        exchangeRate: await this.currencyService.getVndPerUsd(),
         shippingMethod,
         shippingAddress,
         note: dto.note || '',
@@ -181,7 +184,7 @@ export class OrderService {
         where: { id: savedOrder.id },
         relations: ['items'],
       });
-      return { data: result };
+      return { data: presentOrder(result!) };
     });
   }
 
@@ -247,21 +250,20 @@ export class OrderService {
     return { cart, selectedItems };
   }
 
-  /** Nơi DUY NHẤT tính tiền đơn: subtotal + phí ship theo `SHIPPING_CONFIG` (ngưỡng miễn phí áp cho mọi phương thức) */
+  /** Nơi DUY NHẤT tính tiền đơn (VND, số nguyên): subtotal + phí ship theo `SHIPPING_CONFIG` (ngưỡng miễn phí áp cho mọi phương thức) */
   private async calculateTotals(selectedItems: CartItem[], shippingMethod: string) {
-    // Làm tròn 2 chữ số như cột decimal(10,2): tránh nhiễu dấu phẩy động (0.1 × 3 = 0.30000000000000004) làm báo giá,
-    // số lưu trong DB và số VND của QR lệch nhau
-    const subtotal = roundMoney(selectedItems.reduce((sum, item) => sum + Number(item.product!.price) * item.quantity, 0));
+    const subtotal = selectedItems.reduce((sum, item) => sum + Number(item.product!.price) * item.quantity, 0);
     const shipping = await this.shippingConfigService.get();
-    const methodPrice = (shipping.methods.find((m) => m.id === shippingMethod) ?? shipping.methods.find((m) => m.id === 'standard'))!.price;
-    const freeShipping = shipping.freeShippingThreshold !== null && subtotal >= shipping.freeShippingThreshold;
+    const methodPrice = (shipping.methods.find((m) => m.id === shippingMethod) ?? shipping.methods.find((m) => m.id === 'standard'))!
+      .priceVnd;
+    const freeShipping = shipping.freeShippingThresholdVnd !== null && subtotal >= shipping.freeShippingThresholdVnd;
     const shippingFee = freeShipping ? 0 : methodPrice;
     return {
       subtotal,
       shippingFee,
-      total: roundMoney(subtotal + shippingFee),
+      total: subtotal + shippingFee,
       freeShipping,
-      freeShippingThreshold: shipping.freeShippingThreshold,
+      freeShippingThresholdVnd: shipping.freeShippingThresholdVnd,
     };
   }
 
@@ -346,7 +348,7 @@ export class OrderService {
 
     const [data, total] = await qb.getManyAndCount();
 
-    return paginated(data, total, page, limit);
+    return paginated(data.map(presentOrder), total, page, limit);
   }
 
   /** Số đơn cần admin thao tác — cùng điều kiện với bộ lọc `needsAction` của `findAllAdmin` */
@@ -360,7 +362,7 @@ export class OrderService {
       relations: ['items'],
     });
     if (!order) throwAppError(EOrderErrorCode.ORDER_NOT_FOUND);
-    return { data: order };
+    return { data: presentOrder(order) };
   }
 
   async updateStatus(adminId: string, orderId: string, dto: UpdateOrderStatusDto) {

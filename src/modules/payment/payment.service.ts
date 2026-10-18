@@ -2,10 +2,12 @@ import { getPaging, paginated } from '@common/base/pagination.util';
 import { parseSort } from '@common/base/sort.util';
 import { throwAppError } from '@common/exceptions/app.exception';
 import { EOrderErrorCode, EPaymentErrorCode } from '@common/exceptions/error-codes';
+import { money, vndToUsd } from '@common/utils/money.util';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { customAlphabet } from 'nanoid';
 import { DataSource, EntityManager, In, Repository } from 'typeorm';
+import { CurrencyService } from '../currency/currency.service';
 import { Order } from '../order/order.entity';
 import { AdminPaymentAttemptQueryDto } from './dtos/admin-payment-attempt-query.dto';
 import { AdminPaymentTransactionQueryDto } from './dtos/admin-payment-transaction-query.dto';
@@ -22,7 +24,7 @@ import {
   TRANSFER_CODE_MAX_GENERATE_ATTEMPTS,
   VIETQR_IMAGE_URL,
 } from './payment.constant';
-import { convertToVnd } from './payment-amount.util';
+import { presentAmount, presentOrderTotal } from './payment.presenter';
 import { PaymentAttempt } from './payment-attempt.entity';
 import { resolveAttemptStatus } from './payment-attempt-status.util';
 import { PaymentConfigService, QrConfig } from './payment-config.service';
@@ -38,8 +40,9 @@ const EFFECTIVE_ATTEMPT_STATUS_SQL = `(CASE WHEN a.status <> 'PENDING' THEN a.st
 /** Phiên thanh toán như khách được xem (không lộ tài khoản nhận, raw payload, id nội bộ) */
 export interface CustomerPaymentAttempt {
   transferCode: string;
-  /** VND */
-  amount: number;
+  /** Số tiền phải chuyển (VND) và giá trị USD tương ứng theo tỷ giá của đơn */
+  amountVnd: number;
+  amountUsd: number;
   status: PaymentAttemptStatus;
   createdAt: Date;
   expiresAt: Date;
@@ -60,6 +63,7 @@ export class PaymentService {
     @InjectRepository(PaymentTransaction)
     private readonly transactionRepo: Repository<PaymentTransaction>,
     private readonly paymentConfig: PaymentConfigService,
+    private readonly currencyService: CurrencyService,
   ) {}
 
   /** Tạo phiên thanh toán QR cho đơn của user, hoặc trả lại phiên PENDING còn hạn */
@@ -81,7 +85,7 @@ export class PaymentService {
 
       if (!attempt) attempt = await this.insertAttempt(manager, order, config, null);
 
-      return { data: this.toQrView(attempt, config) };
+      return { data: this.toQrView(attempt, config, order.exchangeRate) };
     });
   }
 
@@ -103,7 +107,9 @@ export class PaymentService {
         await manager.update(PaymentAttempt, { orderId: order.id, status: 'PENDING' }, { status: 'EXPIRED', expiresAt: new Date() });
 
       const attempt = await this.insertAttempt(manager, order, config, adminId);
-      return { data: { ...this.toQrView(attempt, config), supersededTransferCodes: superseded.map((old) => old.transferCode) } };
+      return {
+        data: { ...this.toQrView(attempt, config, order.exchangeRate), supersededTransferCodes: superseded.map((old) => old.transferCode) },
+      };
     });
   }
 
@@ -118,7 +124,7 @@ export class PaymentService {
       manager.create(PaymentAttempt, {
         orderId: order.id,
         transferCode: await this.generateUniqueTransferCode(manager, config.prefix),
-        amount: this.toVnd(order.total, config.vndPerUnit),
+        amount: this.toPayableAmount(order.total),
         bankAccount: config.account,
         status: 'PENDING',
         expiresAt: new Date(Date.now() + PAYMENT_QR_TTL_MS),
@@ -133,12 +139,14 @@ export class PaymentService {
     const order = await this.orderRepo.findOne({ where: { id: orderId, userId } });
     if (!order) throwAppError(EOrderErrorCode.ORDER_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
 
-    if (order.paymentStatus !== 'unpaid') return { data: { orderId, status: 'PAID' as PaymentAttemptStatus } };
+    // Số tiền của đơn (VND + USD theo tỷ giá chốt trên đơn) để trang thanh toán vẫn hiển thị khi đang hỏi trạng thái
+    const amount = { ...money('amount', order.total, order.exchangeRate), exchangeRate: order.exchangeRate };
+    if (order.paymentStatus !== 'unpaid') return { data: { orderId, status: 'PAID' as PaymentAttemptStatus, ...amount } };
 
     const attempt = await this.attemptRepo.findOne({ where: { orderId }, order: { createdAt: 'DESC' } });
     if (!attempt) throwAppError(EPaymentErrorCode.PAYMENT_ATTEMPT_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
 
-    return { data: { orderId, status: resolveAttemptStatus(attempt, order.status) } };
+    return { data: { orderId, status: resolveAttemptStatus(attempt, order.status), ...amount } };
   }
 
   /**
@@ -146,7 +154,7 @@ export class PaymentService {
    * Chỉ gồm các field an toàn cho khách; không có tài khoản nhận, raw payload hay id nội bộ.
    * Quyền sở hữu đơn do nơi gọi kiểm tra.
    */
-  async listAttemptsForCustomer(order: { id: string; status: string }): Promise<CustomerPaymentAttempt[]> {
+  async listAttemptsForCustomer(order: { id: string; status: string; exchangeRate: number }): Promise<CustomerPaymentAttempt[]> {
     const attempts = await this.attemptRepo.find({ where: { orderId: order.id }, order: { createdAt: 'DESC' } });
     if (!attempts.length) return [];
 
@@ -161,7 +169,7 @@ export class PaymentService {
 
     return attempts.map((attempt) => ({
       transferCode: attempt.transferCode,
-      amount: attempt.amount,
+      ...money('amount', attempt.amount, order.exchangeRate),
       status: resolveAttemptStatus(attempt, order.status),
       createdAt: attempt.createdAt,
       expiresAt: attempt.expiresAt,
@@ -180,7 +188,7 @@ export class PaymentService {
       .createQueryBuilder('t')
       .leftJoinAndSelect('t.paymentAttempt', 'a')
       .leftJoin('a.order', 'o')
-      .addSelect(['o.id', 'o.status', 'o.paymentStatus', 'o.total', 'o.userId']);
+      .addSelect(['o.id', 'o.status', 'o.paymentStatus', 'o.total', 'o.exchangeRate', 'o.userId']);
 
     if (orderId) qb.andWhere('a.order_id = :orderId', { orderId });
     // Chỉ giao dịch cần admin xử lý (cùng điều kiện với con số trên menu admin)
@@ -199,8 +207,23 @@ export class PaymentService {
     qb.skip((page - 1) * limit).take(limit);
 
     const [data, total] = await qb.getManyAndCount();
+    const currentRate = await this.currencyService.getVndPerUsd();
 
-    return paginated(data, total, page, limit);
+    // USD theo tỷ giá của đơn khớp; giao dịch chưa khớp đơn nào thì theo tỷ giá hiện tại
+    const presented = data.map((transaction) => {
+      const attempt = transaction.paymentAttempt;
+      const rate = attempt?.order?.exchangeRate ?? currentRate;
+      return {
+        ...presentAmount(transaction, rate),
+        paymentAttempt: attempt
+          ? {
+              ...presentAmount(attempt, rate),
+              order: attempt.order ? presentOrderTotal(attempt.order, rate) : attempt.order,
+            }
+          : attempt,
+      };
+    });
+    return paginated(presented, total, page, limit);
   }
 
   /** Số giao dịch cần admin xử lý — cùng điều kiện với bộ lọc `needsReview` của `findTransactionsAdmin` */
@@ -245,7 +268,7 @@ export class PaymentService {
     const qb = this.attemptRepo
       .createQueryBuilder('a')
       .innerJoin('a.order', 'o')
-      .addSelect(['o.id', 'o.status', 'o.paymentStatus', 'o.total', 'o.userId', 'o.shippingAddress']);
+      .addSelect(['o.id', 'o.status', 'o.paymentStatus', 'o.total', 'o.exchangeRate', 'o.userId', 'o.shippingAddress']);
 
     if (orderId) qb.andWhere('a.order_id = :orderId', { orderId });
     if (status) qb.andWhere(`${EFFECTIVE_ATTEMPT_STATUS_SQL} = :status`, { status });
@@ -275,7 +298,7 @@ export class PaymentService {
     const data = attempts.map((attempt) => ({
       id: attempt.id,
       transferCode: attempt.transferCode,
-      amount: attempt.amount,
+      ...money('amount', attempt.amount, attempt.order.exchangeRate),
       status: resolveAttemptStatus(attempt, attempt.order.status),
       createdAt: attempt.createdAt,
       expiresAt: attempt.expiresAt,
@@ -285,7 +308,8 @@ export class PaymentService {
         id: attempt.order.id,
         status: attempt.order.status,
         paymentStatus: attempt.order.paymentStatus,
-        total: attempt.order.total,
+        ...money('total', attempt.order.total, attempt.order.exchangeRate),
+        exchangeRate: attempt.order.exchangeRate,
         userId: attempt.order.userId,
         customer: { fullName: attempt.order.shippingAddress?.fullName ?? null, phone: attempt.order.shippingAddress?.phone ?? null },
       },
@@ -295,7 +319,7 @@ export class PaymentService {
           id: tx.id,
           provider: tx.provider,
           providerTransactionId: tx.providerTransactionId,
-          amount: tx.amount,
+          ...money('amount', tx.amount, attempt.order.exchangeRate),
           verificationStatus: tx.verificationStatus,
           transferContent: tx.transferContent,
           receivedAt: tx.receivedAt,
@@ -326,31 +350,35 @@ export class PaymentService {
           status: order.status,
           paymentStatus: order.paymentStatus,
           paidAt: order.paidAt,
-          subtotal: order.subtotal,
-          shippingFee: order.shippingFee,
-          total: order.total,
+          ...money('subtotal', order.subtotal, order.exchangeRate),
+          ...money('shippingFee', order.shippingFee, order.exchangeRate),
+          ...money('total', order.total, order.exchangeRate),
+          exchangeRate: order.exchangeRate,
           shippingMethod: order.shippingMethod,
           customer: { fullName: order.shippingAddress?.fullName ?? null, phone: order.shippingAddress?.phone ?? null },
           createdAt: order.createdAt,
         },
         // `status` là trạng thái hiệu lực (PENDING quá hạn → EXPIRED; đơn đã huỷ → CANCELLED), giống khách và API status thấy
-        attempts: attempts.map((attempt) => ({ ...attempt, status: resolveAttemptStatus(attempt, order.status) })),
-        transactions,
+        attempts: attempts.map((attempt) => ({
+          ...presentAmount(attempt, order.exchangeRate),
+          status: resolveAttemptStatus(attempt, order.status),
+        })),
+        transactions: transactions.map((transaction) => presentAmount(transaction, order.exchangeRate)),
       },
     };
   }
 
   /**
    * [Admin] Xác nhận thủ công đơn đã thanh toán (webhook SePay không tới/lỗi nhưng tiền đã về).
-   * Luôn gắn một giao dịch làm bằng chứng: giao dịch có sẵn (`transactionId`) hoặc giao dịch mới (`reference` + `amount`).
+   * Luôn gắn một giao dịch làm bằng chứng: giao dịch có sẵn (`transactionId`) hoặc giao dịch mới (`reference` + `amountVnd`).
    * Cùng cơ chế khoá và cập nhật với webhook (order → transaction → attempt), nên không thể trả hai lần.
    */
   async confirmPaymentAdmin(adminId: string, orderId: string, dto: ConfirmPaymentDto) {
     const transferCode = dto.transferCode?.trim().toUpperCase();
     const useExisting = dto.transactionId !== undefined;
-    const hasNewFields = dto.reference !== undefined || dto.amount !== undefined;
-    // transactionId: không kèm reference/amount. Cách còn lại: bắt buộc amount và ít nhất một trong reference / transferCode
-    const invalid = useExisting ? hasNewFields : dto.amount === undefined || (dto.reference === undefined && transferCode === undefined);
+    const hasNewFields = dto.reference !== undefined || dto.amountVnd !== undefined;
+    // transactionId: không kèm reference/amountVnd. Cách còn lại: bắt buộc amountVnd và ít nhất một trong reference / transferCode
+    const invalid = useExisting ? hasNewFields : dto.amountVnd === undefined || (dto.reference === undefined && transferCode === undefined);
     // Không có mã giao dịch ngân hàng thì mã giao dịch được ghi chính là nội dung chuyển khoản (nguồn manual)
     const provider = dto.provider ?? (dto.reference !== undefined ? PAYMENT_PROVIDER_SEPAY : PAYMENT_PROVIDER_MANUAL);
     if (invalid || (!useExisting && dto.reference === undefined && provider !== PAYMENT_PROVIDER_MANUAL)) {
@@ -424,11 +452,11 @@ export class PaymentService {
         );
       }
 
-      const received = transaction ? transaction.amount : (dto.amount as number);
+      const received = transaction ? transaction.amount : (dto.amountVnd as number);
       if (received !== attempt.amount && dto.acceptAmountMismatch !== true) {
         throwAppError(
           EPaymentErrorCode.PAYMENT_AMOUNT_MISMATCH,
-          `Received ${received} but the payment session expects ${attempt.amount}. Send acceptAmountMismatch=true to confirm anyway`,
+          `Received ${received} VND (${vndToUsd(received, order.exchangeRate)} USD) but the payment session expects ${attempt.amount} VND (${vndToUsd(attempt.amount, order.exchangeRate)} USD). Send acceptAmountMismatch=true to confirm anyway`,
         );
       }
 
@@ -466,15 +494,23 @@ export class PaymentService {
             }),
           );
 
-      return { data: { orderId: order.id, paymentStatus: 'paid', paidAt: now, attemptId: attempt.id, transaction: saved } };
+      return {
+        data: {
+          orderId: order.id,
+          paymentStatus: 'paid',
+          paidAt: now,
+          attemptId: attempt.id,
+          transaction: presentAmount(saved, order.exchangeRate),
+        },
+      };
     });
   }
 
-  /** `orders.total` (đơn vị cửa hàng) → số tiền VND nguyên theo tỷ giá cấu hình */
-  private toVnd(total: number | string, vndPerUnit: number): number {
-    const amount = convertToVnd(total, vndPerUnit);
+  /** `orders.total` (VND) chính là số tiền khách phải chuyển; phải là số nguyên dương nằm trong vùng an toàn của number */
+  private toPayableAmount(total: number | string): number {
+    const amount = Number(total);
     if (!Number.isSafeInteger(amount) || amount <= 0) {
-      throwAppError(EPaymentErrorCode.PAYMENT_ORDER_NOT_PAYABLE, 'Order amount cannot be converted to a payable VND amount');
+      throwAppError(EPaymentErrorCode.PAYMENT_ORDER_NOT_PAYABLE, 'Order total is not a payable VND amount');
     }
     return amount;
   }
@@ -488,7 +524,7 @@ export class PaymentService {
     return throwAppError(EPaymentErrorCode.PAYMENT_CODE_GENERATION_FAILED, undefined, HttpStatus.INTERNAL_SERVER_ERROR);
   }
 
-  private toQrView(attempt: PaymentAttempt, config: QrConfig) {
+  private toQrView(attempt: PaymentAttempt, config: QrConfig, vndPerUsd: number) {
     const params = new URLSearchParams({
       acc: attempt.bankAccount,
       bank: config.bankCode,
@@ -499,7 +535,8 @@ export class PaymentService {
       orderId: attempt.orderId,
       paymentId: attempt.id,
       qrUrl: `${VIETQR_IMAGE_URL}?${params.toString()}`,
-      amount: attempt.amount,
+      ...money('amount', attempt.amount, vndPerUsd),
+      exchangeRate: vndPerUsd,
       bankName: config.bankName,
       accountNumber: attempt.bankAccount,
       accountName: config.accountName,

@@ -1,6 +1,6 @@
 # wishlist (`src/modules/wishlist`)
 
-> Cập nhật lần cuối: 2026-10-12
+> Cập nhật lần cuối: 2026-10-16
 
 ## 1. Tổng quan
 
@@ -11,7 +11,7 @@ Module danh sách yêu thích của người dùng đã đăng nhập: thêm, b�
 | Thư mục | `src/modules/wishlist` |
 | Route prefix | `/api/wishlist` |
 | Bảng DB | `wishlists` |
-| Module phụ thuộc | `product` (entity `Product`) |
+| Module phụ thuộc | `product` (entity `Product`, `presentProduct`); `currency` (`CurrencyService.getVndPerUsd`, xem [currency](currency.md)) |
 | Export | không |
 
 ## 2. Mục đích & nghiệp vụ phục vụ
@@ -37,7 +37,7 @@ Cho khách lưu lại các sản phẩm quan tâm và hiển thị trạng thái
 
 Response:
 
-- `GET /` → `{ data: Wishlist[] (kèm product, mới nhất trước), total }`.
+- `GET /` → `{ data: Wishlist[] (kèm product, mới nhất trước), total }`; `product` có dạng sản phẩm của [product](product.md) (`priceVnd`, `priceUsd`, `originalPriceVnd`, `originalPriceUsd`, USD theo tỷ giá hiện tại).
 - `POST /:productId` → `{ data: Wishlist, created: boolean }` (`created = false` nếu đã tồn tại từ trước).
 - `DELETE /:productId` → `{ success: true }`.
 - `GET /check/:productId` → `{ inWishlist: boolean }`.
@@ -73,7 +73,7 @@ Không có error code riêng của module; sản phẩm không tồn tại trả
 
 ### 4.6 Phụ thuộc & cấu hình
 
-`TypeOrmModule.forFeature([Wishlist, Product])`. Không có biến môi trường.
+`TypeOrmModule.forFeature([Wishlist, Product])`; `CurrencyModule`. Không có biến môi trường.
 
 ### 4.7 Test
 

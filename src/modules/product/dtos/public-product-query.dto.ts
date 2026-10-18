@@ -44,14 +44,14 @@ export class PublicProductQueryDto extends PaginationQueryDto {
   @Max(5)
   minRating?: number;
 
-  @ApiPropertyOptional({ type: Number, minimum: 0 })
+  @ApiPropertyOptional({ type: Number, minimum: 0, description: 'Giá bán tối thiểu (VND)' })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(0)
   minPrice?: number;
 
-  @ApiPropertyOptional({ type: Number, minimum: 0 })
+  @ApiPropertyOptional({ type: Number, minimum: 0, description: 'Giá bán tối đa (VND)' })
   @IsOptional()
   @Type(() => Number)
   @IsInt()

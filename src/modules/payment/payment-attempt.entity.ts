@@ -1,13 +1,8 @@
 import { BaseEntity } from '@common/base/base.entity';
+import { bigintTransformer } from '@common/base/column-transformers';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { Order } from '../order/order.entity';
 import { PaymentAttemptStatus } from './payment.constant';
-
-/** bigint của Postgres về dạng chuỗi → ép về number (số tiền VND luôn nằm trong vùng an toàn của number) */
-export const bigintTransformer = {
-  to: (value?: number | null) => value,
-  from: (value?: string | null) => (value === null || value === undefined ? value : Number(value)),
-};
 
 @Entity('payment_attempts')
 export class PaymentAttempt extends BaseEntity {
@@ -17,7 +12,7 @@ export class PaymentAttempt extends BaseEntity {
   @Column({ type: 'varchar', length: 32, name: 'transfer_code', unique: true })
   transferCode: string;
 
-  /** Số tiền VND phải chuyển (đã quy đổi từ `orders.total`) */
+  /** Số tiền VND phải chuyển (bằng `orders.total` lúc tạo phiên) */
   @Column({ type: 'bigint', transformer: bigintTransformer })
   amount: number;
 

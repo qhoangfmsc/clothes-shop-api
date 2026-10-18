@@ -1,6 +1,6 @@
 # return (`src/modules/return`)
 
-> Cập nhật lần cuối: 2026-10-13
+> Cập nhật lần cuối: 2026-10-16
 
 ## 1. Tổng quan
 
@@ -66,14 +66,14 @@ Lỗi: đơn không thuộc user → `404` `ORDER_NOT_FOUND`; đơn không đủ
 {
   "id": "…", "orderId": "…", "status": "APPROVED", "reason": "WRONG_SIZE", "note": "…", "adminNote": "…",
   "createdAt": "…", "approvedAt": "…", "receivedAt": null,
-  "items": [{ "id": "…", "orderItemId": "…", "productName": "…", "productImage": "…", "size": "M", "color": "white", "price": 60, "quantity": 1, "acceptedQuantity": null }],
-  "refund": { "amount": 3125000, "status": "REQUESTED", "bankReference": null, "processedAt": null }
+  "items": [{ "id": "…", "orderItemId": "…", "productName": "…", "productImage": "…", "size": "M", "color": "white", "priceVnd": 1500000, "priceUsd": 60, "quantity": 1, "acceptedQuantity": null }],
+  "refund": { "amountVnd": 3125000, "amountUsd": 125, "status": "REQUESTED", "bankReference": null, "processedAt": null }
 }
 ```
 
-`adminNote` là phản hồi của cửa hàng (hướng dẫn gửi hàng khi duyệt, lý do khi từ chối). `price` là giá lúc đặt (đơn vị cửa hàng); `refund.amount` là VND; `refund` là khoản hoàn mới nhất gắn với yêu cầu (`null` khi chưa nhận hàng). Không có người xử lý, đơn hay id khoản hoàn.
+`adminNote` là phản hồi của cửa hàng (hướng dẫn gửi hàng khi duyệt, lý do khi từ chối). `priceVnd` là giá lúc đặt (VND) và `refund.amountVnd` là số tiền hoàn (VND); các `...Usd` là giá trị USD tương ứng theo tỷ giá chốt trên đơn (`orders.exchange_rate`, xem [currency](currency.md)); `refund` là khoản hoàn mới nhất gắn với yêu cầu (`null` khi chưa nhận hàng). Không có người xử lý, đơn hay id khoản hoàn.
 
-**GET `/api/admin/returns`** — `AdminReturnQueryDto` (extends `PaginationQueryDto`): `status`, `orderId`, `search` (≤ 255; `ILIKE` trên `return_requests.id`, `order_id`, `shipping_address->>'phone'`, `shipping_address->>'fullName'`), `sort` (whitelist `createdAt`, `updatedAt`; mặc định `-createdAt`). **View admin** = view khách + `requestedBy`, `processedBy`, `shippingRefunded`, `updatedAt`, `refund.id`, và `order: { id, status, paymentStatus, total, shippingFee, deliveredAt, userId, customer: { fullName, phone } }`.
+**GET `/api/admin/returns`** — `AdminReturnQueryDto` (extends `PaginationQueryDto`): `status`, `orderId`, `search` (≤ 255; `ILIKE` trên `return_requests.id`, `order_id`, `shipping_address->>'phone'`, `shipping_address->>'fullName'`), `sort` (whitelist `createdAt`, `updatedAt`; mặc định `-createdAt`). **View admin** = view khách + `requestedBy`, `processedBy`, `shippingRefunded`, `updatedAt`, `refund.id`, và `order: { id, status, paymentStatus, totalVnd, totalUsd, shippingFeeVnd, shippingFeeUsd, exchangeRate, deliveredAt, userId, customer: { fullName, phone } }`.
 
 **POST `/api/admin/returns/:returnId/approve`** — `ApproveReturnDto`: `note` tuỳ chọn (trim, ≤ 500). **`/reject`** — `RejectReturnDto`: `note` bắt buộc (trim, not empty, ≤ 500). **`/receive`** — `ReceiveReturnDto`, tất cả tuỳ chọn:
 
@@ -148,8 +148,8 @@ Sai bước → `RETURN_INVALID_STATE`. `REJECTED`, `CANCELLED`, `REFUNDED` là 
 **Nhận hàng** (`receive`): ngoài việc kiểm trạng thái `APPROVED` và đơn còn `paid`:
 
 1. Số lượng chấp nhận: mặc định đủ số xin trả; `items` ghi đè từng dòng (0 đến số xin trả); tổng phải > 0 (không nhận gì thì phải từ chối yêu cầu).
-2. Giá trị hoàn = Σ `order_items.price × accepted` (giá lúc đặt) + (nếu `refundShipping`) `orders.shipping_fee`, tính bằng xu (× 100). `refundShipping` bị từ chối nếu đơn đã có yêu cầu khác với `shipping_refunded = true`.
-3. `RefundService.createForReturn`: số tiền VND tính theo tỷ lệ trên số tiền ngân hàng thực nhận (không quy đổi lại theo tỷ giá hiện tại) và theo luỹ kế: `prorate(đã nhận, giá trị các lần trả đã nhận trước + lần này) − prorate(đã nhận, giá trị các lần trả đã nhận trước)`, nên nhiều lần trả cộng lại đúng bằng số đã nhận, không lệch do làm tròn; hoàn đủ giá trị đơn thì đúng bằng số đã nhận; không vượt phần còn lại chưa hoàn; đơn đang có khoản hoàn `REQUESTED` khác thì từ chối (`REFUND_NOT_ALLOWED`).
+2. Giá trị hoàn = Σ `order_items.price × accepted` (giá lúc đặt) + (nếu `refundShipping`) `orders.shipping_fee`, tính bằng VND nguyên (không có bước đổi xu). `refundShipping` bị từ chối nếu đơn đã có yêu cầu khác với `shipping_refunded = true`.
+3. `RefundService.createForReturn`: số tiền VND tính theo tỷ lệ trên số tiền ngân hàng thực nhận (so với `orders.total`, cùng đơn vị VND) và theo luỹ kế: `prorate(đã nhận, giá trị các lần trả đã nhận trước + lần này) − prorate(đã nhận, giá trị các lần trả đã nhận trước)`, nên nhiều lần trả cộng lại đúng bằng số đã nhận, không lệch do làm tròn; hoàn đủ giá trị đơn thì đúng bằng số đã nhận; không vượt phần còn lại chưa hoàn; đơn đang có khoản hoàn `REQUESTED` khác thì từ chối (`REFUND_NOT_ALLOWED`).
 4. Ghi `accepted_quantity`, `status = RECEIVED`, `received_at`, `processed_by`, `shipping_refunded`, `admin_note` (nếu có `note`).
 
 Sau đó admin chuyển khoản và ghi khoản hoàn ở `/api/admin/refunds` ([payment](payment.md)): xong → yêu cầu trả hàng `REFUNDED`; khi tổng đã hoàn bằng số đã trả thì đơn `payment_status = refunded`.

@@ -1,7 +1,8 @@
 import { BaseEntity } from '@common/base/base.entity';
+import { bigintTransformer } from '@common/base/column-transformers';
 import { Column, Entity, JoinColumn, ManyToOne, Unique } from 'typeorm';
 import { PAYMENT_PROVIDER_SEPAY, PaymentVerificationStatus } from './payment.constant';
-import { bigintTransformer, PaymentAttempt } from './payment-attempt.entity';
+import { PaymentAttempt } from './payment-attempt.entity';
 
 @Unique('UQ_payment_transactions_provider_and_transaction_id', ['provider', 'providerTransactionId'])
 @Entity('payment_transactions')

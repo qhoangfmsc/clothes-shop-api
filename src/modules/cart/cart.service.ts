@@ -1,13 +1,18 @@
 import { NON_ORDERABLE_BADGES } from '@common/constants/enum-values.constant';
 import { throwAppError } from '@common/exceptions/app.exception';
 import { EOrderErrorCode, EProductErrorCode } from '@common/exceptions/error-codes';
+import { money } from '@common/utils/money.util';
 import { BadRequestException, HttpStatus, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { CurrencyService } from '../currency/currency.service';
 import { Product } from '../product/product.entity';
+import { presentProduct } from '../product/product.presenter';
 import { Cart } from './cart.entity';
 import { CartItem } from './cart-item.entity';
 import { AddToCartDto, UpdateCartItemDto } from './dtos/cart.dto';
+
+const EMPTY_CART = { items: [], itemCount: 0, subtotalVnd: 0, subtotalUsd: 0 };
 
 @Injectable()
 export class CartService {
@@ -18,6 +23,7 @@ export class CartService {
     private readonly cartItemRepo: Repository<CartItem>,
     @InjectRepository(Product)
     private readonly productRepo: Repository<Product>,
+    private readonly currencyService: CurrencyService,
   ) {}
 
   /** Get or create cart for user */
@@ -37,27 +43,28 @@ export class CartService {
     });
 
     if (!cart) {
-      return { data: { items: [], subtotal: 0, itemCount: 0 } };
+      return { data: { ...EMPTY_CART } };
     }
 
-    const items = cart.items.map((item) => ({
-      id: item.id,
-      productId: item.productId,
-      product: item.product,
-      quantity: item.quantity,
-      size: item.size,
-      color: item.color,
-      lineTotal: Number(item.product?.price ?? 0) * item.quantity,
-    }));
-
-    const subtotal = items.reduce((sum, i) => sum + i.lineTotal, 0);
+    const rate = await this.currencyService.getVndPerUsd();
+    // Tiền tính bằng VND (số nguyên) rồi mới suy ra USD, nên tổng USD luôn là quy đổi của tổng VND
+    const lines = cart.items.map((item) => ({ item, lineTotalVnd: Number(item.product?.price ?? 0) * item.quantity }));
+    const subtotalVnd = lines.reduce((sum, line) => sum + line.lineTotalVnd, 0);
 
     return {
       data: {
         id: cart.id,
-        items,
-        subtotal,
-        itemCount: items.reduce((sum, i) => sum + i.quantity, 0),
+        items: lines.map(({ item, lineTotalVnd }) => ({
+          id: item.id,
+          productId: item.productId,
+          product: item.product ? presentProduct(item.product, rate) : item.product,
+          quantity: item.quantity,
+          size: item.size,
+          color: item.color,
+          ...money('lineTotal', lineTotalVnd, rate),
+        })),
+        ...money('subtotal', subtotalVnd, rate),
+        itemCount: lines.reduce((sum, line) => sum + line.item.quantity, 0),
       },
     };
   }
@@ -126,10 +133,10 @@ export class CartService {
 
   async clearCart(userId: string) {
     const cart = await this.cartRepo.findOne({ where: { userId } });
-    if (!cart) return { data: { items: [], subtotal: 0, itemCount: 0 } };
+    if (!cart) return { data: { ...EMPTY_CART } };
 
     await this.cartItemRepo.delete({ cartId: cart.id });
 
-    return { data: { items: [], subtotal: 0, itemCount: 0 } };
+    return { data: { ...EMPTY_CART } };
   }
 }

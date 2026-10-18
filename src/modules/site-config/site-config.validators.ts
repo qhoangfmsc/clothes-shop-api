@@ -1,3 +1,4 @@
+import { validateExchangeRateConfigValue } from '../currency/exchange-rate-config';
 import { validateShippingConfigValue } from '../shipping/shipping-config';
 import { SiteConfigKey } from './site-config.constant';
 
@@ -8,4 +9,5 @@ import { SiteConfigKey } from './site-config.constant';
  */
 export const SITE_CONFIG_VALUE_VALIDATORS: Partial<Record<SiteConfigKey, (value: string) => string>> = {
   [SiteConfigKey.SHIPPING_CONFIG]: validateShippingConfigValue,
+  [SiteConfigKey.EXCHANGE_RATE]: validateExchangeRateConfigValue,
 };

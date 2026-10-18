@@ -5,7 +5,7 @@
  * `type` : quy định FE nên render kiểu gì (banner = carousel/hero, text = đoạn text...)
  *
  * `value` luôn là 1 string (thường là JSON.stringify của mảng) — FE tự JSON.parse theo `type`.
- * BE không quan tâm hình dạng bên trong, trừ key mà chính BE đọc để tính toán (vd `SHIPPING_CONFIG`):
+ * BE không quan tâm hình dạng bên trong, trừ key mà chính BE đọc để tính toán (vd `SHIPPING_CONFIG`, `EXCHANGE_RATE`):
  * những key đó có validator riêng ở `site-config.validators.ts`.
  */
 
@@ -13,6 +13,7 @@ export enum SiteConfigType {
   BANNER = 'BANNER',
   TEXT = 'TEXT',
   SHIPPING = 'SHIPPING',
+  CURRENCY = 'CURRENCY',
 }
 
 export enum SiteConfigKey {
@@ -21,6 +22,7 @@ export enum SiteConfigKey {
   COLLECTIONS_HERO_BANNERS = 'COLLECTIONS_HERO_BANNERS',
   NAV_MENU_BANNERS = 'NAV_MENU_BANNERS',
   SHIPPING_CONFIG = 'SHIPPING_CONFIG',
+  EXCHANGE_RATE = 'EXCHANGE_RATE',
 }
 
 /** Mỗi key luôn gắn với đúng 1 type cố định — BE tự suy ra, admin không cần truyền type. */
@@ -30,4 +32,5 @@ export const SITE_CONFIG_KEY_TYPE: Record<SiteConfigKey, SiteConfigType> = {
   [SiteConfigKey.COLLECTIONS_HERO_BANNERS]: SiteConfigType.BANNER,
   [SiteConfigKey.NAV_MENU_BANNERS]: SiteConfigType.BANNER,
   [SiteConfigKey.SHIPPING_CONFIG]: SiteConfigType.SHIPPING,
+  [SiteConfigKey.EXCHANGE_RATE]: SiteConfigType.CURRENCY,
 };

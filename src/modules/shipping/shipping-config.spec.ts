@@ -8,12 +8,12 @@ describe('parseShippingConfig', () => {
     expect(parse(DEFAULT_SHIPPING_CONFIG)).toEqual({ ok: true, config: DEFAULT_SHIPPING_CONFIG });
   });
 
-  it('accepts decimal prices up to 2 places, price 0, and threshold null', () => {
+  it('accepts whole-VND prices, price 0, and threshold null', () => {
     const cfg = clone();
-    cfg.freeShippingThreshold = null;
-    cfg.methods[0].price = 9.99;
-    cfg.methods[1].price = 0;
-    expect(parse(cfg)).toMatchObject({ ok: true, config: { freeShippingThreshold: null } });
+    cfg.freeShippingThresholdVnd = null;
+    cfg.methods[0].priceVnd = 35_000;
+    cfg.methods[1].priceVnd = 0;
+    expect(parse(cfg)).toMatchObject({ ok: true, config: { freeShippingThresholdVnd: null } });
   });
 
   it('normalises the method order', () => {
@@ -42,32 +42,60 @@ describe('parseShippingConfig', () => {
       'missing threshold',
       (() => {
         const c = clone();
-        delete c.freeShippingThreshold;
+        delete c.freeShippingThresholdVnd;
+        return c;
+      })(),
+      'freeShippingThresholdVnd',
+    ],
+    ['zero threshold', { ...clone(), freeShippingThresholdVnd: 0 }, 'freeShippingThresholdVnd'],
+    ['negative threshold', { ...clone(), freeShippingThresholdVnd: -1 }, 'freeShippingThresholdVnd'],
+    ['string threshold', { ...clone(), freeShippingThresholdVnd: '1500000' }, 'freeShippingThresholdVnd'],
+    ['fractional threshold', { ...clone(), freeShippingThresholdVnd: 1500000.5 }, 'freeShippingThresholdVnd'],
+    ['threshold above the maximum', { ...clone(), freeShippingThresholdVnd: 1_000_000_001 }, 'freeShippingThresholdVnd'],
+    [
+      'the old USD-era key',
+      (() => {
+        const c = clone();
+        c.freeShippingThreshold = 150;
         return c;
       })(),
       'freeShippingThreshold',
     ],
-    ['zero threshold', { ...clone(), freeShippingThreshold: 0 }, 'freeShippingThreshold'],
-    ['negative threshold', { ...clone(), freeShippingThreshold: -1 }, 'freeShippingThreshold'],
-    ['string threshold', { ...clone(), freeShippingThreshold: '150' }, 'freeShippingThreshold'],
-    ['3 decimal places', { ...clone(), freeShippingThreshold: 1.234 }, 'freeShippingThreshold'],
     ['unknown top-level field', { ...clone(), extra: 1 }, 'extra'],
-    ['missing methods', { freeShippingThreshold: 150 }, 'methods'],
+    ['missing methods', { freeShippingThresholdVnd: 1_500_000 }, 'methods'],
     ['too few methods', { ...clone(), methods: clone().methods.slice(0, 2) }, 'methods'],
     [
       'negative price',
       (() => {
         const c = clone();
-        c.methods[0].price = -1;
+        c.methods[0].priceVnd = -1;
         return c;
       })(),
-      'methods.0.price',
+      'methods.0.priceVnd',
     ],
     [
       'price as string',
       (() => {
         const c = clone();
-        c.methods[0].price = '8';
+        c.methods[0].priceVnd = '30000';
+        return c;
+      })(),
+      'methods.0.priceVnd',
+    ],
+    [
+      'fractional price',
+      (() => {
+        const c = clone();
+        c.methods[0].priceVnd = 30000.5;
+        return c;
+      })(),
+      'methods.0.priceVnd',
+    ],
+    [
+      'the old USD-era price key',
+      (() => {
+        const c = clone();
+        c.methods[0].price = 8;
         return c;
       })(),
       'methods.0.price',
@@ -131,14 +159,14 @@ describe('validateShippingConfigValue', () => {
 
   it('throws SITE_CONFIG_VALUE_INVALID (1503, HTTP 400) listing the problems', () => {
     const cfg = clone();
-    cfg.methods[0].price = -5;
+    cfg.methods[0].priceVnd = -5;
     expect.assertions(3);
     try {
       validateShippingConfigValue(JSON.stringify(cfg));
     } catch (error: any) {
       expect(error.getStatus()).toBe(400);
       expect(error.getResponse().errorCode).toBe(1503);
-      expect(error.getResponse().message).toContain('methods.0.price');
+      expect(error.getResponse().message).toContain('methods.0.priceVnd');
     }
   });
 });

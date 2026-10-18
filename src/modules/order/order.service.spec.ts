@@ -14,6 +14,7 @@ import { OrderService } from './order.service';
 
 type Item = { id: string; productId: string; quantity: number; size: string; color: string; product: any };
 
+/** `price` là giá VND của sản phẩm (số nguyên) */
 const item = (id: string, price: number, quantity = 1, status = 'active', badge: string | null = null): Item => ({
   id,
   productId: `p-${id}`,
@@ -23,7 +24,8 @@ const item = (id: string, price: number, quantity = 1, status = 'active', badge:
   product: { name: `Product ${id}`, price, status, badge, images: [] },
 });
 
-function setup(cartItems: Item[], shippingConfig: ShippingConfig = DEFAULT_SHIPPING_CONFIG, vndPerUnit: number | null = 25_000) {
+// Mặc định (DEFAULT_SHIPPING_CONFIG): standard 30 000, express 50 000, store-pickup 0; miễn phí ship từ 1 500 000
+function setup(cartItems: Item[], shippingConfig: ShippingConfig = DEFAULT_SHIPPING_CONFIG, vndPerUsd = 25_000) {
   const deleted: any[] = [];
   const savedOrders: any[] = [];
   const savedItems: any[] = [];
@@ -62,28 +64,28 @@ function setup(cartItems: Item[], shippingConfig: ShippingConfig = DEFAULT_SHIPP
   };
   const dataSource: any = { transaction: (cb: any) => cb(manager), manager };
   const shippingConfigService: any = { get: jest.fn(async () => shippingConfig) };
-  const paymentConfigService: any = { getVndPerUnit: jest.fn(() => vndPerUnit) };
+  const currencyService: any = { getVndPerUsd: jest.fn(async () => vndPerUsd) };
   const paymentService: any = { listAttemptsForCustomer: jest.fn(async () => []), cancelPendingAttempts: jest.fn(async () => undefined) };
-  const service = new OrderService({} as any, dataSource, shippingConfigService, paymentConfigService, paymentService, {} as any);
-  return { service, manager, deleted, savedOrders, savedItems, shippingConfigService, paymentService };
+  const service = new OrderService({} as any, dataSource, shippingConfigService, currencyService, paymentService, {} as any);
+  return { service, manager, deleted, savedOrders, savedItems, shippingConfigService, currencyService, paymentService };
 }
 
 describe('OrderService.checkout', () => {
   const base = { addressId: 'a1' };
 
   it('orders only the selected items and removes only them from the cart', async () => {
-    const { service, deleted, savedOrders, savedItems } = setup([item('1', 20), item('2', 30), item('3', 40)]);
+    const { service, deleted, savedOrders, savedItems } = setup([item('1', 200_000), item('2', 300_000), item('3', 400_000)]);
     await service.checkout('u1', { ...base, cartItemIds: ['1', '3'] });
 
     expect(savedItems.map((i) => i.productId)).toEqual(['p-1', 'p-3']);
-    expect(savedOrders[0]).toMatchObject({ subtotal: 60, shippingFee: 8, total: 68 });
+    expect(savedOrders[0]).toMatchObject({ subtotal: 600_000, shippingFee: 30_000, total: 630_000 });
     expect(deleted).toHaveLength(1);
     expect(deleted[0].entity).toBe(CartItem);
     expect(deleted[0].criteria).toEqual({ cartId: 'cart-1', id: In(['1', '3']) });
   });
 
   it('orders the whole cart when cartItemIds is omitted (regression)', async () => {
-    const { service, deleted, savedItems } = setup([item('1', 20), item('2', 30), item('3', 40)]);
+    const { service, deleted, savedItems } = setup([item('1', 200_000), item('2', 300_000), item('3', 400_000)]);
     await service.checkout('u1', base);
 
     expect(savedItems).toHaveLength(3);
@@ -91,7 +93,7 @@ describe('OrderService.checkout', () => {
   });
 
   it('behaves like the whole cart when every id is sent', async () => {
-    const { service, deleted, savedItems } = setup([item('1', 20), item('2', 30)]);
+    const { service, deleted, savedItems } = setup([item('1', 200_000), item('2', 300_000)]);
     await service.checkout('u1', { ...base, cartItemIds: ['2', '1'] });
 
     expect(savedItems).toHaveLength(2);
@@ -99,59 +101,80 @@ describe('OrderService.checkout', () => {
   });
 
   it('computes free shipping on the selected subtotal, not the whole cart', async () => {
-    const { service, savedOrders } = setup([item('1', 100), item('2', 100), item('3', 10)]);
+    const { service, savedOrders } = setup([item('1', 1_000_000), item('2', 1_000_000), item('3', 100_000)]);
     await service.checkout('u1', { ...base, cartItemIds: ['3'] });
-    expect(savedOrders[0]).toMatchObject({ subtotal: 10, shippingFee: 8, total: 18 });
+    expect(savedOrders[0]).toMatchObject({ subtotal: 100_000, shippingFee: 30_000, total: 130_000 });
   });
 
   it('gives free shipping when the selected subtotal reaches the threshold', async () => {
-    const { service, savedOrders } = setup([item('1', 100), item('2', 60), item('3', 10)]);
+    const { service, savedOrders } = setup([item('1', 1_000_000), item('2', 600_000), item('3', 100_000)]);
     await service.checkout('u1', { ...base, cartItemIds: ['1', '2'] });
-    expect(savedOrders[0]).toMatchObject({ subtotal: 160, shippingFee: 0, total: 160 });
+    expect(savedOrders[0]).toMatchObject({ subtotal: 1_600_000, shippingFee: 0, total: 1_600_000 });
+  });
+
+  it('freezes the current exchange rate on the order and returns every amount in VND and USD', async () => {
+    const { service, savedOrders, savedItems } = setup([item('1', 500_000, 2)], DEFAULT_SHIPPING_CONFIG, 26_000);
+    const { data } = await service.checkout('u1', { ...base, shippingMethod: 'express' });
+
+    expect(savedOrders[0]).toMatchObject({ subtotal: 1_000_000, shippingFee: 50_000, total: 1_050_000, exchangeRate: 26_000 });
+    expect(savedItems[0]).toMatchObject({ price: 500_000, quantity: 2 });
+    expect(data).toMatchObject({
+      subtotalVnd: 1_000_000,
+      subtotalUsd: 38.46,
+      shippingFeeVnd: 50_000,
+      shippingFeeUsd: 1.92,
+      totalVnd: 1_050_000,
+      totalUsd: 40.38,
+      exchangeRate: 26_000,
+      items: [{ productId: 'p-1', priceVnd: 500_000, priceUsd: 19.23, quantity: 2 }],
+    });
+    // Không còn field tiền không có đơn vị
+    for (const key of ['subtotal', 'shippingFee', 'total']) expect(data).not.toHaveProperty(key);
+    expect(data.items?.[0]).not.toHaveProperty('price');
   });
 
   describe('shipping fee comes from the shipping config', () => {
     const config = (over: Partial<ShippingConfig> = {}, prices: Record<string, number> = {}): ShippingConfig => ({
       ...DEFAULT_SHIPPING_CONFIG,
       ...over,
-      methods: DEFAULT_SHIPPING_CONFIG.methods.map((m) => ({ ...m, price: prices[m.id] ?? m.price })),
+      methods: DEFAULT_SHIPPING_CONFIG.methods.map((m) => ({ ...m, priceVnd: prices[m.id] ?? m.priceVnd })),
     });
 
     it.each([
-      ['standard', 8],
-      ['express', 15],
+      ['standard', 30_000],
+      ['express', 50_000],
       ['store-pickup', 0],
     ])('defaults: %s costs %d', async (method, fee) => {
-      const { service, savedOrders } = setup([item('1', 20)]);
+      const { service, savedOrders } = setup([item('1', 200_000)]);
       await service.checkout('u1', { ...base, shippingMethod: method });
-      expect(savedOrders[0]).toMatchObject({ shippingFee: fee, shippingMethod: method, total: 20 + fee });
+      expect(savedOrders[0]).toMatchObject({ shippingFee: fee, shippingMethod: method, total: 200_000 + fee });
     });
 
     it('uses the configured price per method', async () => {
-      const { service, savedOrders } = setup([item('1', 20)], config({}, { standard: 30000, express: 50000 }));
+      const { service, savedOrders } = setup([item('1', 200_000)], config({}, { standard: 35_000, express: 60_000 }));
       await service.checkout('u1', { ...base, shippingMethod: 'express' });
-      expect(savedOrders[0]).toMatchObject({ shippingFee: 50000, total: 50020 });
+      expect(savedOrders[0]).toMatchObject({ shippingFee: 60_000, total: 260_000 });
     });
 
     it('uses the configured free-shipping threshold (reached → free, below → paid)', async () => {
-      const cfg = config({ freeShippingThreshold: 50 });
-      const reached = setup([item('1', 50)], cfg);
+      const cfg = config({ freeShippingThresholdVnd: 500_000 });
+      const reached = setup([item('1', 500_000)], cfg);
       await reached.service.checkout('u1', base);
-      expect(reached.savedOrders[0]).toMatchObject({ subtotal: 50, shippingFee: 0 });
+      expect(reached.savedOrders[0]).toMatchObject({ subtotal: 500_000, shippingFee: 0 });
 
-      const below = setup([item('1', 49.99)], cfg);
+      const below = setup([item('1', 499_999)], cfg);
       await below.service.checkout('u1', base);
-      expect(below.savedOrders[0]).toMatchObject({ shippingFee: 8 });
+      expect(below.savedOrders[0]).toMatchObject({ shippingFee: 30_000 });
     });
 
     it('never gives free shipping when the threshold is null', async () => {
-      const { service, savedOrders } = setup([item('1', 1_000_000)], config({ freeShippingThreshold: null }));
+      const { service, savedOrders } = setup([item('1', 1_000_000_000)], config({ freeShippingThresholdVnd: null }));
       await service.checkout('u1', { ...base, shippingMethod: 'express' });
-      expect(savedOrders[0]).toMatchObject({ subtotal: 1_000_000, shippingFee: 15 });
+      expect(savedOrders[0]).toMatchObject({ subtotal: 1_000_000_000, shippingFee: 50_000 });
     });
 
     it('reads the config inside checkout (admin changes apply to the next order)', async () => {
-      const { service, shippingConfigService } = setup([item('1', 20)]);
+      const { service, shippingConfigService } = setup([item('1', 200_000)]);
       await service.checkout('u1', base);
       expect(shippingConfigService.get).toHaveBeenCalledTimes(1);
     });
@@ -162,16 +185,16 @@ describe('OrderService.checkout', () => {
     const addressLookups = (manager: any) => manager.findOne.mock.calls.filter(([entity]: any[]) => entity === Address);
 
     it('store-pickup with pickupContact (no addressId) creates the order and snapshots only fullName + phone', async () => {
-      const { service, manager, savedOrders } = setup([item('1', 20)]);
+      const { service, manager, savedOrders } = setup([item('1', 200_000)]);
       await service.checkout('u1', { shippingMethod: 'store-pickup', pickupContact: contact });
 
-      expect(savedOrders[0]).toMatchObject({ shippingMethod: 'store-pickup', shippingFee: 0, total: 20 });
+      expect(savedOrders[0]).toMatchObject({ shippingMethod: 'store-pickup', shippingFee: 0, total: 200_000 });
       expect(savedOrders[0].shippingAddress).toEqual({ fullName: 'Nguyen Van A', phone: '0901234567' });
       expect(addressLookups(manager)).toHaveLength(0);
     });
 
     it('store-pickup with only addressId still works and keeps the full address snapshot (backward compatible)', async () => {
-      const { service, savedOrders } = setup([item('1', 20)]);
+      const { service, savedOrders } = setup([item('1', 200_000)]);
       await service.checkout('u1', { shippingMethod: 'store-pickup', addressId: 'a1' });
       expect(savedOrders[0].shippingAddress).toMatchObject({ fullName: 'N', addressLine1: 'x', city: 'c', country: 'VN' });
     });
@@ -190,14 +213,14 @@ describe('OrderService.checkout', () => {
       ['express with only pickupContact', { shippingMethod: 'express', pickupContact: contact }, 1306],
       ['default method with only pickupContact', { pickupContact: contact }, 1306],
     ])('rejects %s with 400 and changes nothing', async (_name, dto, errorCode) => {
-      const { service, manager, deleted } = setup([item('1', 20)]);
+      const { service, manager, deleted } = setup([item('1', 200_000)]);
       await expect(service.checkout('u1', dto as any)).rejects.toMatchObject({ status: 400, response: { errorCode } });
       expect(manager.save).not.toHaveBeenCalled();
       expect(deleted).toHaveLength(0);
     });
 
     it('standard/express still return 404 for an address that does not belong to the user', async () => {
-      const { service, manager } = setup([item('1', 20)]);
+      const { service, manager } = setup([item('1', 200_000)]);
       const original = manager.findOne.getMockImplementation()!;
       manager.findOne.mockImplementation(async (entity: any, opts: any) => (entity === Address ? null : original(entity, opts)));
       await expect(service.checkout('u1', { addressId: 'someone-elses', shippingMethod: 'express' })).rejects.toMatchObject({
@@ -207,47 +230,57 @@ describe('OrderService.checkout', () => {
   });
 
   describe('totals per method and threshold', () => {
-    const config = (freeShippingThreshold: number | null): ShippingConfig => ({ ...DEFAULT_SHIPPING_CONFIG, freeShippingThreshold });
+    const config = (freeShippingThresholdVnd: number | null): ShippingConfig => ({ ...DEFAULT_SHIPPING_CONFIG, freeShippingThresholdVnd });
     const methods = [
-      ['standard', 8],
-      ['express', 15],
+      ['standard', 30_000],
+      ['express', 50_000],
       ['store-pickup', 0],
     ] as const;
 
     it.each(methods)('%s: total = subtotal + method price below the threshold', async (method, price) => {
-      const { service, savedOrders } = setup([item('1', 100)], config(150));
+      const { service, savedOrders } = setup([item('1', 1_000_000)], config(1_500_000));
       await service.checkout('u1', { addressId: 'a1', shippingMethod: method });
-      expect(savedOrders[0]).toMatchObject({ subtotal: 100, shippingFee: price, total: 100 + price });
+      expect(savedOrders[0]).toMatchObject({ subtotal: 1_000_000, shippingFee: price, total: 1_000_000 + price });
     });
 
     it.each(methods)('%s: total = subtotal once the threshold is reached', async (method) => {
-      const { service, savedOrders } = setup([item('1', 150)], config(150));
+      const { service, savedOrders } = setup([item('1', 1_500_000)], config(1_500_000));
       await service.checkout('u1', { addressId: 'a1', shippingMethod: method });
-      expect(savedOrders[0]).toMatchObject({ subtotal: 150, shippingFee: 0, total: 150 });
+      expect(savedOrders[0]).toMatchObject({ subtotal: 1_500_000, shippingFee: 0, total: 1_500_000 });
     });
 
     it.each(methods)('%s: threshold null is never free', async (method, price) => {
-      const { service, savedOrders } = setup([item('1', 5000)], config(null));
+      const { service, savedOrders } = setup([item('1', 50_000_000)], config(null));
       await service.checkout('u1', { addressId: 'a1', shippingMethod: method });
-      expect(savedOrders[0]).toMatchObject({ shippingFee: price, total: 5000 + price });
+      expect(savedOrders[0]).toMatchObject({ shippingFee: price, total: 50_000_000 + price });
+    });
+
+    it('sums whole VND exactly (price × quantity over several lines, no rounding step)', async () => {
+      const { service, savedOrders } = setup([item('1', 33_333, 3), item('2', 12_345, 7)], config(null));
+      await service.checkout('u1', { addressId: 'a1', shippingMethod: 'store-pickup' });
+      expect(savedOrders[0]).toMatchObject({ subtotal: 33_333 * 3 + 12_345 * 7, total: 33_333 * 3 + 12_345 * 7 });
+      expect(Number.isInteger(savedOrders[0].total)).toBe(true);
     });
   });
 
   describe('quote', () => {
-    const lines = () => [item('1', 20), item('2', 30), item('3', 40)];
+    const lines = () => [item('1', 200_000), item('2', 300_000), item('3', 400_000)];
 
-    it('returns subtotal, fee, total, freeShipping and the threshold', async () => {
+    it('returns subtotal, fee, total in VND and USD, freeShipping, the threshold and the rate used', async () => {
       const { service } = setup(lines());
       await expect(service.quote('u1', { shippingMethod: 'express' })).resolves.toEqual({
         data: {
           shippingMethod: 'express',
-          subtotal: 90,
-          shippingFee: 15,
-          total: 105,
+          subtotalVnd: 900_000,
+          subtotalUsd: 36,
+          shippingFeeVnd: 50_000,
+          shippingFeeUsd: 2,
+          totalVnd: 950_000,
+          totalUsd: 38,
           freeShipping: false,
-          freeShippingThreshold: 150,
-          vndPerUnit: 25_000,
-          amountVnd: 105 * 25_000,
+          freeShippingThresholdVnd: 1_500_000,
+          freeShippingThresholdUsd: 60,
+          exchangeRate: 25_000,
         },
       });
     });
@@ -255,104 +288,96 @@ describe('OrderService.checkout', () => {
     it('defaults to standard and the whole cart', async () => {
       const { service } = setup(lines());
       await expect(service.quote('u1', {})).resolves.toMatchObject({
-        data: { shippingMethod: 'standard', subtotal: 90, shippingFee: 8, total: 98 },
+        data: { shippingMethod: 'standard', subtotalVnd: 900_000, shippingFeeVnd: 30_000, totalVnd: 930_000 },
       });
     });
 
     it('flags freeShipping when the selected subtotal reaches the threshold (and respects cartItemIds)', async () => {
-      const { service } = setup([item('1', 100), item('2', 60), item('3', 10)]);
+      const { service } = setup([item('1', 1_000_000), item('2', 600_000), item('3', 100_000)]);
       await expect(service.quote('u1', { cartItemIds: ['1', '2'] })).resolves.toMatchObject({
-        data: { subtotal: 160, shippingFee: 0, total: 160, freeShipping: true },
+        data: { subtotalVnd: 1_600_000, shippingFeeVnd: 0, totalVnd: 1_600_000, freeShipping: true },
       });
       await expect(service.quote('u1', { cartItemIds: ['3'] })).resolves.toMatchObject({
-        data: { subtotal: 10, shippingFee: 8, freeShipping: false },
+        data: { subtotalVnd: 100_000, shippingFeeVnd: 30_000, freeShipping: false },
       });
     });
 
     it('store-pickup has a 0 price but is not "free shipping" below the threshold', async () => {
-      const { service } = setup([item('1', 20)]);
+      const { service } = setup([item('1', 200_000)]);
       await expect(service.quote('u1', { shippingMethod: 'store-pickup' })).resolves.toMatchObject({
-        data: { shippingFee: 0, total: 20, freeShipping: false },
+        data: { shippingFeeVnd: 0, totalVnd: 200_000, freeShipping: false },
       });
     });
 
-    it('reports a null threshold and never frees shipping', async () => {
-      const { service } = setup([item('1', 5000)], { ...DEFAULT_SHIPPING_CONFIG, freeShippingThreshold: null });
+    it('reports a null threshold (both currencies) and never frees shipping', async () => {
+      const { service } = setup([item('1', 5_000_000)], { ...DEFAULT_SHIPPING_CONFIG, freeShippingThresholdVnd: null });
       await expect(service.quote('u1', {})).resolves.toMatchObject({
-        data: { shippingFee: 8, freeShipping: false, freeShippingThreshold: null },
+        data: { shippingFeeVnd: 30_000, freeShipping: false, freeShippingThresholdVnd: null, freeShippingThresholdUsd: null },
       });
     });
 
     it.each([
-      ['standard', 8],
-      ['express', 15],
+      ['standard', 30_000],
+      ['express', 50_000],
       ['store-pickup', 0],
     ])('gives the same numbers as checkout for %s (single calculation)', async (method, _price) => {
       const q = await setup(lines()).service.quote('u1', { shippingMethod: method });
       const c = setup(lines());
       await c.service.checkout('u1', { addressId: 'a1', shippingMethod: method });
       expect(c.savedOrders[0]).toMatchObject({
-        subtotal: q.data.subtotal,
-        shippingFee: q.data.shippingFee,
-        total: q.data.total,
+        subtotal: q.data.subtotalVnd,
+        shippingFee: q.data.shippingFeeVnd,
+        total: q.data.totalVnd,
         shippingMethod: q.data.shippingMethod,
       });
     });
 
-    it('amountVnd = round(total × vndPerUnit), including the shipping fee', async () => {
-      const { service } = setup([item('1', 120)]);
-      await expect(service.quote('u1', { shippingMethod: 'express' })).resolves.toMatchObject({
-        data: { total: 135, vndPerUnit: 25_000, amountVnd: 135 * 25_000 },
-      });
-      await expect(service.quote('u1', { shippingMethod: 'store-pickup' })).resolves.toMatchObject({
-        data: { total: 120, amountVnd: 120 * 25_000 },
-      });
-    });
-
-    it('rounds fractional VND to a whole number', async () => {
-      const { service } = setup([item('1', 10.05)], DEFAULT_SHIPPING_CONFIG, 24_567.5);
-      const { data } = await service.quote('u1', { shippingMethod: 'store-pickup' });
-      expect(data.amountVnd).toBe(Math.round(10.05 * 24_567.5));
-      expect(Number.isInteger(data.amountVnd)).toBe(true);
-    });
-
-    it('returns null VND fields (and does not fail) when PAYMENT_VND_PER_UNIT is not configured', async () => {
-      const { service } = setup([item('1', 20)], DEFAULT_SHIPPING_CONFIG, null);
-      await expect(service.quote('u1', {})).resolves.toMatchObject({
-        data: { subtotal: 20, total: 28, vndPerUnit: null, amountVnd: null },
+    it('USD is derived from the current exchange rate and rounded to 2 decimals', async () => {
+      const { service, currencyService } = setup([item('1', 1_000_000)], DEFAULT_SHIPPING_CONFIG, 26_000);
+      const { data } = await service.quote('u1', { shippingMethod: 'express' });
+      expect(currencyService.getVndPerUsd).toHaveBeenCalled();
+      expect(data).toMatchObject({
+        exchangeRate: 26_000,
+        subtotalVnd: 1_000_000,
+        subtotalUsd: 38.46,
+        totalVnd: 1_050_000,
+        totalUsd: 40.38,
       });
     });
 
-    it('quote.amountVnd equals the QR amount created for the order placed with the same input', async () => {
-      const q = (await setup([item('1', 120)]).service.quote('u1', { shippingMethod: 'express' })).data;
-      const c = setup([item('1', 120)]);
+    it('has no VND-per-unit / amountVnd any more: the total is already the VND amount to transfer', async () => {
+      const { data } = await setup(lines()).service.quote('u1', {});
+      expect(data).not.toHaveProperty('vndPerUnit');
+      expect(data).not.toHaveProperty('amountVnd');
+    });
+
+    it('quote.totalVnd equals the QR amount created for the order placed with the same input', async () => {
+      const q = (await setup([item('1', 1_200_000)]).service.quote('u1', { shippingMethod: 'express' })).data;
+      const c = setup([item('1', 1_200_000)]);
       await c.service.checkout('u1', { addressId: 'a1', shippingMethod: 'express' });
 
-      const order = { id: 'o1', userId: 'u1', status: 'pending', paymentStatus: 'unpaid', total: String(c.savedOrders[0].total) };
+      const order = {
+        id: 'o1',
+        userId: 'u1',
+        status: 'pending',
+        paymentStatus: 'unpaid',
+        total: c.savedOrders[0].total,
+        exchangeRate: 25_000,
+      };
       const paymentService = new PaymentService(
         { transaction: async (fn: any) => fn(createFakeManager({ orders: [order] })) } as any,
         {} as any,
         {} as any,
         {} as any,
         {
-          getQrConfig: () => ({ bankCode: 'VCB', bankName: 'V', account: '1', accountName: 'D', prefix: 'DH', vndPerUnit: 25_000 }),
+          getQrConfig: () => ({ bankCode: 'VCB', bankName: 'V', account: '1', accountName: 'D', prefix: 'DH' }),
         } as any,
+        {} as any,
       );
       const { data } = await paymentService.createQr('u1', { orderId: 'o1' });
-      expect(q.amountVnd).toBe(data.amount);
-    });
-
-    it('rounds money to 2 decimals (no floating-point noise) so quote, saved order and QR amount agree', async () => {
-      const lines = [item('1', 0.1, 3)]; // 0.1 × 3 = 0.30000000000000004 in floating point
-      const q = (await setup(lines, DEFAULT_SHIPPING_CONFIG).service.quote('u1', { shippingMethod: 'store-pickup' })).data;
-      expect(q).toMatchObject({ subtotal: 0.3, total: 0.3, amountVnd: Math.round(0.3 * 25_000) });
-
-      const c = setup(lines);
-      await c.service.checkout('u1', { addressId: 'a1', shippingMethod: 'store-pickup' });
-      expect(c.savedOrders[0]).toMatchObject({ subtotal: 0.3, shippingFee: 0, total: 0.3 });
-
-      const withFee = (await setup([item('1', 10.1, 1), item('2', 0.2, 1)]).service.quote('u1', {})).data; // 10.1 + 0.2 + 8
-      expect(withFee).toMatchObject({ subtotal: 10.3, total: 18.3 });
+      expect(q.totalVnd).toBe(1_250_000);
+      expect(data.amountVnd).toBe(q.totalVnd);
+      expect(data.amountUsd).toBe(q.totalUsd);
     });
 
     it('has no side effects: creates no order and removes nothing from the cart', async () => {
@@ -368,19 +393,19 @@ describe('OrderService.checkout', () => {
     it('validates like checkout: unknown ids, empty cart, inactive and non-orderable products', async () => {
       await expect(setup(lines()).service.quote('u1', { cartItemIds: ['1', 'nope'] })).rejects.toBeInstanceOf(BadRequestException);
       await expect(setup([]).service.quote('u1', {})).rejects.toBeInstanceOf(BadRequestException);
-      await expect(setup([item('1', 20, 1, 'disabled')]).service.quote('u1', {})).rejects.toBeInstanceOf(BadRequestException);
-      await expect(setup([item('1', 20, 1, 'active', 'sold_out')]).service.quote('u1', {})).rejects.toMatchObject({
+      await expect(setup([item('1', 200_000, 1, 'disabled')]).service.quote('u1', {})).rejects.toBeInstanceOf(BadRequestException);
+      await expect(setup([item('1', 200_000, 1, 'active', 'sold_out')]).service.quote('u1', {})).rejects.toMatchObject({
         response: { errorCode: 1303 },
       });
     });
   });
 
-  it('payment: an express order produces a QR amount of (subtotal + express fee) × PAYMENT_VND_PER_UNIT', async () => {
-    const { service, savedOrders } = setup([item('1', 120)]);
+  it('payment: an express order produces a QR amount of exactly subtotal + express fee (VND, no conversion)', async () => {
+    const { service, savedOrders } = setup([item('1', 1_200_000)]);
     await service.checkout('u1', { addressId: 'a1', shippingMethod: 'express' });
-    expect(savedOrders[0]).toMatchObject({ subtotal: 120, shippingFee: 15, total: 135 });
+    expect(savedOrders[0]).toMatchObject({ subtotal: 1_200_000, shippingFee: 50_000, total: 1_250_000 });
 
-    const order = { id: 'o1', userId: 'u1', status: 'pending', paymentStatus: 'unpaid', total: String(savedOrders[0].total) };
+    const order = { id: 'o1', userId: 'u1', status: 'pending', paymentStatus: 'unpaid', total: savedOrders[0].total, exchangeRate: 25_000 };
     const manager = createFakeManager({ orders: [order] });
     const paymentService = new PaymentService(
       { transaction: async (fn: any) => fn(manager) } as any,
@@ -394,37 +419,38 @@ describe('OrderService.checkout', () => {
           account: '0010000000355',
           accountName: 'DOOVAN',
           prefix: 'DH',
-          vndPerUnit: 25_000,
         }),
       } as any,
+      {} as any,
     );
     const { data } = await paymentService.createQr('u1', { orderId: 'o1' });
-    expect(data.amount).toBe((120 + 15) * 25_000);
+    expect(data.amountVnd).toBe(1_250_000);
+    expect(data.amountUsd).toBe(50);
   });
 
   it.each([
     ['an id of another user / unknown id', ['1', 'other-user-item']],
     ['only unknown ids', ['nope']],
   ])('rejects %s with 400 and changes nothing', async (_name, ids) => {
-    const { service, manager, deleted } = setup([item('1', 20), item('2', 30)]);
+    const { service, manager, deleted } = setup([item('1', 200_000), item('2', 300_000)]);
     await expect(service.checkout('u1', { ...base, cartItemIds: ids })).rejects.toBeInstanceOf(BadRequestException);
     expect(manager.save).not.toHaveBeenCalled();
     expect(deleted).toHaveLength(0);
   });
 
   it('rejects when a selected product is inactive', async () => {
-    const { service } = setup([item('1', 20), item('2', 30, 1, 'disabled')]);
+    const { service } = setup([item('1', 200_000), item('2', 300_000, 1, 'disabled')]);
     await expect(service.checkout('u1', { ...base, cartItemIds: ['1', '2'] })).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('ignores inactive products that are not selected', async () => {
-    const { service, savedItems } = setup([item('1', 20), item('2', 30, 1, 'disabled')]);
+    const { service, savedItems } = setup([item('1', 200_000), item('2', 300_000, 1, 'disabled')]);
     await service.checkout('u1', { ...base, cartItemIds: ['1'] });
     expect(savedItems).toHaveLength(1);
   });
 
   it.each(['sold_out', 'custom_order'])('rejects a selected %s product with error 1303 and changes nothing', async (badge) => {
-    const { service, manager, deleted } = setup([item('1', 20), item('2', 30, 1, 'active', badge)]);
+    const { service, manager, deleted } = setup([item('1', 200_000), item('2', 300_000, 1, 'active', badge)]);
     await expect(service.checkout('u1', { ...base, cartItemIds: ['1', '2'] })).rejects.toMatchObject({
       status: 400,
       response: { errorCode: 1303, message: expect.stringContaining('Product 2') },
@@ -434,18 +460,18 @@ describe('OrderService.checkout', () => {
   });
 
   it('rejects the whole-cart checkout when the cart holds a sold_out product', async () => {
-    const { service } = setup([item('1', 20), item('2', 30, 1, 'active', 'sold_out')]);
+    const { service } = setup([item('1', 200_000), item('2', 300_000, 1, 'active', 'sold_out')]);
     await expect(service.checkout('u1', base)).rejects.toMatchObject({ response: { errorCode: 1303 } });
   });
 
   it('ignores sold_out / custom_order products that are not selected', async () => {
-    const { service, savedItems } = setup([item('1', 20), item('2', 30, 1, 'active', 'custom_order')]);
+    const { service, savedItems } = setup([item('1', 200_000), item('2', 300_000, 1, 'active', 'custom_order')]);
     await service.checkout('u1', { ...base, cartItemIds: ['1'] });
     expect(savedItems.map((i) => i.productId)).toEqual(['p-1']);
   });
 
   it.each(['new', 'sale', 'bestseller', 'limited'])('still orders a %s product', async (badge) => {
-    const { service, savedItems } = setup([item('1', 20, 1, 'active', badge)]);
+    const { service, savedItems } = setup([item('1', 200_000, 1, 'active', badge)]);
     await service.checkout('u1', base);
     expect(savedItems).toHaveLength(1);
   });
@@ -460,7 +486,8 @@ describe('OrderService.findOne — payment attempts and refunds for the customer
   const attempts = [
     {
       transferCode: 'DHNEW00000',
-      amount: 3_375_000,
+      amountVnd: 3_375_000,
+      amountUsd: 135,
       status: 'PENDING',
       createdAt: new Date('2026-02-01'),
       expiresAt: new Date('2026-02-01T00:30:00Z'),
@@ -469,7 +496,8 @@ describe('OrderService.findOne — payment attempts and refunds for the customer
     },
     {
       transferCode: 'DHOLD00000',
-      amount: 3_375_000,
+      amountVnd: 3_375_000,
+      amountUsd: 135,
       status: 'EXPIRED',
       createdAt: new Date('2026-01-01'),
       expiresAt: new Date('2026-01-01T00:30:00Z'),
@@ -479,7 +507,8 @@ describe('OrderService.findOne — payment attempts and refunds for the customer
   ];
   const listedRefunds = [
     {
-      amount: 3_375_000,
+      amountVnd: 3_375_000,
+      amountUsd: 135,
       status: 'COMPLETED',
       reason: 'ADMIN_CANCELLED',
       createdAt: new Date(),
@@ -496,16 +525,34 @@ describe('OrderService.findOne — payment attempts and refunds for the customer
     const service = new OrderService(orderRepo, {} as any, {} as any, {} as any, paymentService, refundService);
     return { service, orderRepo, paymentService, refundService };
   }
-  const order = { id: 'o1', userId: 'u1', status: 'pending', total: '135.00', items: [{ id: 'i1' }] };
+  const order = {
+    id: 'o1',
+    userId: 'u1',
+    status: 'pending',
+    subtotal: 3_000_000,
+    shippingFee: 375_000,
+    total: 3_375_000,
+    exchangeRate: 25_000,
+    items: [{ id: 'i1', price: 3_000_000 }],
+  };
 
   it('returns the order with items, paymentAttempts (newest first, as given by the payment service) and refunds', async () => {
     const { service, paymentService, refundService } = make(order, attempts, listedRefunds);
     const { data } = await service.findOne('u1', 'o1');
-    expect(data).toMatchObject({ id: 'o1', total: '135.00', items: [{ id: 'i1' }] });
+    expect(data).toMatchObject({
+      id: 'o1',
+      totalVnd: 3_375_000,
+      totalUsd: 135,
+      subtotalVnd: 3_000_000,
+      shippingFeeVnd: 375_000,
+      exchangeRate: 25_000,
+      items: [{ id: 'i1', priceVnd: 3_000_000, priceUsd: 120 }],
+    });
+    expect(data).not.toHaveProperty('total');
     expect(data.paymentAttempts).toEqual(attempts);
     expect(data.refunds).toEqual(listedRefunds);
     expect(paymentService.listAttemptsForCustomer).toHaveBeenCalledWith(order);
-    expect(refundService.listForCustomer).toHaveBeenCalledWith('o1');
+    expect(refundService.listForCustomer).toHaveBeenCalledWith(order);
   });
 
   it('returns empty arrays for an order that never had a payment session or a refund', async () => {
@@ -527,7 +574,17 @@ describe('OrderService.findOne — payment attempts and refunds for the customer
 /** Huỷ đơn với thanh toán + hoàn tiền: dùng `RefundService` thật trên EntityManager giả trong bộ nhớ */
 describe('OrderService cancel rules with payments and refunds', () => {
   const paidAttempt = { id: 'att-paid', orderId: 'o1', status: 'PAID', amount: 3_375_000, transferCode: 'DHPAID0000', paidAt: new Date() };
-  const base = { id: 'o1', userId: 'u1', status: 'pending', paymentStatus: 'unpaid', items: [] };
+  const base = {
+    id: 'o1',
+    userId: 'u1',
+    status: 'pending',
+    paymentStatus: 'unpaid',
+    subtotal: 3_375_000,
+    shippingFee: 0,
+    total: 3_375_000,
+    exchangeRate: 25_000,
+    items: [],
+  };
 
   function make(order: any, seed: { attempts?: any[]; refunds?: any[] } = {}) {
     const manager = createFakeManager({ orders: [{ ...order }], attempts: seed.attempts ?? [], refunds: seed.refunds ?? [] });

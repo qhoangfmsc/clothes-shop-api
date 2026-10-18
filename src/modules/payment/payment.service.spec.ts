@@ -9,14 +9,14 @@ const qrConfig = {
   account: '0010000000355',
   accountName: 'CONG TY DOOVAN',
   prefix: 'DH',
-  vndPerUnit: 25_000,
 };
 const order = (over: Record<string, any> = {}) => ({
   id: 'o1',
   userId: 'u1',
   status: 'pending',
   paymentStatus: 'unpaid',
-  total: '185.00',
+  total: 4_625_000,
+  exchangeRate: 25_000,
   ...over,
 });
 const attempt = (over: Record<string, any> = {}) => ({
@@ -47,18 +47,27 @@ function setup(seed: Parameters<typeof createFakeManager>[0], config = qrConfig)
     }),
   };
   const paymentConfig = { getQrConfig: jest.fn(() => config) };
-  const service = new PaymentService(dataSource as any, orderRepo as any, attemptRepo as any, {} as any, paymentConfig as any);
+  const service = new PaymentService(
+    dataSource as any,
+    orderRepo as any,
+    attemptRepo as any,
+    {} as any,
+    paymentConfig as any,
+    { getVndPerUsd: async () => 25000 } as any,
+  );
   return { manager, service, attempts: () => manager.tables.get(PaymentAttempt)! };
 }
 
 describe('PaymentService.createQr', () => {
-  it('creates a PENDING attempt with the amount converted from the DB total and a DH-prefixed unique code', async () => {
+  it('creates a PENDING attempt whose amount is the order total (VND) and a DH-prefixed unique code', async () => {
     const { service, attempts } = setup({ orders: [order()] });
 
     const { data } = await service.createQr('u1', { orderId: 'o1' });
 
     expect(attempts()).toHaveLength(1);
-    expect(data.amount).toBe(4_625_000); // 185 × 25 000
+    expect(data.amountVnd).toBe(4_625_000); // = orders.total, không quy đổi
+    expect(data.amountUsd).toBe(185); // 4 625 000 / tỷ giá 25 000 của đơn
+    expect(data.exchangeRate).toBe(25_000);
     expect(data.transferContent).toMatch(/^DH[A-HJ-NP-Z2-9]{8}$/);
     expect(data).toMatchObject({
       orderId: 'o1',
@@ -97,11 +106,20 @@ describe('PaymentService.createQr', () => {
     });
   });
 
-  it('rounds fractional amounts to whole VND', async () => {
-    const { service } = setup({ orders: [order({ total: '10.05' })] }, { ...qrConfig, vndPerUnit: 24_567.5 });
+  it('USD follows the exchange rate frozen on the order, not today’s rate', async () => {
+    const { service } = setup({ orders: [order({ total: 2_600_000, exchangeRate: 26_000 })] });
     const { data } = await service.createQr('u1', { orderId: 'o1' });
-    expect(data.amount).toBe(Math.round(10.05 * 24_567.5));
-    expect(Number.isInteger(data.amount)).toBe(true);
+    expect(data).toMatchObject({ amountVnd: 2_600_000, amountUsd: 100, exchangeRate: 26_000 });
+  });
+
+  it.each([
+    ['zero', 0],
+    ['negative', -5],
+    ['fractional', 1000.5],
+  ])('rejects an order whose total is %s (1702) and creates nothing', async (_name, total) => {
+    const { service, attempts } = setup({ orders: [order({ total })] });
+    await expect(service.createQr('u1', { orderId: 'o1' })).rejects.toMatchObject({ response: { errorCode: 1702 } });
+    expect(attempts()).toHaveLength(0);
   });
 
   it('locks the order row so concurrent requests cannot create two pending sessions', async () => {
@@ -117,7 +135,7 @@ describe('PaymentService.createQr', () => {
     const { data } = await service.createQr('u1', { orderId: 'o1' });
 
     expect(attempts()).toHaveLength(1);
-    expect(data).toMatchObject({ paymentId: 'a1', transferContent: 'DH8K4T72M9', amount: 4_625_000, expiresAt: existing.expiresAt });
+    expect(data).toMatchObject({ paymentId: 'a1', transferContent: 'DH8K4T72M9', amountVnd: 4_625_000, expiresAt: existing.expiresAt });
   });
 
   it('expires an outdated PENDING attempt, keeps it, and issues a NEW unique code (old code is never reused)', async () => {
@@ -160,22 +178,30 @@ describe('PaymentService.createQr', () => {
 describe('PaymentService.getStatus', () => {
   it('PAID when the order is paid', async () => {
     const { service } = setup({ orders: [order({ paymentStatus: 'paid' })], attempts: [attempt({ status: 'PAID' })] });
-    await expect(service.getStatus('u1', 'o1')).resolves.toEqual({ data: { orderId: 'o1', status: 'PAID' } });
+    await expect(service.getStatus('u1', 'o1')).resolves.toEqual({
+      data: { orderId: 'o1', status: 'PAID', amountVnd: 4_625_000, amountUsd: 185, exchangeRate: 25_000 },
+    });
   });
 
   it('PENDING while the QR is valid', async () => {
     const { service } = setup({ orders: [order()], attempts: [attempt()] });
-    await expect(service.getStatus('u1', 'o1')).resolves.toEqual({ data: { orderId: 'o1', status: 'PENDING' } });
+    await expect(service.getStatus('u1', 'o1')).resolves.toEqual({
+      data: { orderId: 'o1', status: 'PENDING', amountVnd: 4_625_000, amountUsd: 185, exchangeRate: 25_000 },
+    });
   });
 
   it('EXPIRED when the QR deadline has passed even if the row is still PENDING', async () => {
     const { service } = setup({ orders: [order()], attempts: [attempt({ expiresAt: pastDate() })] });
-    await expect(service.getStatus('u1', 'o1')).resolves.toEqual({ data: { orderId: 'o1', status: 'EXPIRED' } });
+    await expect(service.getStatus('u1', 'o1')).resolves.toEqual({
+      data: { orderId: 'o1', status: 'EXPIRED', amountVnd: 4_625_000, amountUsd: 185, exchangeRate: 25_000 },
+    });
   });
 
   it('CANCELLED when the order was cancelled while a session was pending', async () => {
     const { service } = setup({ orders: [order({ status: 'cancelled' })], attempts: [attempt()] });
-    await expect(service.getStatus('u1', 'o1')).resolves.toEqual({ data: { orderId: 'o1', status: 'CANCELLED' } });
+    await expect(service.getStatus('u1', 'o1')).resolves.toEqual({
+      data: { orderId: 'o1', status: 'CANCELLED', amountVnd: 4_625_000, amountUsd: 185, exchangeRate: 25_000 },
+    });
   });
 
   it('404 for another user, and 404 (1703) when no payment session exists yet', async () => {
@@ -219,9 +245,20 @@ describe('PaymentService.listAttemptsForCustomer', () => {
   function make(attempts: any[], transactions: any[] = []) {
     const attemptRepo: any = { find: jest.fn(async () => [...attempts].sort((a, b) => b.createdAt - a.createdAt)) };
     const transactionRepo: any = { find: jest.fn(async () => transactions) };
-    return { service: new PaymentService({} as any, {} as any, attemptRepo, transactionRepo, {} as any), attemptRepo, transactionRepo };
+    return {
+      service: new PaymentService(
+        {} as any,
+        {} as any,
+        attemptRepo,
+        transactionRepo,
+        {} as any,
+        { getVndPerUsd: async () => 25000 } as any,
+      ),
+      attemptRepo,
+      transactionRepo,
+    };
   }
-  const order = { id: 'o1', status: 'pending' };
+  const order = { id: 'o1', status: 'pending', exchangeRate: 25_000 };
 
   it('returns [] for an order that never had a session, without querying transactions', async () => {
     const { service, transactionRepo } = make([]);
@@ -250,7 +287,7 @@ describe('PaymentService.listAttemptsForCustomer', () => {
       ],
       [tx()],
     );
-    const list = await service.listAttemptsForCustomer({ id: 'o1', status: 'pending' });
+    const list = await service.listAttemptsForCustomer({ id: 'o1', status: 'pending', exchangeRate: 25_000 });
     expect(list[0]).toMatchObject({ transferCode: 'DH8K4T72M9', status: 'PAID', transactionRef: '92704' });
     expect(list[0].paidAt).toEqual(new Date('2026-02-02'));
     expect(list[1].transactionRef).toBeNull();
@@ -279,14 +316,23 @@ describe('PaymentService.listAttemptsForCustomer', () => {
       [att(), att({ id: 'a2', transferCode: 'DHPAID0000', status: 'PAID', paidAt: new Date(), createdAt: new Date('2025-12-01') })],
       [tx({ paymentAttemptId: 'a2', providerTransactionId: '1' })],
     );
-    const list = await cancelled.service.listAttemptsForCustomer({ id: 'o1', status: 'cancelled' });
+    const list = await cancelled.service.listAttemptsForCustomer({ id: 'o1', status: 'cancelled', exchangeRate: 25_000 });
     expect(list.map((a) => a.status)).toEqual(['CANCELLED', 'PAID']); // phiên PAID giữ nguyên
   });
 
   it('exposes only customer-safe fields: no bank account, raw payload, internal ids or order id', async () => {
     const { service } = make([att({ status: 'PAID', paidAt: new Date() })], [tx()]);
     const [item] = await service.listAttemptsForCustomer(order);
-    expect(Object.keys(item).sort()).toEqual(['amount', 'createdAt', 'expiresAt', 'paidAt', 'status', 'transactionRef', 'transferCode']);
+    expect(Object.keys(item).sort()).toEqual([
+      'amountUsd',
+      'amountVnd',
+      'createdAt',
+      'expiresAt',
+      'paidAt',
+      'status',
+      'transactionRef',
+      'transferCode',
+    ]);
     expect(JSON.stringify(item)).not.toMatch(/0010000000355|secret|rawPayload|bankAccount|"id"|orderId/);
   });
 
@@ -296,13 +342,20 @@ describe('PaymentService.listAttemptsForCustomer', () => {
     const fromList = (await service.listAttemptsForCustomer(order))[0].status;
     const orderRepo: any = { findOne: jest.fn(async () => ({ id: 'o1', userId: 'u1', status: 'pending', paymentStatus: 'unpaid' })) };
     const attemptRepo: any = { findOne: jest.fn(async () => attempt) };
-    const statusService = new PaymentService({} as any, orderRepo, attemptRepo, {} as any, {} as any);
+    const statusService = new PaymentService(
+      {} as any,
+      orderRepo,
+      attemptRepo,
+      {} as any,
+      {} as any,
+      { getVndPerUsd: async () => 25000 } as any,
+    );
     expect((await statusService.getStatus('u1', 'o1')).data.status).toBe(fromList);
   });
 });
 
 describe('PaymentService.createQrAdmin', () => {
-  it('creates a code for any customer’s order, recorded as created by that admin, amount from the DB total', async () => {
+  it('creates a code for any customer’s order, recorded as created by that admin, amount = the order total', async () => {
     const { service, attempts, manager } = setup({ orders: [order({ userId: 'someone-else' })] });
     const { data } = await service.createQrAdmin('adm-1', 'o1');
     expect(attempts()).toHaveLength(1);
@@ -313,7 +366,7 @@ describe('PaymentService.createQrAdmin', () => {
       createdBy: 'adm-1',
       transferCode: data.transferContent,
     });
-    expect(data).toMatchObject({ orderId: 'o1', amount: 4_625_000, status: 'PENDING', supersededTransferCodes: [] });
+    expect(data).toMatchObject({ orderId: 'o1', amountVnd: 4_625_000, amountUsd: 185, status: 'PENDING', supersededTransferCodes: [] });
     expect(data.transferContent).toMatch(/^DH[A-HJ-NP-Z2-9]{8}$/);
     expect(data.qrUrl).toContain(`des=${data.transferContent}`);
     expect(manager.locks[0]).toContain('Order');

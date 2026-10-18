@@ -10,8 +10,6 @@ export interface QrConfig {
   account: string;
   accountName: string;
   prefix: string;
-  /** VND cho mỗi 1 đơn vị tiền của `orders.total` */
-  vndPerUnit: number;
 }
 
 export interface WebhookConfig {
@@ -27,7 +25,6 @@ const ENV_NAMES: Record<string, string> = {
   accountName: 'SEPAY_RECEIVING_ACCOUNT_NAME',
   secret: 'SEPAY_WEBHOOK_SECRET',
   prefix: 'PAYMENT_TRANSFER_PREFIX',
-  vndPerUnit: 'PAYMENT_VND_PER_UNIT',
 };
 
 /** Đọc cấu hình thanh toán từ env; thiếu hoặc sai → `PAYMENT_NOT_CONFIGURED` (503), không có giá trị mặc định cho secret/tài khoản */
@@ -36,21 +33,13 @@ export class PaymentConfigService {
   constructor(private readonly config: ConfigService) {}
 
   getQrConfig(): QrConfig {
-    const rate = Number(this.config.get<string>('PAYMENT_VND_PER_UNIT'));
     return this.require({
       bankCode: this.read('SEPAY_RECEIVING_BANK_CODE'),
       bankName: this.read('SEPAY_RECEIVING_BANK_NAME'),
       account: this.read('SEPAY_RECEIVING_ACCOUNT'),
       accountName: this.read('SEPAY_RECEIVING_ACCOUNT_NAME'),
       prefix: this.prefix(),
-      vndPerUnit: Number.isFinite(rate) && rate > 0 ? rate : undefined,
     });
-  }
-
-  /** Tỷ giá VND cho mỗi 1 đơn vị tiền của đơn; `null` nếu chưa cấu hình (dùng cho báo giá, không được làm hỏng checkout) */
-  getVndPerUnit(): number | null {
-    const rate = Number(this.config.get<string>('PAYMENT_VND_PER_UNIT'));
-    return Number.isFinite(rate) && rate > 0 ? rate : null;
   }
 
   getWebhookConfig(): WebhookConfig {

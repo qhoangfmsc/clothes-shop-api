@@ -2,16 +2,20 @@ import { getPaging, paginated } from '@common/base/pagination.util';
 import { parseSort } from '@common/base/sort.util';
 import { throwAppError } from '@common/exceptions/app.exception';
 import { EProductErrorCode } from '@common/exceptions/error-codes';
+import { money } from '@common/utils/money.util';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { FindOptionsOrder, FindOptionsWhere, ILike, MoreThanOrEqual, Not, Repository } from 'typeorm';
 import { Category } from '../category/category.entity';
 import { SubCategory } from '../category/sub-category.entity';
+import { CurrencyService } from '../currency/currency.service';
 import { AdminProductQueryDto } from './dtos/admin-product-query.dto';
 import { CreateProductDto, UpdateProductDto } from './dtos/product.dto';
 import { AUTOCOMPLETE_DEFAULT_LIMIT, ProductAutocompleteQueryDto } from './dtos/product-autocomplete-query.dto';
+import { ProductDetailQueryDto, RELATED_DEFAULT_LIMIT } from './dtos/product-detail-query.dto';
 import { PublicProductQueryDto } from './dtos/public-product-query.dto';
 import { Product } from './product.entity';
+import { presentProduct } from './product.presenter';
 
 @Injectable()
 export class ProductService {
@@ -22,50 +26,8 @@ export class ProductService {
     private readonly categoryRepo: Repository<Category>,
     @InjectRepository(SubCategory)
     private readonly subCategoryRepo: Repository<SubCategory>,
+    private readonly currencyService: CurrencyService,
   ) {}
-
-  /**
-   * @deprecated Use findAllPublic instead — kept for backward compatibility.
-   */
-  async findAll(query: { category?: string; subcategory?: string; badge?: string; sort?: string; limit?: number }) {
-    const where: FindOptionsWhere<Product> = { status: 'active' };
-
-    if (query.category) {
-      const cat = await this.categoryRepo.findOne({ where: { slug: query.category } });
-      if (cat) {
-        where.category = { id: cat.id };
-      } else {
-        return { data: [], total: 0 };
-      }
-    }
-    if (query.subcategory) {
-      const subWhere: any = { slug: query.subcategory };
-      if (where.category) {
-        subWhere.category = { id: (where.category as any).id };
-      }
-      const sub = await this.subCategoryRepo.findOne({ where: subWhere });
-      if (sub) {
-        where.subcategory = { id: sub.id };
-      } else {
-        return { data: [], total: 0 };
-      }
-    }
-    if (query.badge) {
-      where.badge = query.badge;
-    }
-
-    const { field, direction } = parseSort(query.sort, '-createdAt');
-    const order: FindOptionsOrder<Product> = { [field]: direction };
-
-    const [data, total] = await this.productRepo.findAndCount({
-      where,
-      relations: ['category', 'subcategory'],
-      order,
-      take: query.limit && query.limit > 0 ? query.limit : undefined,
-    });
-
-    return { data, total };
-  }
 
   // ============================================
   // PUBLIC METHODS (Phase 1)
@@ -101,7 +63,7 @@ export class ProductService {
       qb.andWhere('p.badge = :badge', { badge });
     }
 
-    // Filter by price range (decimal column — numeric comparison works)
+    // Filter by price range (VND)
     if (minPrice != null) {
       qb.andWhere('p.price >= :minPrice', { minPrice: Number(minPrice) });
     }
@@ -145,8 +107,14 @@ export class ProductService {
     qb.skip((page - 1) * limit).take(limit);
 
     const [data, total] = await qb.getManyAndCount();
+    const rate = await this.currencyService.getVndPerUsd();
 
-    return paginated(data, total, page, limit);
+    return paginated(
+      data.map((product) => presentProduct(product, rate)),
+      total,
+      page,
+      limit,
+    );
   }
 
   async autocomplete({ q, limit = AUTOCOMPLETE_DEFAULT_LIMIT }: ProductAutocompleteQueryDto) {
@@ -164,19 +132,21 @@ export class ProductService {
       .limit(limit)
       .getMany();
 
+    const rate = await this.currencyService.getVndPerUsd();
     return {
       data: results.map((p) => ({
         id: p.id,
         name: p.name,
         slug: p.slug,
-        price: Number(p.price),
+        ...money('price', p.price, rate),
         image: p.images?.[0] ?? null,
         badge: p.badge ?? null,
       })),
     };
   }
 
-  async findById(id: string) {
+  async findById(id: string, query: ProductDetailQueryDto = {}) {
+    const relatedLimit = query.relatedLimit ?? RELATED_DEFAULT_LIMIT;
     const product = await this.productRepo.findOne({
       where: { id },
       relations: ['category', 'subcategory'],
@@ -194,10 +164,11 @@ export class ProductService {
       },
       relations: ['category', 'subcategory'],
       order: { createdAt: 'DESC' },
-      take: 4,
+      take: relatedLimit,
     });
 
-    return { data: product, related };
+    const rate = await this.currencyService.getVndPerUsd();
+    return { data: presentProduct(product, rate), related: related.map((item) => presentProduct(item, rate)) };
   }
 
   // ============================================
@@ -249,8 +220,14 @@ export class ProductService {
       skip: (page - 1) * limit,
       take: limit,
     });
+    const rate = await this.currencyService.getVndPerUsd();
 
-    return paginated(data, total, page, limit);
+    return paginated(
+      data.map((product) => presentProduct(product, rate)),
+      total,
+      page,
+      limit,
+    );
   }
 
   async create(dto: CreateProductDto) {
@@ -260,7 +237,7 @@ export class ProductService {
     }
 
     // Validate price logic
-    if (dto.originalPrice != null && dto.originalPrice < dto.price) {
+    if (dto.originalPriceVnd != null && dto.originalPriceVnd < dto.priceVnd) {
       throwAppError(EProductErrorCode.PRODUCT_INVALID_PRICE);
     }
 
@@ -276,8 +253,9 @@ export class ProductService {
 
     const sku = dto.sku || `${category.slug}-${subcategory.slug}-${dto.slug}`;
 
-    const product = this.productRepo.create({ ...dto, sku, category, subcategory });
-    return { data: await this.productRepo.save(product) };
+    const { priceVnd, originalPriceVnd, ...rest } = dto;
+    const product = this.productRepo.create({ ...rest, price: priceVnd, originalPrice: originalPriceVnd, sku, category, subcategory });
+    return { data: presentProduct(await this.productRepo.save(product), await this.currencyService.getVndPerUsd()) };
   }
 
   async update(id: string, dto: UpdateProductDto) {
@@ -308,22 +286,24 @@ export class ProductService {
     }
 
     // Validate price logic
-    const finalPrice = dto.price != null ? dto.price : product.price;
-    const finalOriginalPrice = dto.originalPrice !== undefined ? dto.originalPrice : product.originalPrice;
+    const finalPrice = dto.priceVnd != null ? dto.priceVnd : product.price;
+    const finalOriginalPrice = dto.originalPriceVnd !== undefined ? dto.originalPriceVnd : product.originalPrice;
     if (finalOriginalPrice != null && finalOriginalPrice < finalPrice) {
       throwAppError(EProductErrorCode.PRODUCT_INVALID_PRICE);
     }
 
     // Merge remaining fields (exclude FK fields handled above)
-    const { categoryId, subcategoryId, ...rest } = dto;
+    const { categoryId, subcategoryId, priceVnd, originalPriceVnd, ...rest } = dto;
     Object.assign(product, rest);
+    if (priceVnd !== undefined) product.price = priceVnd;
+    if (originalPriceVnd !== undefined) product.originalPrice = originalPriceVnd;
 
     // Regenerate SKU if dependencies changed
     if (categoryId || subcategoryId || dto.slug) {
       product.sku = dto.sku || `${product.category.slug}-${product.subcategory.slug}-${product.slug}`;
     }
 
-    return { data: await this.productRepo.save(product) };
+    return { data: presentProduct(await this.productRepo.save(product), await this.currencyService.getVndPerUsd()) };
   }
 
   async delete(id: string) {

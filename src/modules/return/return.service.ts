@@ -2,6 +2,7 @@ import { getPaging, paginated } from '@common/base/pagination.util';
 import { parseSort } from '@common/base/sort.util';
 import { throwAppError } from '@common/exceptions/app.exception';
 import { EOrderErrorCode, EReturnErrorCode } from '@common/exceptions/error-codes';
+import { money, moneyOrNull } from '@common/utils/money.util';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, Repository } from 'typeorm';
@@ -26,8 +27,6 @@ import {
 import { computeReturnEligibility, RETURN_INELIGIBLE_MESSAGES } from './return-eligibility.util';
 import { ReturnRequest } from './return-request.entity';
 import { ReturnRequestItem } from './return-request-item.entity';
-
-const roundCents = (value: number | string) => Math.round(Number(value) * 100);
 
 /**
  * Trả hàng sau khi giao. Luồng: khách gửi yêu cầu (REQUESTED) → cửa hàng duyệt (APPROVED) → khách gửi hàng về → cửa hàng nhận và
@@ -249,37 +248,37 @@ export class ReturnService {
       }
 
       const orderItems = await manager.find(OrderItem, { where: { orderId: order.id } });
-      const priceCents = new Map(orderItems.map((orderItem) => [orderItem.id, roundCents(orderItem.price)]));
-      const itemsCents = items.reduce((sum, item) => sum + (priceCents.get(item.orderItemId) ?? 0) * (accepted.get(item.id) ?? 0), 0);
+      const priceVnd = new Map(orderItems.map((orderItem) => [orderItem.id, orderItem.price]));
+      const itemsVnd = items.reduce((sum, item) => sum + (priceVnd.get(item.orderItemId) ?? 0) * (accepted.get(item.id) ?? 0), 0);
 
-      let shippingCents = 0;
+      let shippingVnd = 0;
       if (dto.refundShipping) {
         if (await manager.exists(ReturnRequest, { where: { orderId: order.id, shippingRefunded: true } })) {
           throwAppError(EReturnErrorCode.RETURN_RECEIVE_INVALID, 'The shipping fee of this order has already been refunded');
         }
-        shippingCents = roundCents(order.shippingFee);
+        shippingVnd = order.shippingFee;
       }
-      const totalCents = roundCents(order.total);
+      const totalVnd = order.total;
 
       // Giá trị các lần trả đã nhận trước đó: mỗi lần hoàn tính chênh lệch luỹ kế nên tổng các lần luôn khớp số đã trả
       const earlier = await manager.find(ReturnRequest, { where: { orderId: order.id, status: In(['RECEIVED', 'REFUNDED']) } });
       const earlierItems = earlier.length
         ? await manager.find(ReturnRequestItem, { where: { returnRequestId: In(earlier.map((request) => request.id)) } })
         : [];
-      const previousValueCents =
-        earlierItems.reduce((sum, item) => sum + (priceCents.get(item.orderItemId) ?? 0) * (item.acceptedQuantity ?? 0), 0) +
-        earlier.filter((request) => request.shippingRefunded).length * roundCents(order.shippingFee);
+      const previousValueVnd =
+        earlierItems.reduce((sum, item) => sum + (priceVnd.get(item.orderItemId) ?? 0) * (item.acceptedQuantity ?? 0), 0) +
+        earlier.filter((request) => request.shippingRefunded).length * order.shippingFee;
 
-      if (previousValueCents + itemsCents + shippingCents > totalCents) {
+      if (previousValueVnd + itemsVnd + shippingVnd > totalVnd) {
         throwAppError(EReturnErrorCode.RETURN_RECEIVE_INVALID, 'The accepted items are worth more than the order total');
       }
 
       await this.refundService.createForReturn(manager, {
         orderId: order.id,
         returnRequestId: request.id,
-        valueCents: itemsCents + shippingCents,
-        previousValueCents,
-        totalCents,
+        valueVnd: itemsVnd + shippingVnd,
+        previousValueVnd,
+        totalVnd,
         requestedBy: adminId,
       });
 
@@ -377,11 +376,15 @@ export class ReturnService {
       : [];
     const orderItemById = new Map(orderItems.map((orderItem) => [orderItem.id, orderItem]));
     const refunds = await manager.find(Refund, { where: { returnRequestId: In(ids) }, order: { createdAt: 'DESC' } });
-    const orders = admin ? await manager.find(Order, { where: { id: In([...new Set(requests.map((request) => request.orderId))]) } }) : [];
+    // Đơn cần cho cả khách (tỷ giá chốt trên đơn để suy ra USD) lẫn admin (tóm tắt đơn)
+    const orders = await manager.find(Order, { where: { id: In([...new Set(requests.map((request) => request.orderId))]) } });
     const orderById = new Map(orders.map((order) => [order.id, order]));
 
     return requests.map((request) => {
       const refund = refunds.find((candidate) => candidate.returnRequestId === request.id) ?? null;
+      const order = orderById.get(request.orderId);
+      // Đơn luôn tồn tại (FK RESTRICT); tỷ giá chốt trên đơn để USD của yêu cầu không đổi khi admin đổi tỷ giá
+      const rate = order?.exchangeRate ?? 1;
       const view = {
         id: request.id,
         orderId: request.orderId,
@@ -403,7 +406,7 @@ export class ReturnService {
               productImage: orderItem?.productImage ?? null,
               size: orderItem?.size ?? null,
               color: orderItem?.color ?? null,
-              price: orderItem ? Number(orderItem.price) : null,
+              ...moneyOrNull('price', orderItem?.price, rate),
               quantity: item.quantity,
               acceptedQuantity: item.acceptedQuantity,
             };
@@ -411,7 +414,7 @@ export class ReturnService {
         refund: refund
           ? {
               ...(admin ? { id: refund.id } : {}),
-              amount: refund.amount,
+              ...money('amount', refund.amount, rate),
               status: refund.status,
               bankReference: refund.bankReference,
               processedAt: refund.processedAt,
@@ -420,7 +423,6 @@ export class ReturnService {
       };
       if (!admin) return view;
 
-      const order = orderById.get(request.orderId);
       return {
         ...view,
         requestedBy: request.requestedBy,
@@ -432,8 +434,9 @@ export class ReturnService {
               id: order.id,
               status: order.status,
               paymentStatus: order.paymentStatus,
-              total: order.total,
-              shippingFee: order.shippingFee,
+              ...money('total', order.total, rate),
+              ...money('shippingFee', order.shippingFee, rate),
+              exchangeRate: order.exchangeRate,
               deliveredAt: order.deliveredAt,
               userId: order.userId,
               customer: { fullName: order.shippingAddress?.fullName ?? null, phone: order.shippingAddress?.phone ?? null },

@@ -4,7 +4,7 @@ Thư mục này là tài liệu thực tế của backend: mỗi module một fi
 
 Quy tắc viết: `.claude/rules/module-docs.md` · Quy trình: skill `module-docs` · Template: `.claude/skills/module-docs/TEMPLATE.md`.
 
-Cập nhật lần cuối: 2026-10-14
+Cập nhật lần cuối: 2026-10-16
 
 ## Hệ thống
 
@@ -31,7 +31,8 @@ Toàn bộ module được khai báo trong `src/main.module.ts`. Hai guard toàn
 | [return](modules/return.md) | `src/modules/return` | `/api/returns`, `/api/admin/returns` | DB | Trả hàng sau khi giao: yêu cầu của khách, duyệt/nhận hàng của admin, sinh khoản hoàn tiền |
 | [payment](modules/payment.md) | `src/modules/payment` | `/api/payments`, `/api/webhooks/sepay`, `/api/admin/payments`, `/api/admin/refunds` | DB + SePay webhook | Thanh toán VietQR: phiên QR, webhook SePay (HMAC), đối soát giao dịch, theo dõi hoàn tiền |
 | [media](modules/media.md) | `src/modules/media` | `/api/admin/media` | DB + Supabase Storage | Upload/list/xoá ảnh thư viện; lưu và xác nhận ảnh khách đính vào đánh giá |
-| [site-config](modules/site-config.md) | `src/modules/site-config` | `/api/site-config`, `/api/admin/site-config` | DB | Cấu hình theo key: banner nội dung trang, phí ship (`SHIPPING_CONFIG`) |
+| [site-config](modules/site-config.md) | `src/modules/site-config` | `/api/site-config`, `/api/admin/site-config` | DB | Cấu hình theo key: banner nội dung trang, phí ship (`SHIPPING_CONFIG`), tỷ giá VND/USD (`EXCHANGE_RATE`) |
+| [currency](modules/currency.md) | `src/modules/currency` | — (đổi tỷ giá qua `/api/admin/site-config`) | Config (site_configs) | Tiền gốc VND, USD suy ra theo tỷ giá: `CurrencyService`, quy ước field `...Vnd`/`...Usd` của mọi API có tiền |
 | [shipping](modules/shipping.md) | `src/modules/shipping` | `/api/shipping` | Config (site_configs) + dữ liệu tĩnh | Phương thức vận chuyển và phí/ngưỡng miễn phí (admin chỉnh được), chính sách đổi trả |
 | [size-guide](modules/size-guide.md) | `src/modules/size-guide` | `/api/size-guides` | Dữ liệu tĩnh | Bảng size theo danh mục |
 
@@ -47,6 +48,8 @@ cart ──► product, user
 address ──► user
 order ──► cart, address, product, user   (checkout đọc Cart/CartItem/Address qua EntityManager)
 order ──► shipping ──► site-config   (phí ship/ngưỡng miễn phí đọc từ dòng SHIPPING_CONFIG)
+currency ──► site-config   (tỷ giá VND/USD đọc từ dòng EXCHANGE_RATE)
+product, cart, wishlist, collection, shipping, order, payment ──► currency   (USD suy ra từ tiền VND; đơn chốt tỷ giá trong orders.exchange_rate)
 payment ──► order   (đọc/khoá/cập nhật `orders.payment_status` qua EntityManager)
 return ──► order, payment, shipping   (đọc đơn/dòng hàng qua EntityManager; `RefundService` tạo khoản hoàn; `returnPolicy.days` từ shipping)
 pending-count ──► order, payment, return, review   (gọi `countNeedsAction`/`countNeedsReview`/`countRequested`/`countAwaitingReply` của từng service)

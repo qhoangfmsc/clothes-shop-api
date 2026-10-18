@@ -8,7 +8,7 @@ const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? val
 /**
  * Xác nhận thủ công đơn đã được thanh toán. Gửi đúng MỘT trong hai cách:
  * - `transactionId`: gắn giao dịch đã có trong `payment_transactions` (webhook tới nhưng không tự khớp)
- * - `amount` + (`reference` và/hoặc `transferCode`): ghi giao dịch mới (webhook không tới, admin đối chiếu trên SePay/sao kê ngân hàng)
+ * - `amountVnd` + (`reference` và/hoặc `transferCode`): ghi giao dịch mới (webhook không tới, admin đối chiếu trên SePay/sao kê ngân hàng)
  * `transferCode` (nội dung chuyển khoản khách đã dùng) chọn đúng phiên được đánh dấu đã trả, kể cả phiên đã hết hạn.
  */
 export class ConfirmPaymentDto {
@@ -21,7 +21,7 @@ export class ConfirmPaymentDto {
 
   @ApiPropertyOptional({
     description:
-      'Nội dung chuyển khoản khách đã dùng (vd DHG29JR5A8). Xác nhận đúng phiên mang mã này, kể cả phiên đã hết hạn; mặc định là phiên mới nhất của đơn. Với cách `amount`, nếu bỏ `reference` thì mã này cũng là mã giao dịch được ghi (provider manual).',
+      'Nội dung chuyển khoản khách đã dùng (vd DHG29JR5A8). Xác nhận đúng phiên mang mã này, kể cả phiên đã hết hạn; mặc định là phiên mới nhất của đơn. Với cách `amountVnd`, nếu bỏ `reference` thì mã này cũng là mã giao dịch được ghi (provider manual).',
   })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim().toUpperCase() : value))
   @IsString()
@@ -32,7 +32,7 @@ export class ConfirmPaymentDto {
 
   @ApiPropertyOptional({
     description:
-      'Mã giao dịch SePay (provider=sepay) hoặc mã tham chiếu ngân hàng (provider=manual). Dùng với `amount`; có thể bỏ nếu đã có `transferCode`.',
+      'Mã giao dịch SePay (provider=sepay) hoặc mã tham chiếu ngân hàng (provider=manual). Dùng với `amountVnd`; có thể bỏ nếu đã có `transferCode`.',
   })
   @Transform(trim)
   @IsString()
@@ -46,10 +46,11 @@ export class ConfirmPaymentDto {
   @IsOptional()
   @Min(1)
   @Max(Number.MAX_SAFE_INTEGER)
-  amount?: number;
+  amountVnd?: number;
 
   @ApiPropertyOptional({
-    description: 'Nội dung chuyển khoản đúng như trên sao kê (nếu khác mã đã cấp). Mặc định: mã chuyển khoản của phiên. Dùng với `amount`.',
+    description:
+      'Nội dung chuyển khoản đúng như trên sao kê (nếu khác mã đã cấp). Mặc định: mã chuyển khoản của phiên. Dùng với `amountVnd`.',
   })
   @Transform(trim)
   @IsString()

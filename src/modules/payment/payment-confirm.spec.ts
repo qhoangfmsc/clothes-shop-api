@@ -12,7 +12,8 @@ const order = (over: Record<string, any> = {}) => ({
   status: 'pending',
   paymentStatus: 'unpaid',
   paidAt: null,
-  total: '185.00',
+  total: 4_625_000,
+  exchangeRate: 25_000,
   ...over,
 });
 const attempt = (over: Record<string, any> = {}) => ({
@@ -44,7 +45,14 @@ const tx = (over: Record<string, any> = {}) => ({
 function setup(seed: Parameters<typeof createFakeManager>[0]) {
   const manager = createFakeManager(seed);
   const dataSource = { transaction: jest.fn(async (fn: any) => fn(manager)) };
-  const service = new PaymentService(dataSource as any, {} as any, {} as any, {} as any, {} as any);
+  const service = new PaymentService(
+    dataSource as any,
+    {} as any,
+    {} as any,
+    {} as any,
+    {} as any,
+    { getVndPerUsd: async () => 25000 } as any,
+  );
   const row = (entity: any, index = 0) => manager.tables.get(entity)![index];
   return { manager, service, row, rows: (entity: any) => manager.tables.get(entity)! };
 }
@@ -177,7 +185,7 @@ describe('PaymentService.confirmPaymentAdmin — with an existing transaction', 
 });
 
 describe('PaymentService.confirmPaymentAdmin — recording a new transaction (webhook never arrived)', () => {
-  const base = { reference: '92704', amount: 4_625_000, note };
+  const base = { reference: '92704', amountVnd: 4_625_000, note };
 
   it('creates a sepay transaction identical in key to what the webhook would have stored, marked MANUALLY_CONFIRMED', async () => {
     const h = setup({ orders: [order()], attempts: [attempt({ status: 'EXPIRED', expiresAt: pastDate() })] });
@@ -237,13 +245,20 @@ describe('PaymentService.confirmPaymentAdmin — recording a new transaction (we
 
   it('wrong amount → 1710 and nothing is recorded; accepted with the flag', async () => {
     const refused = setup({ orders: [order()], attempts: [attempt()] });
-    await expect(refused.service.confirmPaymentAdmin('adm1', 'o1', { ...base, amount: 1 })).rejects.toMatchObject({
+    await expect(refused.service.confirmPaymentAdmin('adm1', 'o1', { ...base, amountVnd: 1 })).rejects.toMatchObject({
       response: { errorCode: 1710 },
     });
     expect(refused.rows(PaymentTransaction)).toHaveLength(0);
 
+    // Thông báo nêu cả VND lẫn USD (tỷ giá chốt trên đơn 25 000) của số nhận được và số của phiên
+    await expect(refused.service.confirmPaymentAdmin('adm1', 'o1', { ...base, amountVnd: 2_500_000 })).rejects.toMatchObject({
+      response: {
+        message: expect.stringContaining('Received 2500000 VND (100 USD) but the payment session expects 4625000 VND (185 USD)'),
+      },
+    });
+
     const accepted = setup({ orders: [order()], attempts: [attempt()] });
-    await accepted.service.confirmPaymentAdmin('adm1', 'o1', { ...base, amount: 4_000_000, acceptAmountMismatch: true });
+    await accepted.service.confirmPaymentAdmin('adm1', 'o1', { ...base, amountVnd: 4_000_000, acceptAmountMismatch: true });
     expect(accepted.row(PaymentTransaction).amount).toBe(4_000_000);
   });
 
@@ -257,10 +272,10 @@ describe('PaymentService.confirmPaymentAdmin — recording a new transaction (we
 describe('PaymentService.confirmPaymentAdmin — guards', () => {
   it.each([
     ['neither transactionId nor reference+amount', {}],
-    ['both transactionId and reference+amount', { transactionId: 't1', reference: 'x', amount: 1 }],
-    ['transactionId with only amount', { transactionId: 't1', amount: 1 }],
+    ['both transactionId and reference+amount', { transactionId: 't1', reference: 'x', amountVnd: 1 }],
+    ['transactionId with only amount', { transactionId: 't1', amountVnd: 1 }],
     ['reference without amount', { reference: 'x' }],
-    ['amount without reference', { amount: 1 }],
+    ['amount without reference', { amountVnd: 1 }],
   ])('rejects %s with 400 / 1707', async (_n, body) => {
     const h = setup({ orders: [order()], attempts: [attempt()], transactions: [tx()] });
     await expect(h.service.confirmPaymentAdmin('adm1', 'o1', { ...body, note } as any)).rejects.toMatchObject({
@@ -305,7 +320,7 @@ describe('PaymentService.confirmPaymentAdmin — guards', () => {
 
   it('after a manual confirmation, a late webhook replay of the same SePay id is an idempotent no-op', async () => {
     const h = setup({ orders: [order()], attempts: [attempt()] });
-    await h.service.confirmPaymentAdmin('adm1', 'o1', { reference: '92704', amount: 4_625_000, note });
+    await h.service.confirmPaymentAdmin('adm1', 'o1', { reference: '92704', amountVnd: 4_625_000, note });
     const existing = await h.manager.findOne(PaymentTransaction, { where: { providerTransactionId: '92704' } });
     expect(existing).toMatchObject({ verificationStatus: 'MANUALLY_CONFIRMED' }); // webhook.process() returns DUPLICATE when this row exists
   });
@@ -316,26 +331,40 @@ describe('PaymentService.getOrderPaymentsAdmin', () => {
     const attempts = [attempt({ id: 'a2', createdAt: new Date('2026-02-01') }), attempt({ id: 'a1', createdAt: new Date('2026-01-01') })];
     const transactions = [tx({ id: 't1', paymentAttemptId: 'a1' })];
     const orderRepo: any = {
-      findOne: jest.fn(async () =>
-        order({ shippingAddress: { fullName: 'Nguyen A', phone: '09' }, subtotal: '185.00', shippingFee: '0.00' }),
-      ),
+      findOne: jest.fn(async () => order({ shippingAddress: { fullName: 'Nguyen A', phone: '09' }, subtotal: 4_625_000, shippingFee: 0 })),
     };
     const attemptRepo: any = { find: jest.fn(async () => attempts) };
     const transactionRepo: any = { find: jest.fn(async () => transactions) };
-    const service = new PaymentService({} as any, orderRepo, attemptRepo, transactionRepo, {} as any);
+    const service = new PaymentService(
+      {} as any,
+      orderRepo,
+      attemptRepo,
+      transactionRepo,
+      {} as any,
+      { getVndPerUsd: async () => 25000 } as any,
+    );
 
     const { data } = await service.getOrderPaymentsAdmin('o1');
 
     expect(data.order).toMatchObject({ id: 'o1', paymentStatus: 'unpaid', customer: { fullName: 'Nguyen A', phone: '09' } });
     expect(attemptRepo.find).toHaveBeenCalledWith({ where: { orderId: 'o1' }, order: { createdAt: 'DESC' } });
     expect(data.attempts.map((a) => a.id)).toEqual(['a2', 'a1']);
-    expect(data.transactions).toBe(transactions);
+    expect(data.transactions).toEqual([expect.objectContaining({ id: 't1', amountVnd: 4_625_000, amountUsd: 185 })]);
+    expect(data.transactions[0]).not.toHaveProperty('amount');
+    expect(data.order).toMatchObject({ totalVnd: 4_625_000, totalUsd: 185, exchangeRate: 25_000 });
   });
 
   it('works for a pickup order whose snapshot has no address, and for an order with no attempts', async () => {
     const orderRepo: any = { findOne: jest.fn(async () => order({ shippingAddress: {} })) };
     const transactionRepo: any = { find: jest.fn() };
-    const service = new PaymentService({} as any, orderRepo, { find: jest.fn(async () => []) } as any, transactionRepo, {} as any);
+    const service = new PaymentService(
+      {} as any,
+      orderRepo,
+      { find: jest.fn(async () => []) } as any,
+      transactionRepo,
+      {} as any,
+      { getVndPerUsd: async () => 25000 } as any,
+    );
     const { data } = await service.getOrderPaymentsAdmin('o1');
     expect(data.order.customer).toEqual({ fullName: null, phone: null });
     expect(data.transactions).toEqual([]);
@@ -343,7 +372,14 @@ describe('PaymentService.getOrderPaymentsAdmin', () => {
   });
 
   it('404 / 1301 for an unknown order', async () => {
-    const service = new PaymentService({} as any, { findOne: jest.fn(async () => null) } as any, {} as any, {} as any, {} as any);
+    const service = new PaymentService(
+      {} as any,
+      { findOne: jest.fn(async () => null) } as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      { getVndPerUsd: async () => 25000 } as any,
+    );
     await expect(service.getOrderPaymentsAdmin('nope')).rejects.toMatchObject({ status: 404, response: { errorCode: 1301 } });
   });
 });
@@ -355,7 +391,7 @@ describe('ConfirmPaymentDto', () => {
   it('accepts both input styles and trims text', async () => {
     await expect(run({ transactionId: 't1', note: '  ok ' })).resolves.toMatchObject({ transactionId: 't1', note: 'ok' });
     await expect(
-      run({ reference: ' 92704 ', amount: 4625000, provider: 'manual', acceptAmountMismatch: true, note: 'ok' }),
+      run({ reference: ' 92704 ', amountVnd: 4625000, provider: 'manual', acceptAmountMismatch: true, note: 'ok' }),
     ).resolves.toMatchObject({ reference: '92704', provider: 'manual' });
   });
 
@@ -363,13 +399,13 @@ describe('ConfirmPaymentDto', () => {
     ['missing note', { transactionId: 't1' }],
     ['blank note', { transactionId: 't1', note: '   ' }],
     ['note > 500', { transactionId: 't1', note: 'x'.repeat(501) }],
-    ['fractional amount', { reference: 'r', amount: 10.5, note: 'n' }],
-    ['zero amount', { reference: 'r', amount: 0, note: 'n' }],
-    ['string amount', { reference: 'r', amount: '10', note: 'n' }],
-    ['unknown provider', { reference: 'r', amount: 1, provider: 'momo', note: 'n' }],
+    ['fractional amount', { reference: 'r', amountVnd: 10.5, note: 'n' }],
+    ['zero amount', { reference: 'r', amountVnd: 0, note: 'n' }],
+    ['string amount', { reference: 'r', amountVnd: '10', note: 'n' }],
+    ['unknown provider', { reference: 'r', amountVnd: 1, provider: 'momo', note: 'n' }],
     ['non-boolean acceptAmountMismatch', { transactionId: 't1', acceptAmountMismatch: 'yes', note: 'n' }],
     ['reference > 64', { reference: 'x'.repeat(65), amount: 1, note: 'n' }],
-    ['transferContent > 500', { reference: 'r', amount: 1, transferContent: 'x'.repeat(501), note: 'n' }],
+    ['transferContent > 500', { reference: 'r', amountVnd: 1, transferContent: 'x'.repeat(501), note: 'n' }],
     ['unknown field', { transactionId: 't1', note: 'n', orderId: 'o1' }],
   ])('rejects %s with 400', async (_n, body) => {
     await expect(run(body)).rejects.toMatchObject({ status: 400 });
@@ -391,7 +427,7 @@ describe('PaymentService.confirmPaymentAdmin — by the transfer content the cus
 
   it('marks exactly the session with that code as PAID (not the newest) and cancels the other pending one', async () => {
     const h = twoSessions();
-    await h.service.confirmPaymentAdmin('adm1', 'o1', { transferCode: 'DHG29JR5A8', amount: 4_625_000, note });
+    await h.service.confirmPaymentAdmin('adm1', 'o1', { transferCode: 'DHG29JR5A8', amountVnd: 4_625_000, note });
     expect(h.rows(PaymentAttempt).find((a) => a.id === 'old')).toMatchObject({ status: 'PAID' });
     expect(h.rows(PaymentAttempt).find((a) => a.id === 'new')).toMatchObject({ status: 'CANCELLED' });
     expect(h.row(Order)).toMatchObject({ paymentStatus: 'paid' });
@@ -400,7 +436,7 @@ describe('PaymentService.confirmPaymentAdmin — by the transfer content the cus
 
   it('without a bank reference the recorded transaction id is the transfer content itself (provider manual)', async () => {
     const h = twoSessions();
-    await h.service.confirmPaymentAdmin('adm1', 'o1', { transferCode: 'DHG29JR5A8', amount: 4_625_000, note });
+    await h.service.confirmPaymentAdmin('adm1', 'o1', { transferCode: 'DHG29JR5A8', amountVnd: 4_625_000, note });
     expect(h.row(PaymentTransaction)).toMatchObject({
       provider: 'manual',
       providerTransactionId: 'DHG29JR5A8',
@@ -412,20 +448,20 @@ describe('PaymentService.confirmPaymentAdmin — by the transfer content the cus
 
   it('with a bank reference both are kept: the reference identifies the bank transaction, the code picks the session', async () => {
     const h = twoSessions();
-    await h.service.confirmPaymentAdmin('adm1', 'o1', { transferCode: 'dhg29jr5a8', reference: '92704', amount: 4_625_000, note });
+    await h.service.confirmPaymentAdmin('adm1', 'o1', { transferCode: 'dhg29jr5a8', reference: '92704', amountVnd: 4_625_000, note });
     expect(h.row(PaymentTransaction)).toMatchObject({ provider: 'sepay', providerTransactionId: '92704', paymentAttemptId: 'old' });
   });
 
   it('a code that is not a session of this order is refused (404 / 1703), even if it exists on another order', async () => {
     const h = twoSessions();
     await expect(
-      h.service.confirmPaymentAdmin('adm1', 'o1', { transferCode: 'DHZZZZ2222', amount: 4_625_000, note }),
+      h.service.confirmPaymentAdmin('adm1', 'o1', { transferCode: 'DHZZZZ2222', amountVnd: 4_625_000, note }),
     ).rejects.toMatchObject({
       status: 404,
       response: { errorCode: 1703 },
     });
     await expect(
-      h.service.confirmPaymentAdmin('adm1', 'o1', { transferCode: 'DHNOPE0000', amount: 4_625_000, note }),
+      h.service.confirmPaymentAdmin('adm1', 'o1', { transferCode: 'DHNOPE0000', amountVnd: 4_625_000, note }),
     ).rejects.toMatchObject({
       response: { errorCode: 1703 },
     });
@@ -435,16 +471,18 @@ describe('PaymentService.confirmPaymentAdmin — by the transfer content the cus
 
   it('the amount is checked against the chosen session (1710 unless acceptAmountMismatch)', async () => {
     const h = twoSessions();
-    await expect(h.service.confirmPaymentAdmin('adm1', 'o1', { transferCode: 'DHG29JR5A8', amount: 13_000, note })).rejects.toMatchObject({
+    await expect(
+      h.service.confirmPaymentAdmin('adm1', 'o1', { transferCode: 'DHG29JR5A8', amountVnd: 13_000, note }),
+    ).rejects.toMatchObject({
       response: { errorCode: 1710 },
     });
   });
 
   it('confirming the same code twice is refused (1702 once paid)', async () => {
     const h = twoSessions();
-    await h.service.confirmPaymentAdmin('adm1', 'o1', { transferCode: 'DHG29JR5A8', amount: 4_625_000, note });
+    await h.service.confirmPaymentAdmin('adm1', 'o1', { transferCode: 'DHG29JR5A8', amountVnd: 4_625_000, note });
     await expect(
-      h.service.confirmPaymentAdmin('adm1', 'o1', { transferCode: 'DHG29JR5A8', amount: 4_625_000, note }),
+      h.service.confirmPaymentAdmin('adm1', 'o1', { transferCode: 'DHG29JR5A8', amountVnd: 4_625_000, note }),
     ).rejects.toMatchObject({
       response: { errorCode: 1702 },
     });
@@ -463,12 +501,12 @@ describe('PaymentService.confirmPaymentAdmin — by the transfer content the cus
 
   it('a manual provider reference alone (no transferCode) is still allowed', async () => {
     const h = twoSessions();
-    await h.service.confirmPaymentAdmin('adm1', 'o1', { reference: 'FT24012345', provider: 'manual', amount: 4_625_000, note });
+    await h.service.confirmPaymentAdmin('adm1', 'o1', { reference: 'FT24012345', provider: 'manual', amountVnd: 4_625_000, note });
     expect(h.row(PaymentTransaction)).toMatchObject({ provider: 'manual', providerTransactionId: 'FT24012345', paymentAttemptId: 'new' });
   });
 
   it.each([
-    ['sepay provider with no reference', { transferCode: 'DHG29JR5A8', amount: 1, provider: 'sepay' }],
+    ['sepay provider with no reference', { transferCode: 'DHG29JR5A8', amountVnd: 1, provider: 'sepay' }],
     ['transferCode without amount', { transferCode: 'DHG29JR5A8' }],
     ['transactionId with a reference', { transactionId: 't1', reference: 'x' }],
   ])('rejects %s with 400 / 1707', async (_n, body) => {
@@ -481,8 +519,8 @@ describe('PaymentService.confirmPaymentAdmin — by the transfer content the cus
   it('ConfirmPaymentDto upper-cases and trims transferCode, rejects an over-long one', async () => {
     const pipe = new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true });
     const run = (body: unknown) => pipe.transform(body, { type: 'body', metatype: ConfirmPaymentDto });
-    await expect(run({ transferCode: '  dhg29jr5a8 ', amount: 1, note: 'n' })).resolves.toMatchObject({ transferCode: 'DHG29JR5A8' });
-    await expect(run({ transferCode: 'X'.repeat(33), amount: 1, note: 'n' })).rejects.toMatchObject({ status: 400 });
+    await expect(run({ transferCode: '  dhg29jr5a8 ', amountVnd: 1, note: 'n' })).resolves.toMatchObject({ transferCode: 'DHG29JR5A8' });
+    await expect(run({ transferCode: 'X'.repeat(33), amountVnd: 1, note: 'n' })).rejects.toMatchObject({ status: 400 });
   });
 });
 
@@ -498,6 +536,7 @@ describe('PaymentService.getOrderPaymentsAdmin — effective status', () => {
       { find: jest.fn(async () => attempts) } as any,
       { find: jest.fn(async () => []) } as any,
       {} as any,
+      { getVndPerUsd: async () => 25000 } as any,
     );
     const { data } = await service.getOrderPaymentsAdmin('o1');
     expect(data.attempts.map((a) => [a.transferCode, a.status])).toEqual([

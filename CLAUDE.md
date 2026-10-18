@@ -20,6 +20,7 @@ src/
 │   ├── wishlist/
 │   ├── review/
 │   ├── media/      # Admin media upload (Supabase Storage REST + media_files metadata table)
+│   ├── currency/    # Tỷ giá VND/USD (site_configs EXCHANGE_RATE), CurrencyService
 │   ├── user/        # entity + service + admin controller
 │   ├── auth/        # Google login, JWT strategy
 │   ├── shipping/    # Static data, no DB
@@ -99,6 +100,13 @@ Khi tạo hoặc sửa API list, dùng skill `list-api` (`.claude/skills/list-ap
 **Guard**: `src/common/dto/list-query.dto.spec.ts` tự quét mọi `*-query.dto.ts` và kiểm tra kế thừa `PaginationQueryDto`, default 1/25, `limit <= 200`, `sorts` bị từ chối, whitelist sort. Query DTO không phải list (vd autocomplete) thêm vào `NOT_LIST_DTO_FILES` trong spec đó. Thêm hoặc sửa list API → chạy `yarn test`.
 
 **Thay đổi chuẩn/hành vi API** (đổi default, đổi sort, đổi shape...) phải cập nhật file module tương ứng trong `docs/modules/` (và `docs/modules/common.md` nếu chạm helper dùng chung). Không viết tài liệu riêng cho FE.
+
+## Tiền tệ (BẮT BUỘC, mọi API có tiền)
+
+- **VND là tiền gốc**, lưu số nguyên (`bigint` + `bigintTransformer` từ `@common/base/column-transformers`). USD chỉ là giá trị suy ra khi trả API (`vndToUsd`, làm tròn 2 chữ số), KHÔNG lưu USD, KHÔNG tính toán/so sánh/sort/lọc bằng USD.
+- Mọi field tiền trong response có đủ cặp `<tên>Vnd` + `<tên>Usd` (`money()`/`moneyOrNull()` ở `@common/utils/money.util`); body/query nhận tiền chỉ nhận VND nguyên (hậu tố `Vnd`, trần `MAX_MONEY_VND`). Không trả field tiền trần (`price`, `total`, `amount`).
+- Tỷ giá lấy từ `CurrencyService.getVndPerUsd()` (dòng `EXCHANGE_RATE` của site_configs). Dữ liệu danh mục/giỏ dùng tỷ giá hiện tại; dữ liệu gắn với đơn (đơn, thanh toán, hoàn tiền, trả hàng) dùng `orders.exchange_rate` đã chốt lúc checkout.
+- Entity trả thẳng ra API phải đi qua presenter (`presentProduct`, `presentOrder`, `payment.presenter`) — không trả entity có cột tiền thô.
 
 ## Docs (`docs/`) — quy trình khép kín Docs → Feature → Docs (BẮT BUỘC)
 

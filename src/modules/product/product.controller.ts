@@ -2,6 +2,7 @@ import { Public } from '@common/decorator/public.decorator';
 import { Controller, Get, Param, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ProductAutocompleteQueryDto } from './dtos/product-autocomplete-query.dto';
+import { ProductDetailQueryDto } from './dtos/product-detail-query.dto';
 import { PublicProductQueryDto } from './dtos/public-product-query.dto';
 import { ProductService } from './product.service';
 
@@ -25,7 +26,7 @@ export class ProductController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Get product by ID with related products' })
-  async findOne(@Param('id') id: string) {
-    return this.productService.findById(id);
+  async findOne(@Param('id') id: string, @Query() query: ProductDetailQueryDto) {
+    return this.productService.findById(id, query);
   }
 }

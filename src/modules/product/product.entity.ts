@@ -1,4 +1,5 @@
 import { BaseEntity } from '@common/base/base.entity';
+import { bigintTransformer } from '@common/base/column-transformers';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { Category } from '../category/category.entity';
 import { SubCategory } from '../category/sub-category.entity';
@@ -14,10 +15,12 @@ export class Product extends BaseEntity {
   @Column({ type: 'varchar', length: 255 })
   name: string;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2 })
+  /** Giá bán (VND, số nguyên) */
+  @Column({ type: 'bigint', transformer: bigintTransformer })
   price: number;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true, name: 'original_price' })
+  /** Giá gốc (VND, số nguyên) */
+  @Column({ type: 'bigint', nullable: true, name: 'original_price', transformer: bigintTransformer })
   originalPrice: number | null;
 
   @Column({ type: 'jsonb', default: [] })

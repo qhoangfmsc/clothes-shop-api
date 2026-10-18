@@ -1,6 +1,6 @@
 # common & core (`src/common`, `src/core`, `src/main*.ts`, `src/migrations`)
 
-> Cập nhật lần cuối: 2026-10-14
+> Cập nhật lần cuối: 2026-10-17
 
 ## 1. Tổng quan
 
@@ -188,6 +188,8 @@ Entity **không** extends `BaseEntity` (tự khai báo id nanoid16): `Wishlist` 
 
 | File | Nội dung | Dùng ở |
 |---|---|---|
+| `utils/money.util.ts` | Tiền tệ gốc VND: `MAX_MONEY_VND` (1 tỷ), `vndToUsd(vnd, vndPerUsd)` (làm tròn 2 chữ số), `money(tên, vnd, tỷ giá)` → `{ <tên>Vnd, <tên>Usd }`, `moneyOrNull(...)` (`null` ở cả hai field khi vắng giá trị) | mọi module trả tiền (xem [currency](currency.md)) |
+| `base/column-transformers.ts` | `bigintTransformer` (bigint → number, dùng cho mọi cột tiền VND), `numericTransformer` (numeric → number, dùng cho `orders.exchange_rate`) | entity product, order, order_item, payment_attempt, payment_transaction, refund |
 | `utils/helper.ts` | `sleep(ms)`, `formatError(err)` (kèm `err.cause`) | chưa có chỗ gọi |
 | `utils/transform.ts` | `transformJSON`, `transformArray`, `transformImageUrl` (nối `process.env.STORAGE_URL`) | chưa có chỗ gọi |
 | `validator/BaseValidate.ts` | `BaseValidate` + `baseValidateEnum/String/Number/Date/Boolean`, hiểu operator `lt lte gt gte ne in range eq` | chưa có chỗ gọi |
@@ -226,6 +228,8 @@ Entity **không** extends `BaseEntity` (tự khai báo id nanoid16): `Wishlist` 
 | `1791884003973-AddReturns` | `orders.delivered_at` (+ CHECK, điền `updated_at` cho đơn đã giao), bảng `return_requests`, `return_request_items`, `refunds.return_request_id` + lý do `RETURN` (CHECK), cấp `RETURN_CREATE`/`RETURN_VIEW` cho user hiện có `ORDER_CREATE`/`ORDER_VIEW_DETAIL`; idempotent, `down` từ chối nếu đã có khoản hoàn `RETURN` |
 | `1791895935291-AddPaymentAttemptCreatedBy` | `payment_attempts.created_by` (FK users SET NULL, index): admin tạo mã QR cho đơn; idempotent |
 | `1791966947507-AddReviewFeatures` | `reviews`: `order_item_id` (FK order_items SET NULL, UNIQUE), `size`, `color`, `fit`, `status`, `helpful_count`, `edited_at`, kiểm duyệt (`moderation_note`, `moderated_by/at`), phản hồi (`reply`, `replied_by/at`) + CHECK/FK/index; bảng `review_votes`; cấp `REVIEW_CREATE`/`REVIEW_VIEW`/`REVIEW_VOTE` cho user hiện có `ORDER_CREATE`; idempotent, `down` từ chối nếu đã có đánh giá của khách |
+| `1792169276231-VndBaseCurrency` | Tiền gốc sang VND: `products.price/original_price`, `order_items.price`, `orders.subtotal/shipping_fee/total` từ decimal(10,2) sang bigint (làm tròn, giá tối thiểu 1, **không nhân tỷ giá**); `orders.exchange_rate` numeric(12,2) NOT NULL (`CK_orders_exchange_rate > 0`, điền tỷ giá seed cho đơn cũ); mở rộng `CK_site_configs_type` thêm `CURRENCY`, seed dòng `EXCHANGE_RATE` (tỷ giá cố định 25000, không đọc biến môi trường); đổi khoá `SHIPPING_CONFIG` thành `priceVnd`/`freeShippingThresholdVnd`; idempotent, `down` trả kiểu về decimal(10,2) (lỗi nếu giá trị VND quá 99.999.999) |
+| `1792233304878-SetAllProductPricesTo2000Vnd` | Migration dữ liệu: đặt `products.price` = 2000 (VND) cho mọi sản phẩm, `products.original_price` = 2000 cho dòng đang có giá gốc (giữ `NULL` nếu không có); không đụng đơn, giỏ, `order_items`; idempotent; **không hoàn tác được** (giá cũ không được lưu, `down` không làm gì) |
 | `1791968077807-AddReviewImagesAndProductRating` | `media_files.purpose` (`LIBRARY`/`REVIEW`, CHECK) + `uploaded_by` (FK users SET NULL, index); `reviews.images` (jsonb, CHECK mảng ≤ 5 phần tử); `products.rating_average`/`rating_count` (CHECK, index) điền lại từ đánh giá `PUBLISHED`; idempotent, `down` từ chối nếu đã có ảnh đánh giá |
 
 ### 4.10 Biến môi trường (chỉ tên)
@@ -239,7 +243,7 @@ Entity **không** extends `BaseEntity` (tự khai báo id nanoid16): `Wishlist` 
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | module auth |
 | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET` | module media |
 | `STORAGE_URL` | `utils/transform.ts` (`transformImageUrl`) |
-| `SEPAY_RECEIVING_BANK_CODE`, `SEPAY_RECEIVING_BANK_NAME`, `SEPAY_RECEIVING_ACCOUNT`, `SEPAY_RECEIVING_ACCOUNT_NAME`, `SEPAY_WEBHOOK_SECRET`, `PAYMENT_TRANSFER_PREFIX`, `PAYMENT_VND_PER_UNIT` | module payment (`PAYMENT_VND_PER_UNIT` còn được module order đọc khi báo giá) |
+| `SEPAY_RECEIVING_BANK_CODE`, `SEPAY_RECEIVING_BANK_NAME`, `SEPAY_RECEIVING_ACCOUNT`, `SEPAY_RECEIVING_ACCOUNT_NAME`, `SEPAY_WEBHOOK_SECRET`, `PAYMENT_TRANSFER_PREFIX` | module payment |
 
 ### 4.11 Lệnh
 
