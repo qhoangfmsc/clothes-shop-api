@@ -30,3 +30,19 @@ describe('CartService.addItem', () => {
     expect(cartItemRepo.save).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('CartService.getCart', () => {
+  it('loads product with category and subcategory', async () => {
+    const cartRepo: any = { findOne: jest.fn(async () => ({ id: 'cart-1', items: [] })) };
+    const service = new CartService(cartRepo, {} as any, {} as any, { getVndPerUsd: async () => 25000 } as any);
+
+    await service.getCart('u1');
+
+    expect(cartRepo.findOne.mock.calls[0][0].relations).toEqual([
+      'items',
+      'items.product',
+      'items.product.category',
+      'items.product.subcategory',
+    ]);
+  });
+});

@@ -21,7 +21,7 @@ export class WishlistService {
   async findAll(userId: string) {
     const data = await this.wishlistRepo.find({
       where: { userId },
-      relations: ['product'],
+      relations: ['product', 'product.category', 'product.subcategory'],
       order: { createdAt: 'DESC' },
     });
     const rate = await this.currencyService.getVndPerUsd();

@@ -39,7 +39,7 @@ export class CartService {
   async getCart(userId: string) {
     const cart = await this.cartRepo.findOne({
       where: { userId },
-      relations: ['items', 'items.product'],
+      relations: ['items', 'items.product', 'items.product.category', 'items.product.subcategory'],
     });
 
     if (!cart) {

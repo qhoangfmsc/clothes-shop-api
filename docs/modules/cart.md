@@ -1,6 +1,6 @@
 # cart (`src/modules/cart`)
 
-> Cập nhật lần cuối: 2026-10-16
+> Cập nhật lần cuối: 2026-10-18
 
 ## 1. Tổng quan
 
@@ -61,7 +61,7 @@ Response của `GET`, `POST`, `PATCH`, `DELETE items/:itemId`:
 } }
 ```
 
-`lineTotalVnd = price hiện tại của sản phẩm (VND) × quantity`; `subtotalVnd` = tổng `lineTotalVnd`; `...Usd` suy ra từ tổng VND theo tỷ giá hiện tại (không phải tổng các USD đã làm tròn); `itemCount` = tổng `quantity`. `product` có dạng sản phẩm của [product](product.md) (`priceVnd`, `priceUsd`, `originalPriceVnd`, `originalPriceUsd`). Chưa có giỏ (hoặc sau `clear`) → `{ data: { items: [], itemCount: 0, subtotalVnd: 0, subtotalUsd: 0 } }`.
+`lineTotalVnd = price hiện tại của sản phẩm (VND) × quantity`; `subtotalVnd` = tổng `lineTotalVnd`; `...Usd` suy ra từ tổng VND theo tỷ giá hiện tại (không phải tổng các USD đã làm tròn); `itemCount` = tổng `quantity`. `product` có dạng sản phẩm của [product](product.md) (`priceVnd`, `priceUsd`, `originalPriceVnd`, `originalPriceUsd`) và kèm `category`, `subcategory`. Chưa có giỏ (hoặc sau `clear`) → `{ data: { items: [], itemCount: 0, subtotalVnd: 0, subtotalUsd: 0 } }`.
 
 ### 4.2 Dữ liệu
 
@@ -123,7 +123,7 @@ Các lỗi khác là HTTP thô: `NotFoundException` (`Cart not found`, `Cart ite
 
 ### 4.7 Test
 
-`cart.service.spec.ts` — `CartService.addItem` (service dựng với stub `CurrencyService`): sản phẩm badge `sold_out` / `custom_order` bị từ chối với `errorCode 1303` (HTTP 400, message chứa tên sản phẩm) và không lưu gì; sản phẩm không badge hoặc badge `new`/`sale`/`bestseller`/`limited` vẫn được thêm.
+`cart.service.spec.ts` — `CartService.addItem` (service dựng với stub `CurrencyService`): sản phẩm badge `sold_out` / `custom_order` bị từ chối với `errorCode 1303` (HTTP 400, message chứa tên sản phẩm) và không lưu gì; sản phẩm không badge hoặc badge `new`/`sale`/`bestseller`/`limited` vẫn được thêm. `CartService.getCart` nạp kèm `items.product.category` và `items.product.subcategory`.
 
 ### 4.8 Lưu ý hiện trạng
 

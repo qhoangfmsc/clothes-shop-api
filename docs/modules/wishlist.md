@@ -1,6 +1,6 @@
 # wishlist (`src/modules/wishlist`)
 
-> Cập nhật lần cuối: 2026-10-16
+> Cập nhật lần cuối: 2026-10-18
 
 ## 1. Tổng quan
 
@@ -37,7 +37,7 @@ Cho khách lưu lại các sản phẩm quan tâm và hiển thị trạng thái
 
 Response:
 
-- `GET /` → `{ data: Wishlist[] (kèm product, mới nhất trước), total }`; `product` có dạng sản phẩm của [product](product.md) (`priceVnd`, `priceUsd`, `originalPriceVnd`, `originalPriceUsd`, USD theo tỷ giá hiện tại).
+- `GET /` → `{ data: Wishlist[] (kèm product, mới nhất trước), total }`; `product` có dạng sản phẩm của [product](product.md) (`priceVnd`, `priceUsd`, `originalPriceVnd`, `originalPriceUsd`, USD theo tỷ giá hiện tại) và kèm `category`, `subcategory`.
 - `POST /:productId` → `{ data: Wishlist, created: boolean }` (`created = false` nếu đã tồn tại từ trước).
 - `DELETE /:productId` → `{ success: true }`.
 - `GET /check/:productId` → `{ inWishlist: boolean }`.
@@ -77,7 +77,7 @@ Không có error code riêng của module; sản phẩm không tồn tại trả
 
 ### 4.7 Test
 
-Chưa có test.
+`wishlist.service.spec.ts` — `WishlistService.findAll` nạp kèm `product.category` và `product.subcategory`.
 
 ### 4.8 Lưu ý hiện trạng
 
