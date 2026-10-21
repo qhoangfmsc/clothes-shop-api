@@ -10,6 +10,7 @@ import { MediaService } from '../media/media.service';
 import { Order } from '../order/order.entity';
 import { OrderItem } from '../order/order-item.entity';
 import { Product } from '../product/product.entity';
+import { presentProductSummary } from '../product/product.presenter';
 import { User } from '../user/user.entity';
 import { AdminReviewQueryDto } from './dtos/admin-review-query.dto';
 import { CreateReviewDto } from './dtos/create-review.dto';
@@ -50,8 +51,7 @@ const roundAverage = (sum: number, count: number) => Math.floor((sum * 20 + coun
 const HAS_IMAGES_SQL = 'jsonb_array_length(r.images) > 0';
 const NO_IMAGES_SQL = 'jsonb_array_length(r.images) = 0';
 
-const productSummary = (product?: { id: string; name: string; slug: string; images: string[] } | null) =>
-  product ? { id: product.id, name: product.name, slug: product.slug, image: product.images?.[0] ?? null } : null;
+const productSummary = (product?: Product | null) => (product ? presentProductSummary(product) : null);
 
 /** Phần công khai của một đánh giá (không lộ `userId`, `orderItemId`, ghi chú kiểm duyệt) */
 const toPublicView = (r: Review) => ({
@@ -311,7 +311,12 @@ export class ReviewService {
     const { status, productId, sort } = query;
     const { page, limit } = getPaging(query);
 
-    const qb = this.reviewRepo.createQueryBuilder('r').leftJoinAndSelect('r.product', 'p').where('r.userId = :userId', { userId });
+    const qb = this.reviewRepo
+      .createQueryBuilder('r')
+      .leftJoinAndSelect('r.product', 'p')
+      .leftJoinAndSelect('p.category', 'cat')
+      .leftJoinAndSelect('p.subcategory', 'sub')
+      .where('r.userId = :userId', { userId });
     if (status) qb.andWhere('r.status = :status', { status });
     if (productId) qb.andWhere('r.productId = :productId', { productId });
 
@@ -331,6 +336,9 @@ export class ReviewService {
     const qb = this.dataSource
       .createQueryBuilder(OrderItem, 'oi')
       .innerJoinAndSelect('oi.order', 'o')
+      .leftJoinAndSelect('oi.product', 'p')
+      .leftJoinAndSelect('p.category', 'cat')
+      .leftJoinAndSelect('p.subcategory', 'sub')
       .leftJoin(Review, 'r', 'r.orderItemId = oi.id')
       .where('o.userId = :userId', { userId })
       .andWhere('o.status IN (:...statuses)', { statuses: REVIEWABLE_ORDER_STATUSES })
@@ -351,6 +359,7 @@ export class ReviewService {
         productId: item.productId,
         productName: item.productName,
         productImage: item.productImage,
+        product: productSummary(item.product),
         size: item.size,
         color: item.color,
         quantity: item.quantity,
@@ -413,7 +422,11 @@ export class ReviewService {
     const { search, status, rating, fit, hasImages, product, userId, replied, sort } = query;
     const { page, limit } = getPaging(query);
 
-    const qb = this.reviewRepo.createQueryBuilder('r').leftJoinAndSelect('r.product', 'p');
+    const qb = this.reviewRepo
+      .createQueryBuilder('r')
+      .leftJoinAndSelect('r.product', 'p')
+      .leftJoinAndSelect('p.category', 'cat')
+      .leftJoinAndSelect('p.subcategory', 'sub');
     if (status) qb.andWhere('r.status = :status', { status });
     if (rating !== undefined) qb.andWhere('r.rating = :rating', { rating });
     if (fit) qb.andWhere('r.fit = :fit', { fit });
@@ -526,7 +539,10 @@ export class ReviewService {
   }
 
   private async getWithProduct(reviewId: string): Promise<Review> {
-    const review = await this.reviewRepo.findOne({ where: { id: reviewId }, relations: { product: true } });
+    const review = await this.reviewRepo.findOne({
+      where: { id: reviewId },
+      relations: { product: { category: true, subcategory: true } },
+    });
     if (!review) throwAppError(EReviewErrorCode.REVIEW_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
     return review;
   }

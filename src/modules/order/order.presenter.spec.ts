@@ -39,3 +39,39 @@ describe('presentOrder', () => {
     expect(out).not.toHaveProperty('items');
   });
 });
+
+describe('presentOrder item product', () => {
+  const product = {
+    id: 'p1',
+    name: 'Áo mới tên',
+    slug: 'ao',
+    images: ['new.jpg'],
+    badge: null,
+    price: 999,
+    category: { id: 'c1', slug: 'ao', title: 'Áo', subcategories: [] },
+    subcategory: { id: 's1', slug: 'thun', label: 'Thun' },
+  };
+  const withProduct = (item: object) => ({
+    ...order,
+    items: [{ id: 'i1', productId: 'p1', productName: 'A', price: 450_000, quantity: 2, ...item }],
+  });
+
+  it('adds the current product as a summary next to the snapshot fields (no raw product entity)', () => {
+    const [item] = presentOrder(withProduct({ product })).items as any[];
+    expect(item).toMatchObject({ productId: 'p1', productName: 'A', priceVnd: 450_000 });
+    expect(item.product).toEqual({
+      id: 'p1',
+      name: 'Áo mới tên',
+      slug: 'ao',
+      image: 'new.jpg',
+      badge: null,
+      category: { id: 'c1', slug: 'ao', title: 'Áo' },
+      subcategory: { id: 's1', slug: 'thun', label: 'Thun' },
+    });
+  });
+
+  it('product is null when the product was deleted or not loaded', () => {
+    expect((presentOrder(withProduct({ productId: null, product: null })).items as any[])[0].product).toBeNull();
+    expect((presentOrder(withProduct({})).items as any[])[0].product).toBeNull();
+  });
+});

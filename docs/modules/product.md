@@ -1,6 +1,6 @@
 # product (`src/modules/product`)
 
-> Cập nhật lần cuối: 2026-10-18
+> Cập nhật lần cuối: 2026-10-19
 
 ## 1. Tổng quan
 
@@ -58,7 +58,13 @@ Module sản phẩm: API công khai để duyệt/tìm/xem chi tiết sản ph�
 
 Luôn chỉ lấy `status = 'active'`. Response `paginated(...)`, mỗi phần tử là sản phẩm kèm `category`, `subcategory`, `ratingAverage` (number 1.0–5.0 hoặc `null`) và `ratingCount` (xem 4.2). Giá trả ra dạng `priceVnd`, `priceUsd`, `originalPriceVnd`, `originalPriceUsd` (cả hai `originalPrice…` là `null` khi không có giá gốc); không còn field `price`/`originalPrice`. Quy ước này áp dụng cho mọi nơi trả sản phẩm (chi tiết, `related`, admin, create/update, giỏ, wishlist, collection).
 
-**GET `/api/products/autocomplete`** — `ProductAutocompleteQueryDto`: `q` (string, 2–255 ký tự, bắt buộc), `limit` (int, tuỳ chọn, mặc định 8, 1–10; vượt → 400). Khớp "chứa" `ILIKE '%q%'` trên `name` hoặc `slug` (ký tự `%`, `_`, `\` trong `q` được escape nên khớp theo nghĩa đen), chỉ `active`. Sắp xếp: tên bắt đầu bằng `q` lên trước, rồi `name` ASC. Response `{ data: [{ id, name, slug, priceVnd, priceUsd, image, badge }] }` (`image` là ảnh đầu tiên hoặc `null`, `badge` là `new`/`sale`/`bestseller`/`sold_out`/`limited`/`custom_order` hoặc `null`). `limit` nằm riêng trong DTO này (không kế thừa `PaginationQueryDto`), không phân trang; DTO nằm trong `NOT_LIST_DTO_FILES`.
+**Hình dạng chung của sản phẩm trong mọi response**: luôn qua `presentProduct` (`product.presenter.ts`). `category` là `{ id, slug, title, description, heroImage, priority, createdAt, updatedAt }` (không có `subcategories`), `subcategory` là `{ id, slug, label, description, count, createdAt, updatedAt }` (không có `category`) — giống nhau dù entity được nạp bằng `find` (eager `Category.subcategories`) hay query builder. Nơi nào trả sản phẩm phải nạp `PRODUCT_RELATIONS` (`['category', 'subcategory']`, cùng file presenter) để hai field này có mặt: danh sách/chi tiết/`related`/admin/create/update sản phẩm, `GET /api/cart`, `GET /api/wishlist`, mọi response collection. 
+
+**Tóm tắt sản phẩm `ProductSummary`** — nơi chỉ cần nhận diện sản phẩm và dựng link (autocomplete, `product` trong đánh giá, `product` trong dòng đơn hàng và trong danh sách chờ đánh giá) luôn dùng `presentProductSummary` (cùng file presenter): `{ id, name, slug, image, badge, category: { id, slug, title } | null, subcategory: { id, slug, label } | null }`. `image` là ảnh đầu tiên hoặc `null`, `badge` hoặc `null`; mọi key luôn có mặt. Nơi cần giá thì ghép thêm cặp `priceVnd`/`priceUsd` (autocomplete). Quan hệ phải được nạp (join) trước khi present, nếu không `category`/`subcategory` là `null`.
+
+Dòng đơn hàng (`order_items`) giữ ảnh chụp lúc đặt (`productId`, `productName`, `productImage`, `price`) và có thêm `product` là `ProductSummary` của sản phẩm hiện tại (`null` khi sản phẩm đã bị xoá), xem [order](order.md).
+
+**GET `/api/products/autocomplete`** — `ProductAutocompleteQueryDto`: `q` (string, 2–255 ký tự, bắt buộc), `limit` (int, tuỳ chọn, mặc định 8, 1–10; vượt → 400). Khớp "chứa" `ILIKE '%q%'` trên `name` hoặc `slug` (ký tự `%`, `_`, `\` trong `q` được escape nên khớp theo nghĩa đen), chỉ `active`. Sắp xếp: tên bắt đầu bằng `q` lên trước, rồi `name` ASC. Response `{ data: ProductSummary & { priceVnd, priceUsd } }[]` (`badge` là `new`/`sale`/`bestseller`/`sold_out`/`limited`/`custom_order` hoặc `null`; `category`/`subcategory` lấy bằng join chỉ chọn các cột `id`, `slug`, `title`/`label`). `limit` nằm riêng trong DTO này (không kế thừa `PaginationQueryDto`), không phân trang; DTO nằm trong `NOT_LIST_DTO_FILES`.
 
 **GET `/api/products/:id`** → `{ data: Product(+category, subcategory), related: Product[] }`. `ProductDetailQueryDto`: `relatedLimit` (int, tuỳ chọn, mặc định 4, 1–20; ngoài khoảng hoặc không phải số nguyên → 400). `related`: tối đa `relatedLimit` sản phẩm `active` cùng category, khác chính nó, mới nhất trước (ít hơn nếu category không đủ sản phẩm). `relatedLimit` nằm riêng trong DTO này (không phải API list, không kế thừa `PaginationQueryDto`); DTO nằm trong `NOT_LIST_DTO_FILES`. Không thấy → `404 Product not found`.
 
@@ -182,7 +188,7 @@ Sizes/colors/images rỗng không có error code riêng: bị chặn ở DTO (`A
 
 ### 4.7 Test
 
-`product.presenter.spec.ts` — `presentProduct` (thay field giá bằng cặp Vnd/Usd, giá gốc `null`, không đổi entity gốc). `product.service.spec.ts` — lọc `minRating` và sort theo `ratingAverage`/`ratingCount` (public: điều kiện, `NULLS LAST`, thứ tự phụ; admin: `where`/`order`, kết hợp với search). Các phần còn lại của service chưa có spec riêng. `PublicProductQueryDto` và `AdminProductQueryDto` được `list-query.dto.spec.ts` kiểm tra tự động; `ProductAutocompleteQueryDto` và `ProductDetailQueryDto` nằm trong danh sách DTO không phải list. `findById`: `related` dùng `take` mặc định 4 và theo `relatedLimit`; `ProductDetailQueryDto`: mặc định 4, ép kiểu số, từ chối 0, âm, > 20, chữ, số thập phân.
+`product.presenter.spec.ts` — `presentProduct` (thay field giá bằng cặp Vnd/Usd, giá gốc `null`, không đổi entity gốc; `category`/`subcategory` cùng hình dạng dù nạp kiểu nào, vắng mặt khi chưa nạp). `product.service.spec.ts` — lọc `minRating` và sort theo `ratingAverage`/`ratingCount` (public: điều kiện, `NULLS LAST`, thứ tự phụ; admin: `where`/`order`, kết hợp với search). Các phần còn lại của service chưa có spec riêng. `PublicProductQueryDto` và `AdminProductQueryDto` được `list-query.dto.spec.ts` kiểm tra tự động; `ProductAutocompleteQueryDto` và `ProductDetailQueryDto` nằm trong danh sách DTO không phải list. `presentProductSummary`: giữ đúng các key của `ProductSummary`, `null` khi thiếu ảnh/badge/quan hệ; autocomplete trả summary kèm `priceVnd`/`priceUsd` và join `category`, `subcategory`. `presentProduct`: bỏ `category.subcategories` và `subcategory.category`, không đụng entity gốc, không thêm field khi quan hệ chưa nạp. `findById`: `related` dùng `take` mặc định 4 và theo `relatedLimit`; `ProductDetailQueryDto`: mặc định 4, ép kiểu số, từ chối 0, âm, > 20, chữ, số thập phân.
 
 ### 4.8 Lưu ý hiện trạng
 

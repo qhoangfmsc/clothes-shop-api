@@ -6,7 +6,7 @@ import { EOrderErrorCode } from '@common/exceptions/error-codes';
 import { money, moneyOrNull } from '@common/utils/money.util';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, In, Repository } from 'typeorm';
+import { DataSource, EntityManager, In, Repository, SelectQueryBuilder } from 'typeorm';
 import { Address } from '../address/address.entity';
 import { Cart } from '../cart/cart.entity';
 import { CartItem } from '../cart/cart-item.entity';
@@ -41,6 +41,16 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
   cancelled: [],
 };
 
+/** Đơn kèm dòng hàng và sản phẩm hiện tại (kèm category/subcategory) của từng dòng — mọi response đơn cùng một hình dạng */
+const ORDER_RELATIONS = ['items', 'items.product', 'items.product.category', 'items.product.subcategory'];
+
+const joinItems = (qb: SelectQueryBuilder<Order>) =>
+  qb
+    .leftJoinAndSelect('o.items', 'items')
+    .leftJoinAndSelect('items.product', 'product')
+    .leftJoinAndSelect('product.category', 'cat')
+    .leftJoinAndSelect('product.subcategory', 'sub');
+
 @Injectable()
 export class OrderService {
   constructor(
@@ -58,7 +68,7 @@ export class OrderService {
     const { status, sort } = query;
     const { page, limit } = getPaging(query);
 
-    const qb = this.orderRepo.createQueryBuilder('o').leftJoinAndSelect('o.items', 'items').where('o.userId = :userId', { userId });
+    const qb = joinItems(this.orderRepo.createQueryBuilder('o')).where('o.userId = :userId', { userId });
 
     // Filter by status
     if (status) {
@@ -79,7 +89,7 @@ export class OrderService {
   async findOne(userId: string, orderId: string) {
     const order = await this.orderRepo.findOne({
       where: { id: orderId, userId },
-      relations: ['items'],
+      relations: ORDER_RELATIONS,
     });
     if (!order) throw new NotFoundException('Order not found');
     // Kèm các nội dung chuyển khoản đã cấp cho đơn (kể cả đã hết hạn) để khách xem lại và đọc cho cửa hàng, và các khoản hoàn tiền
@@ -182,7 +192,7 @@ export class OrderService {
       // Return full order (re-read within transaction for consistency)
       const result = await manager.findOne(Order, {
         where: { id: savedOrder.id },
-        relations: ['items'],
+        relations: ORDER_RELATIONS,
       });
       return { data: presentOrder(result!) };
     });
@@ -310,7 +320,7 @@ export class OrderService {
     const { userId, search, status, paymentStatus, needsAction, sort } = query;
     const { page, limit } = getPaging(query);
 
-    const qb = this.orderRepo.createQueryBuilder('o').leftJoinAndSelect('o.items', 'items');
+    const qb = joinItems(this.orderRepo.createQueryBuilder('o'));
 
     // Filter by userId
     if (userId) {
@@ -359,7 +369,7 @@ export class OrderService {
   async findOneAdmin(orderId: string) {
     const order = await this.orderRepo.findOne({
       where: { id: orderId },
-      relations: ['items'],
+      relations: ORDER_RELATIONS,
     });
     if (!order) throwAppError(EOrderErrorCode.ORDER_NOT_FOUND);
     return { data: presentOrder(order) };

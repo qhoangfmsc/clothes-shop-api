@@ -109,7 +109,7 @@ function setup(seed: { orders?: Row[]; orderItems?: Row[]; reviews?: Row[]; vote
     };
     return q;
   });
-  const dataSource: any = { transaction: jest.fn(async (fn: any) => fn(manager)), manager };
+  const dataSource: any = { transaction: jest.fn(async (fn: any) => fn(manager)), manager, createQueryBuilder: jest.fn(() => qb) };
 
   // QueryBuilder giả cho các list/summary: ghi lại điều kiện và trả dữ liệu được nạp sẵn
   const calls: { where: [string, any?][]; orderBy?: [string, string]; addOrderBy?: [string, string]; skip?: number; take?: number } = {
@@ -126,6 +126,8 @@ function setup(seed: { orders?: Row[]; orderItems?: Row[]; reviews?: Row[]; vote
       return qb;
     },
     leftJoinAndSelect: () => qb,
+    innerJoinAndSelect: () => qb,
+    leftJoin: () => qb,
     select: () => qb,
     addSelect: () => qb,
     groupBy: () => qb,
@@ -642,6 +644,81 @@ describe('ReviewService.countAwaitingReply', () => {
     const list = setup();
     await list.service.findAllAdmin({ status: 'PUBLISHED', replied: false });
     expect(list.calls.where.map(([sql]) => sql)).toEqual(expect.arrayContaining(['r.status = :status', 'r.reply IS NULL']));
+  });
+});
+
+describe('ReviewService product summary', () => {
+  const product = {
+    id: 'p1',
+    name: 'Áo',
+    slug: 'ao',
+    images: ['a.jpg'],
+    badge: 'sale',
+    price: 1,
+    category: { id: 'c1', slug: 'ao', title: 'Áo', subcategories: [] },
+    subcategory: { id: 's1', slug: 'thun', label: 'Thun', category: {} },
+  };
+  const summary = {
+    id: 'p1',
+    name: 'Áo',
+    slug: 'ao',
+    image: 'a.jpg',
+    badge: 'sale',
+    category: { id: 'c1', slug: 'ao', title: 'Áo' },
+    subcategory: { id: 's1', slug: 'thun', label: 'Thun' },
+  };
+
+  it('own and admin lists show the same product summary, with category/subcategory for links', async () => {
+    const own = setup();
+    own.result.many = [review({ product })];
+    own.result.total = 1;
+    expect((await own.service.findMine('u1', {})).data[0].product).toEqual(summary);
+
+    const admin = setup();
+    admin.result.many = [review({ product })];
+    admin.result.total = 1;
+    expect((await admin.service.findAllAdmin({})).data[0].product).toEqual(summary);
+  });
+});
+
+describe('ReviewService.findPending', () => {
+  it('returns the current product summary next to the order snapshot', async () => {
+    const ctx = setup();
+    const deliveredAt = daysAgo(2);
+    ctx.result.many = [
+      {
+        id: 'i1',
+        orderId: 'o1',
+        productId: 'p1',
+        productName: 'Tên lúc đặt',
+        productImage: 'old.jpg',
+        size: 'M',
+        color: 'white',
+        quantity: 1,
+        order: { deliveredAt },
+        product: {
+          id: 'p1',
+          name: 'Tên hiện tại',
+          slug: 'ao',
+          images: ['new.jpg'],
+          badge: null,
+          category: { id: 'c1', slug: 'ao', title: 'Áo' },
+          subcategory: { id: 's1', slug: 'thun', label: 'Thun' },
+        },
+      },
+    ];
+    ctx.result.total = 1;
+    const { data } = await ctx.service.findPending('u1', {});
+    expect(data[0]).toMatchObject({ productName: 'Tên lúc đặt', productImage: 'old.jpg' });
+    expect(data[0].product).toEqual({
+      id: 'p1',
+      name: 'Tên hiện tại',
+      slug: 'ao',
+      image: 'new.jpg',
+      badge: null,
+      category: { id: 'c1', slug: 'ao', title: 'Áo' },
+      subcategory: { id: 's1', slug: 'thun', label: 'Thun' },
+    });
   });
 });
 

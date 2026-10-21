@@ -1,6 +1,6 @@
 # cart (`src/modules/cart`)
 
-> Cập nhật lần cuối: 2026-10-18
+> Cập nhật lần cuối: 2026-10-19
 
 ## 1. Tổng quan
 

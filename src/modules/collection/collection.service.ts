@@ -7,11 +7,14 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { FindOptionsOrder, FindOptionsWhere, ILike, In, Repository } from 'typeorm';
 import { CurrencyService } from '../currency/currency.service';
 import { Product } from '../product/product.entity';
-import { presentProduct } from '../product/product.presenter';
+import { PRODUCT_RELATIONS, presentProduct } from '../product/product.presenter';
 import { Collection } from './collection.entity';
 import { AdminCollectionQueryDto } from './dtos/admin-collection-query.dto';
 import { CreateCollectionDto, UpdateCollectionDto } from './dtos/collection.dto';
 import { PublicCollectionQueryDto } from './dtos/public-collection-query.dto';
+
+/** Collection kèm products và category/subcategory của từng sản phẩm — mọi response collection cùng một hình dạng */
+const COLLECTION_RELATIONS = ['products', ...PRODUCT_RELATIONS.map((relation) => `products.${relation}`)];
 
 @Injectable()
 export class CollectionService {
@@ -49,7 +52,7 @@ export class CollectionService {
     if (data.length > 0) {
       const withProducts = await this.collectionRepo.find({
         where: { id: In(data.map((c) => c.id)) },
-        relations: ['products'],
+        relations: COLLECTION_RELATIONS,
       });
       const productsById = new Map(withProducts.map((c) => [c.id, c.products]));
       for (const coll of data) {
@@ -69,7 +72,7 @@ export class CollectionService {
   async findBySlug(slug: string) {
     const collection = await this.collectionRepo.findOne({
       where: { slug },
-      relations: ['products', 'products.category', 'products.subcategory'],
+      relations: COLLECTION_RELATIONS,
     });
     if (!collection) {
       throwAppError(ECollectionErrorCode.COLLECTION_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
@@ -110,7 +113,7 @@ export class CollectionService {
 
     const [data, total] = await this.collectionRepo.findAndCount({
       where,
-      relations: ['products'],
+      relations: COLLECTION_RELATIONS,
       order,
       skip: (page - 1) * limit,
       take: limit,
@@ -149,7 +152,7 @@ export class CollectionService {
   async update(id: string, dto: UpdateCollectionDto) {
     const collection = await this.collectionRepo.findOne({
       where: { id },
-      relations: ['products'],
+      relations: COLLECTION_RELATIONS,
     });
     if (!collection) {
       throwAppError(ECollectionErrorCode.COLLECTION_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
@@ -196,7 +199,7 @@ export class CollectionService {
   }
 
   private async resolveProducts(productIds: string[]): Promise<Product[]> {
-    const found = await this.productRepo.find({ where: { id: In(productIds) } });
+    const found = await this.productRepo.find({ where: { id: In(productIds) }, relations: PRODUCT_RELATIONS });
     if (found.length !== productIds.length) {
       const foundIds = new Set(found.map((p) => p.id));
       const missing = productIds.filter((id) => !foundIds.has(id));

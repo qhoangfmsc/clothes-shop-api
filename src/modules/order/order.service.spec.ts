@@ -555,6 +555,17 @@ describe('OrderService.findOne — payment attempts and refunds for the customer
     expect(refundService.listForCustomer).toHaveBeenCalledWith(order);
   });
 
+  it('loads each item with its current product, category and subcategory', async () => {
+    const { service, orderRepo } = make(order, []);
+    await service.findOne('u1', 'o1');
+    expect(orderRepo.findOne.mock.calls[0][0].relations).toEqual([
+      'items',
+      'items.product',
+      'items.product.category',
+      'items.product.subcategory',
+    ]);
+  });
+
   it('returns empty arrays for an order that never had a payment session or a refund', async () => {
     const { service } = make(order, []);
     const { data } = await service.findOne('u1', 'o1');

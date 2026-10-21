@@ -1,6 +1,6 @@
 # review (`src/modules/review`)
 
-> Cập nhật lần cuối: 2026-10-14
+> Cập nhật lần cuối: 2026-10-19
 
 ## 1. Tổng quan
 
@@ -86,13 +86,13 @@ Luôn chỉ lấy `status = 'PUBLISHED'`; thứ tự phụ `id` ASC để phân 
 | `fit` | | `IsIn(REVIEW_FITS)` |
 | `images` | | mảng string, ≤ 5 phần tử, không trùng, mỗi URL ≤ 1000 ký tự; chỉ nhận URL ảnh do chính user upload ở `POST /api/reviews/images` |
 
-Response HTTP 201 `{ data: <góc nhìn tác giả> }`: phần công khai ở trên cộng `productId`, `orderItemId`, `product: { id, name, slug, image }`, `status`, `moderationNote` (chỉ có giá trị khi `HIDDEN`), `editedAt`, `canEdit`, `editableUntil` (`null` khi hết quyền sửa). Field lạ (vd `status`) bị `ValidationPipe` từ chối.
+Response HTTP 201 `{ data: <góc nhìn tác giả> }`: phần công khai ở trên cộng `productId`, `orderItemId`, `product` (tóm tắt sản phẩm `ProductSummary` của [product](product.md): `{ id, name, slug, image, badge, category: { id, slug, title }, subcategory: { id, slug, label } }`), `status`, `moderationNote` (chỉ có giá trị khi `HIDDEN`), `editedAt`, `canEdit`, `editableUntil` (`null` khi hết quyền sửa). Field lạ (vd `status`) bị `ValidationPipe` từ chối.
 
 **PATCH `/api/reviews/:reviewId`** — `UpdateReviewDto`: `rating`, `title`, `content`, `fit`, `images` đều tuỳ chọn, cùng ràng buộc như create (`images` thay toàn bộ danh sách, `[]` = bỏ hết ảnh); phải gửi ít nhất một field (body rỗng → `400 Nothing to update`). Response `{ data: <góc nhìn tác giả> }`.
 
 **GET `/api/my-reviews`** — `MyReviewQueryDto`: `status` (`IsIn(REVIEW_STATUSES)`), `productId` (≤ 16), `sort` (whitelist `createdAt`, `rating`; mặc định `-createdAt`). Response `paginated(...)` các phần tử góc nhìn tác giả.
 
-**GET `/api/my-reviews/pending`** — `MyPendingReviewQueryDto`: `sort` (whitelist `deliveredAt`; mặc định `-deliveredAt`). Response `paginated(...)`, mỗi phần tử `{ orderItemId, orderId, productId, productName, productImage, size, color, quantity, deliveredAt, reviewDeadline }`.
+**GET `/api/my-reviews/pending`** — `MyPendingReviewQueryDto`: `sort` (whitelist `deliveredAt`; mặc định `-deliveredAt`). Response `paginated(...)`, mỗi phần tử `{ orderItemId, orderId, productId, productName, productImage, product, size, color, quantity, deliveredAt, reviewDeadline }`. `productName`/`productImage` là ảnh chụp lúc đặt; `product` là `ProductSummary` của sản phẩm hiện tại (xem [product](product.md)).
 
 **GET `/api/my-reviews/votes`** — `MyReviewVotesQueryDto` (không phân trang): `productId` bắt buộc, ≤ 16. Response `{ data: string[] }` (id các đánh giá của sản phẩm mà user đã bấm "hữu ích").
 
@@ -112,7 +112,7 @@ Response HTTP 201 `{ data: <góc nhìn tác giả> }`: phần công khai ở tr�
 | `replied` | boolean tuỳ chọn (chỉ `true`/`false`, giá trị khác → 400): `true` = đã có phản hồi của cửa hàng, `false` = chưa có |
 | `sort` | whitelist `createdAt`, `rating`, `helpfulCount`; mặc định `-createdAt` |
 
-Response `paginated(...)`; mỗi phần tử là phần công khai cộng `productId`, `orderItemId`, `userId`, `product { id, name, slug, image }`, `status`, `moderationNote`, `moderatedBy`, `moderatedAt`, `editedAt`, `repliedBy`.
+Response `paginated(...)`; mỗi phần tử là phần công khai cộng `productId`, `orderItemId`, `userId`, `product` (`ProductSummary`, như trên), `status`, `moderationNote`, `moderatedBy`, `moderatedAt`, `editedAt`, `repliedBy`.
 
 **POST `/api/admin/reviews/:reviewId/hide`** — `HideReviewDto`: `note` bắt buộc (trim, not empty, ≤ 500), là lý do ẩn và tác giả thấy. **POST `.../publish`** không có body. **PUT `.../reply`** — `ReplyReviewDto`: `content` bắt buộc (trim, not empty, ≤ 1000). Các endpoint admin trả `{ data: <góc nhìn admin> }` của đánh giá sau khi đổi.
 
@@ -208,6 +208,7 @@ Ngoài ra, `PATCH` với body rỗng trả `400` thô (`BadRequestException('Not
 
 ### 4.7 Test
 
+- `review.service.spec.ts` (tiếp) — `findPending` trả `product` tóm tắt cạnh ảnh chụp; `product` trong đánh giá của tôi và danh sách admin có cùng dạng `ProductSummary` kèm `category`/`subcategory`.
 - `review-eligibility.util.spec.ts` — `computeReviewEligibility` (đơn đã trả/đã giao/đã hoàn tiền, từng trạng thái đơn bị từ chối, thiếu `delivered_at`, biên hạn 30 ngày, sản phẩm đã xoá), `reviewEditBlock` (ẩn, đã sửa, quá hạn, biên hạn sửa), `containsLink`.
 - `review.service.spec.ts` (EntityManager giả trong bộ nhớ) — `create` (snapshot, tên/ảnh mặc định, đơn của người khác/không tồn tại → 404, chưa trả/chưa giao/quá hạn/sản phẩm đã xoá, đã có đánh giá → 409, vi phạm UNIQUE đồng thời → 409, lỗi DB khác được ném lại, từ chối liên kết trước khi chạm DB), `update` (sửa một lần, từ chối lần hai/quá hạn/đã ẩn, đánh giá của người khác → 404, body rỗng, liên kết), vote (đếm một lần dù gửi hai lần, nhiều người, bỏ vote chỉ xoá của mình, vote đánh giá của mình, đánh giá bị ẩn/không có → 404, khoá dòng), ẩn/hiện, đặt/thay/xoá phản hồi, list công khai (điều kiện `PUBLISHED`, filter rating/fit, sort, phân trang, không lộ field nội bộ), tổng hợp (trung bình, phân bố, fit, làm tròn, rỗng) và các DTO (`CreateReviewDto`, `UpdateReviewDto`, `HideReviewDto`).
 - `review.service.spec.ts` (tiếp) — ảnh (lưu URL đã xác nhận, mặc định `[]`, ảnh không phải của user → 1908 và không lưu, sửa thay/xoá ảnh, ảnh sai không tiêu hao lần sửa, `uploadImage` uỷ quyền cho media với `REVIEW` (kiểm tra kích thước ở service chỉ là lớp phòng thủ thứ hai sau `FileInterceptor`), filter `hasImages` ở list công khai/admin, `withImages` của tổng hợp), đồng bộ `products.rating_*` (create khoá sản phẩm trước khi chèn, trung bình tính trên mọi đánh giá `PUBLISHED`, sửa sao mới tính lại, ẩn/hiện, ẩn đánh giá cuối về `null`, vote/phản hồi không đụng sản phẩm, làm tròn half-up khớp Postgres), `countAwaitingReply` cùng điều kiện với list admin, và DTO `images`.

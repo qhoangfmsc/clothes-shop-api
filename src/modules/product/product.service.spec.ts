@@ -115,3 +115,56 @@ describe('ProductDetailQueryDto', () => {
     expect(await check({ relatedLimit: String(RELATED_MAX_LIMIT) })).toHaveLength(0);
   });
 });
+
+describe('ProductService.autocomplete', () => {
+  it('returns the product summary (with category/subcategory links) plus price', async () => {
+    const joins: string[] = [];
+    const qb: any = {
+      leftJoin: (path: string) => {
+        joins.push(path);
+        return qb;
+      },
+      select: () => qb,
+      addSelect: () => qb,
+      where: () => qb,
+      andWhere: () => qb,
+      setParameter: () => qb,
+      orderBy: () => qb,
+      addOrderBy: () => qb,
+      limit: () => qb,
+      getMany: async () => [
+        {
+          id: 'p1',
+          name: 'Áo',
+          slug: 'ao',
+          price: 250000,
+          images: ['a.jpg'],
+          badge: null,
+          category: { id: 'c1', slug: 'ao', title: 'Áo' },
+          subcategory: { id: 's1', slug: 'thun', label: 'Thun' },
+        },
+      ],
+    };
+    const service = new ProductService(
+      { createQueryBuilder: () => qb } as any,
+      {} as any,
+      {} as any,
+      { getVndPerUsd: async () => 25000 } as any,
+    );
+
+    const { data } = await service.autocomplete({ q: 'ao' });
+
+    expect(joins).toEqual(['p.category', 'p.subcategory']);
+    expect(data[0]).toEqual({
+      id: 'p1',
+      name: 'Áo',
+      slug: 'ao',
+      image: 'a.jpg',
+      badge: null,
+      category: { id: 'c1', slug: 'ao', title: 'Áo' },
+      subcategory: { id: 's1', slug: 'thun', label: 'Thun' },
+      priceVnd: 250000,
+      priceUsd: 10,
+    });
+  });
+});

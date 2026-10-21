@@ -1,6 +1,6 @@
 # collection (`src/modules/collection`)
 
-> Cập nhật lần cuối: 2026-10-16
+> Cập nhật lần cuối: 2026-10-19
 
 ## 1. Tổng quan
 
@@ -46,7 +46,7 @@ Module bộ sưu tập: nhóm các sản phẩm theo chủ đề/mùa (ví dụ 
 | `search` | ≤ 255; `ILIKE` trên `name`, `slug` |
 | `sort` | whitelist `name`, `createdAt`; mặc định `-createdAt` |
 
-Response list `paginated(...)`: mỗi phần tử là entity `Collection` kèm mảng `products` (không kèm category/subcategory của sản phẩm). Mọi sản phẩm trong response collection (public, admin, create/update) có dạng sản phẩm của [product](product.md): `priceVnd`, `priceUsd`, `originalPriceVnd`, `originalPriceUsd`, USD theo tỷ giá hiện tại.
+Response list `paginated(...)`: mỗi phần tử là entity `Collection` kèm mảng `products`. Mọi sản phẩm trong response collection (public, admin, create/update) có dạng sản phẩm của [product](product.md): `priceVnd`, `priceUsd`, `originalPriceVnd`, `originalPriceUsd`, USD theo tỷ giá hiện tại, kèm `category` và `subcategory` (public list/detail, admin list, create, update cùng một hình dạng; `products` luôn nạp `products.category`, `products.subcategory`).
 
 **GET `/api/admin/collections`** — `AdminCollectionQueryDto`: `search` (≤ 255; `ILIKE` trên `slug`, `name`), `season` (string ≤ 100, lọc bằng so sánh bằng), `sort` (whitelist `name`, `createdAt`; mặc định `-createdAt`). Phần tử kèm `products`.
 
@@ -112,7 +112,7 @@ Bảng nối `collection_products` (`@ManyToMany` + `@JoinTable`): `collection_i
 
 ### 4.7 Test
 
-Chưa có spec riêng. `PublicCollectionQueryDto` và `AdminCollectionQueryDto` được `list-query.dto.spec.ts` kiểm tra tự động.
+`collection.service.spec.ts` — public list/detail, admin list, create, update đều nạp `products` kèm `category` và `subcategory`. `PublicCollectionQueryDto` và `AdminCollectionQueryDto` được `list-query.dto.spec.ts` kiểm tra tự động.
 
 ### 4.8 Lưu ý hiện trạng
 

@@ -15,7 +15,7 @@ import { AUTOCOMPLETE_DEFAULT_LIMIT, ProductAutocompleteQueryDto } from './dtos/
 import { ProductDetailQueryDto, RELATED_DEFAULT_LIMIT } from './dtos/product-detail-query.dto';
 import { PublicProductQueryDto } from './dtos/public-product-query.dto';
 import { Product } from './product.entity';
-import { presentProduct } from './product.presenter';
+import { PRODUCT_RELATIONS, presentProduct, presentProductSummary } from './product.presenter';
 
 @Injectable()
 export class ProductService {
@@ -122,7 +122,10 @@ export class ProductService {
 
     const results = await this.productRepo
       .createQueryBuilder('p')
+      .leftJoin('p.category', 'cat')
+      .leftJoin('p.subcategory', 'sub')
       .select(['p.id', 'p.name', 'p.slug', 'p.price', 'p.images', 'p.badge', 'p.status'])
+      .addSelect(['cat.id', 'cat.slug', 'cat.title', 'sub.id', 'sub.slug', 'sub.label'])
       .addSelect('CASE WHEN p.name ILIKE :prefix THEN 0 ELSE 1 END', 'match_rank')
       .where('p.status = :status', { status: 'active' })
       .andWhere('(p.name ILIKE :contains OR p.slug ILIKE :contains)', { contains: `%${keyword}%` })
@@ -134,14 +137,7 @@ export class ProductService {
 
     const rate = await this.currencyService.getVndPerUsd();
     return {
-      data: results.map((p) => ({
-        id: p.id,
-        name: p.name,
-        slug: p.slug,
-        ...money('price', p.price, rate),
-        image: p.images?.[0] ?? null,
-        badge: p.badge ?? null,
-      })),
+      data: results.map((p) => ({ ...presentProductSummary(p), ...money('price', p.price, rate) })),
     };
   }
 
@@ -149,7 +145,7 @@ export class ProductService {
     const relatedLimit = query.relatedLimit ?? RELATED_DEFAULT_LIMIT;
     const product = await this.productRepo.findOne({
       where: { id },
-      relations: ['category', 'subcategory'],
+      relations: PRODUCT_RELATIONS,
     });
     if (!product) {
       throwAppError(EProductErrorCode.PRODUCT_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
@@ -162,7 +158,7 @@ export class ProductService {
         category: { id: product.category.id },
         id: Not(product.id),
       },
-      relations: ['category', 'subcategory'],
+      relations: PRODUCT_RELATIONS,
       order: { createdAt: 'DESC' },
       take: relatedLimit,
     });
@@ -215,7 +211,7 @@ export class ProductService {
 
     const [data, total] = await this.productRepo.findAndCount({
       where,
-      relations: ['category', 'subcategory'],
+      relations: PRODUCT_RELATIONS,
       order,
       skip: (page - 1) * limit,
       take: limit,
@@ -261,7 +257,7 @@ export class ProductService {
   async update(id: string, dto: UpdateProductDto) {
     const product = await this.productRepo.findOne({
       where: { id },
-      relations: ['category', 'subcategory'],
+      relations: PRODUCT_RELATIONS,
     });
     if (!product) throwAppError(EProductErrorCode.PRODUCT_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
 
