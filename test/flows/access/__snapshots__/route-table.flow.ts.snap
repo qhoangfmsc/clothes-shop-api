@@ -1,0 +1,102 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Route table: discovery, snapshot and invariants matches the committed route–permission snapshot (a permission change must show up as a diff) 1`] = `
+"GET    /                                                PUBLIC
+GET    /api/addresses                                   AUTH   ADDRESS_VIEW(4000)
+POST   /api/addresses                                   AUTH   ADDRESS_CREATE(4001)
+DELETE /api/addresses/:id                               AUTH   ADDRESS_DELETE(4003)
+PATCH  /api/addresses/:id                               AUTH   ADDRESS_UPDATE(4002)
+GET    /api/admin/categories                            AUTH   CATEGORY_VIEW(7003)
+POST   /api/admin/categories                            AUTH   CATEGORY_CREATE(7000)
+DELETE /api/admin/categories/:id                        AUTH   CATEGORY_DELETE(7002)
+PATCH  /api/admin/categories/:id                        AUTH   CATEGORY_UPDATE(7001)
+PATCH  /api/admin/categories/reorder                    AUTH   CATEGORY_UPDATE(7001)
+GET    /api/admin/collections                           AUTH   COLLECTION_VIEW(8003)
+POST   /api/admin/collections                           AUTH   COLLECTION_CREATE(8000)
+DELETE /api/admin/collections/:id                       AUTH   COLLECTION_DELETE(8002)
+PATCH  /api/admin/collections/:id                       AUTH   COLLECTION_UPDATE(8001)
+GET    /api/admin/media                                 AUTH   MEDIA_VIEW(12000)
+POST   /api/admin/media                                 AUTH   MEDIA_UPLOAD(12001)
+DELETE /api/admin/media/:fileId                         AUTH   MEDIA_DELETE(12002)
+GET    /api/admin/media/ping                            AUTH   MEDIA_VIEW(12000)
+GET    /api/admin/orders                                AUTH   ORDER_ADMIN_VIEW(9000)
+GET    /api/admin/orders/:orderId                       AUTH   ORDER_ADMIN_VIEW(9000)
+PATCH  /api/admin/orders/:orderId/status                AUTH   ORDER_ADMIN_UPDATE_STATUS(9001)
+GET    /api/admin/payments/attempts                     AUTH   PAYMENT_ADMIN_VIEW(14000)
+GET    /api/admin/payments/orders/:orderId              AUTH   PAYMENT_ADMIN_VIEW(14000)
+POST   /api/admin/payments/orders/:orderId/confirm      AUTH   PAYMENT_ADMIN_CONFIRM(14001)
+POST   /api/admin/payments/orders/:orderId/qr           AUTH   PAYMENT_ADMIN_CREATE_QR(14003)
+GET    /api/admin/payments/transactions                 AUTH   PAYMENT_ADMIN_VIEW(14000)
+GET    /api/admin/pending-counts                        AUTH   ORDER_ADMIN_VIEW(9000) | PAYMENT_ADMIN_VIEW(14000) | RETURN_ADMIN_VIEW(16000) | REVIEW_ADMIN_VIEW(18000)
+GET    /api/admin/products                              AUTH   PRODUCT_VIEW(6003)
+POST   /api/admin/products                              AUTH   PRODUCT_CREATE(6000)
+DELETE /api/admin/products/:id                          AUTH   PRODUCT_DELETE(6002)
+PATCH  /api/admin/products/:id                          AUTH   PRODUCT_UPDATE(6001)
+GET    /api/admin/refunds                               AUTH   PAYMENT_ADMIN_VIEW(14000)
+POST   /api/admin/refunds                               AUTH   PAYMENT_ADMIN_REFUND(14002)
+POST   /api/admin/refunds/:refundId/complete            AUTH   PAYMENT_ADMIN_REFUND(14002)
+POST   /api/admin/refunds/:refundId/reject              AUTH   PAYMENT_ADMIN_REFUND(14002)
+GET    /api/admin/returns                               AUTH   RETURN_ADMIN_VIEW(16000)
+GET    /api/admin/returns/:returnId                     AUTH   RETURN_ADMIN_VIEW(16000)
+POST   /api/admin/returns/:returnId/approve             AUTH   RETURN_ADMIN_PROCESS(16001)
+POST   /api/admin/returns/:returnId/receive             AUTH   RETURN_ADMIN_PROCESS(16001)
+POST   /api/admin/returns/:returnId/reject              AUTH   RETURN_ADMIN_PROCESS(16001)
+GET    /api/admin/reviews                               AUTH   REVIEW_ADMIN_VIEW(18000)
+GET    /api/admin/reviews/:reviewId                     AUTH   REVIEW_ADMIN_VIEW(18000)
+POST   /api/admin/reviews/:reviewId/hide                AUTH   REVIEW_ADMIN_MODERATE(18001)
+POST   /api/admin/reviews/:reviewId/publish             AUTH   REVIEW_ADMIN_MODERATE(18001)
+DELETE /api/admin/reviews/:reviewId/reply               AUTH   REVIEW_ADMIN_REPLY(18002)
+PUT    /api/admin/reviews/:reviewId/reply               AUTH   REVIEW_ADMIN_REPLY(18002)
+GET    /api/admin/site-config                           AUTH   SITE_CONFIG_VIEW(11000)
+DELETE /api/admin/site-config/:key                      AUTH   SITE_CONFIG_DELETE(11002)
+PUT    /api/admin/site-config/:key                      AUTH   SITE_CONFIG_UPSERT(11001)
+GET    /api/admin/site-config/keys                      AUTH   SITE_CONFIG_VIEW(11000)
+GET    /api/admin/users                                 AUTH   USER_ADMIN_VIEW(10000)
+GET    /api/admin/users/:id                             AUTH   USER_ADMIN_VIEW(10000)
+PATCH  /api/admin/users/:id                             AUTH   USER_ADMIN_UPDATE(10001)
+POST   /api/auth/google                                 PUBLIC
+GET    /api/auth/me                                     AUTH   AUTH_ME(1000)
+GET    /api/auth/permissions                            AUTH   USER_ADMIN_VIEW(10000)
+POST   /api/auth/refresh                                PUBLIC
+GET    /api/cart                                        AUTH   CART_VIEW(2000)
+DELETE /api/cart/clear                                  AUTH   CART_CLEAR(2004)
+POST   /api/cart/items                                  AUTH   CART_ADD_ITEM(2001)
+DELETE /api/cart/items/:itemId                          AUTH   CART_REMOVE_ITEM(2003)
+PATCH  /api/cart/items/:itemId                          AUTH   CART_UPDATE_ITEM(2002)
+GET    /api/categories                                  PUBLIC
+GET    /api/collections                                 PUBLIC
+GET    /api/my-reviews                                  AUTH   REVIEW_VIEW(17001)
+GET    /api/my-reviews/pending                          AUTH   REVIEW_VIEW(17001)
+GET    /api/my-reviews/votes                            AUTH   REVIEW_VIEW(17001)
+GET    /api/orders                                      AUTH   ORDER_VIEW_LIST(3000)
+POST   /api/orders                                      AUTH   ORDER_CREATE(3002)
+GET    /api/orders/:orderId                             AUTH   ORDER_VIEW_DETAIL(3001)
+PATCH  /api/orders/:orderId/cancel                      AUTH   ORDER_CANCEL(3003)
+POST   /api/orders/quote                                AUTH   ORDER_CREATE(3002)
+GET    /api/payments/:orderId/status                    AUTH   PAYMENT_VIEW(13001)
+POST   /api/payments/qr                                 AUTH   PAYMENT_CREATE(13000)
+GET    /api/products                                    PUBLIC
+GET    /api/products/:id                                PUBLIC
+GET    /api/products/autocomplete                       PUBLIC
+GET    /api/returns                                     AUTH   RETURN_VIEW(15001)
+POST   /api/returns                                     AUTH   RETURN_CREATE(15000)
+GET    /api/returns/:returnId                           AUTH   RETURN_VIEW(15001)
+PATCH  /api/returns/:returnId/cancel                    AUTH   RETURN_CREATE(15000)
+GET    /api/returns/eligibility/:orderId                AUTH   RETURN_VIEW(15001)
+POST   /api/reviews                                     AUTH   REVIEW_CREATE(17000)
+GET    /api/reviews/:productId                          PUBLIC
+GET    /api/reviews/:productId/summary                  PUBLIC
+PATCH  /api/reviews/:reviewId                           AUTH   REVIEW_CREATE(17000)
+DELETE /api/reviews/:reviewId/helpful                   AUTH   REVIEW_VOTE(17002)
+POST   /api/reviews/:reviewId/helpful                   AUTH   REVIEW_VOTE(17002)
+POST   /api/reviews/images                              AUTH   REVIEW_CREATE(17000)
+GET    /api/shipping                                    PUBLIC
+GET    /api/site-config                                 PUBLIC
+GET    /api/size-guides/:category                       PUBLIC
+POST   /api/webhooks/sepay                              PUBLIC
+GET    /api/wishlist                                    AUTH   WISHLIST_VIEW(5000)
+DELETE /api/wishlist/:productId                         AUTH   WISHLIST_REMOVE(5002)
+POST   /api/wishlist/:productId                         AUTH   WISHLIST_ADD(5001)
+GET    /api/wishlist/check/:productId                   AUTH   WISHLIST_CHECK(5003)
+GET    /health                                          PUBLIC"
+`;

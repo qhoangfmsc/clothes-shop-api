@@ -15,6 +15,13 @@ export const TEST_ENV = {
   SEPAY_RECEIVING_ACCOUNT_NAME: 'DOOVAN TEST',
   SEPAY_WEBHOOK_SECRET: 'flow-test-sepay-secret',
   PAYMENT_TRANSFER_PREFIX: 'DH',
+  // Dịch vụ ngoài để rỗng: `.env` của máy dev có thể chứa khoá thật, flow test không bao giờ được dùng (ConfigModule không ghi đè biến đã có)
+  SUPABASE_URL: '',
+  SUPABASE_SERVICE_ROLE_KEY: '',
+  SUPABASE_STORAGE_BUCKET: '',
+  GOOGLE_CLIENT_ID: '',
+  GOOGLE_CLIENT_SECRET: '',
+  STORAGE_URL: '',
 } as const;
 
 export function applyTestEnv(): void {
