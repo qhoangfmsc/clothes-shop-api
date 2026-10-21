@@ -31,7 +31,6 @@ const EXTERNAL_SERVICE_KEYS = [
   'SUPABASE_STORAGE_BUCKET',
   'GOOGLE_CLIENT_ID',
   'GOOGLE_CLIENT_SECRET',
-  'STORAGE_URL',
 ] as const;
 
 function readPostgresOverrides(): Record<string, string> {

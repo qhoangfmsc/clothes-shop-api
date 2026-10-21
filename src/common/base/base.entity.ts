@@ -4,12 +4,6 @@ import { BeforeInsert, CreateDateColumn, PrimaryColumn, UpdateDateColumn } from 
 
 const nanoid16 = customAlphabet('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', 16);
 
-export interface IBaseEntity {
-  id: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
 export abstract class BaseEntity {
   @ApiResponseProperty({ example: 1 })
   @PrimaryColumn({ type: 'varchar', length: 16 })

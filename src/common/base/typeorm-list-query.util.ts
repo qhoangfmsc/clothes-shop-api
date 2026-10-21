@@ -1,8 +1,15 @@
 import { BadRequestException } from '@nestjs/common';
 import { ObjectLiteral, SelectQueryBuilder } from 'typeorm';
-import { Paging } from './base.interface';
-import { getPaging } from './pagination.util';
+import { DEFAULT_PAGE, DEFAULT_PAGE_SIZE, getPaging } from './pagination.util';
 import { parseSort } from './sort.util';
+
+export class Paging<T> {
+  items: T[] = [];
+  total = 0;
+  page = DEFAULT_PAGE;
+  limit = DEFAULT_PAGE_SIZE;
+  totalPages = 0;
+}
 
 // ---------------------------------------------------------------------------
 // Types

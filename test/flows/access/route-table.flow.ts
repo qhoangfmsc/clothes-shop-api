@@ -56,7 +56,6 @@ describe('Route table: discovery, snapshot and invariants', () => {
         'SUPABASE_STORAGE_BUCKET',
         'GOOGLE_CLIENT_ID',
         'GOOGLE_CLIENT_SECRET',
-        'STORAGE_URL',
       ]) {
         expect([key, config.get<string>(key)]).toEqual([key, '']);
       }

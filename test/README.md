@@ -13,7 +13,7 @@ Cập nhật lần cuối: 2026-10-21 · Luật: `.claude/rules/testing.md` · T
 
 ## Chạy flow test
 
-**Cấu hình ở [`.env.test`](../.env.test) (root)**: chỉ có kết nối Postgres test (`POSTGRES_*`), docker và jest cùng đọc. Chỉnh khi cổng 55432 bị chiếm hoặc muốn dùng Postgres có sẵn (rồi chạy `yarn test:flows:run`). Đổi xong: `yarn test:db:down && yarn test:db:up`. `POSTGRES_DATABASE` phải kết thúc `_test`. Phần còn lại là hằng số giả trong `test/support/test-env.ts` (JWT, SePay) hoặc luôn rỗng (`SUPABASE_*`, `GOOGLE_*`, `STORAGE_URL`), không cấu hình.
+**Cấu hình ở [`.env.test`](../.env.test) (root)**: chỉ có kết nối Postgres test (`POSTGRES_*`), docker và jest cùng đọc. Chỉnh khi cổng 55432 bị chiếm hoặc muốn dùng Postgres có sẵn (rồi chạy `yarn test:flows:run`). Đổi xong: `yarn test:db:down && yarn test:db:up`. `POSTGRES_DATABASE` phải kết thúc `_test`. Phần còn lại là hằng số giả trong `test/support/test-env.ts` (JWT, SePay) hoặc luôn rỗng (`SUPABASE_*`, `GOOGLE_*`), không cấu hình.
 
 ```bash
 yarn test:flows        # bật Postgres test (docker compose), dựng schema từ migration, chạy mọi flow
@@ -28,7 +28,7 @@ yarn -s jest --config test/jest.flows.config.js --runInBand -t "<tên test>"   #
 - Chỉ chạy trên DB có tên kết thúc `_test`. Hai lần chạy đồng thời bị chặn bằng khoá advisory.
 - Cần Docker đang chạy.
 - Mỗi file flow bắt đầu từ DB trống (`createTestApp` tự dọn) và app listen một lần trên `127.0.0.1` cổng ngẫu nhiên; không đổi hai điều này (xem ghi chú ở `PROGRESS.md`, lượt P0-2).
-- Hermetic: biến `SUPABASE_*`, `GOOGLE_*`, `STORAGE_URL` bị đặt rỗng (kể cả khi `.env` của máy có khoá thật) và `fetch` toàn cục bị chặn; test cần giả dịch vụ ngoài thì `jest.spyOn(globalThis, 'fetch')`.
+- Hermetic: biến `SUPABASE_*`, `GOOGLE_*` bị đặt rỗng (kể cả khi `.env` của máy có khoá thật) và `fetch` toàn cục bị chặn; test cần giả dịch vụ ngoài thì `jest.spyOn(globalThis, 'fetch')`.
 
 ## Độ phủ endpoint (ratchet)
 

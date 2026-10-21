@@ -32,14 +32,14 @@ Phần hạ tầng dùng chung cho mọi module: bootstrap ứng dụng, guard x
 | Swagger | `src/core/swagger/swagger.config.ts` | Tài liệu API tại `/api-docs` |
 | Guards | `src/common/guards` | `JwtAuthGuard`, `PermissionsGuard` |
 | Decorators | `src/common/decorator` | `@Public`, `@Permissions`, `@CurrentUser`, `@SortField`, `@SearchField`, `@ApiEndpoint` |
-| Base | `src/common/base` | `BaseEntity`, `pagination.util`, `sort.util`, `typeorm-list-query.util`, `base.interface` |
+| Base | `src/common/base` | `BaseEntity`, `pagination.util`, `sort.util`, `typeorm-list-query.util` (kèm lớp `Paging<T>`), `column-transformers` |
 | DTO chung | `src/common/dto` | `PaginationQueryDto` + spec guard cho mọi query DTO |
 | Exceptions | `src/common/exceptions` | `AppException`, `throwAppError`, `error-codes.ts` |
 | Filter | `src/common/filter/exception.filter.ts` | `AllExceptionFilter` |
 | Middleware | `src/common/middleware/request-id.middleware.ts` | Gắn `x-request-id` |
 | Permissions | `src/common/permissions/permissions.constant.ts` | Enum `Permission`, `DEFAULT_USER_PERMISSIONS` |
 | Constants | `src/common/constants/enum-values.constant.ts` | Enum dùng chung giữa DTO |
-| Utils / Validator | `src/common/utils`, `src/common/validator` | Helper nhỏ, validator hỗ trợ filter operator |
+| Utils | `src/common/utils` | `money.util` (tiền VND/USD) |
 | Migrations | `src/migrations`, `data-source.ts` | Lịch sử schema |
 
 ## 4. Chi tiết
@@ -153,8 +153,6 @@ Enum dùng chung (`@common/constants/enum-values.constant`):
 
 `ORDER_STATUSES` khai báo ở `src/modules/order/dtos/admin-order.dto.ts` (xem module order).
 
-`base.interface.ts`: kiểu `DeepPartial`, `AsTypeSort`, `BaseListProps`, lớp `Paging<T>`, `BadRequestErrorResponse` (schema Swagger).
-
 ### 4.6 Error code & xử lý lỗi
 
 Format `[MM][EE]` (4 chữ số). `throwAppError(errorCode, message?, statusCode = 400)` ném `AppException`, body: `{ statusCode, errorCode, message }`; không truyền message thì lấy từ `ErrorMessages[errorCode]`.
@@ -187,16 +185,12 @@ Chi tiết từng mã nằm ở mục Error code của module tương ứng.
 
 Entity **không** extends `BaseEntity` (tự khai báo id nanoid16): `Wishlist` (chỉ có `created_at`), `OrderItem` (chỉ có `created_at`).
 
-### 4.8 Utils & validator
+### 4.8 Utils
 
 | File | Nội dung | Dùng ở |
 |---|---|---|
 | `utils/money.util.ts` | Tiền tệ gốc VND: `MAX_MONEY_VND` (1 tỷ), `vndToUsd(vnd, vndPerUsd)` (làm tròn 2 chữ số), `money(tên, vnd, tỷ giá)` → `{ <tên>Vnd, <tên>Usd }`, `moneyOrNull(...)` (`null` ở cả hai field khi vắng giá trị) | mọi module trả tiền (xem [currency](currency.md)) |
 | `base/column-transformers.ts` | `bigintTransformer` (bigint → number, dùng cho mọi cột tiền VND), `numericTransformer` (numeric → number, dùng cho `orders.exchange_rate`) | entity product, order, order_item, payment_attempt, payment_transaction, refund |
-| `utils/helper.ts` | `sleep(ms)`, `formatError(err)` (kèm `err.cause`) | chưa có chỗ gọi |
-| `utils/transform.ts` | `transformJSON`, `transformArray`, `transformImageUrl` (nối `process.env.STORAGE_URL`) | chưa có chỗ gọi |
-| `validator/BaseValidate.ts` | `BaseValidate` + `baseValidateEnum/String/Number/Date/Boolean`, hiểu operator `lt lte gt gte ne in range eq` | chưa có chỗ gọi |
-| `types/baseType.ts` | `GConstructor` | chưa có chỗ gọi |
 
 ### 4.9 Migration
 
@@ -245,7 +239,6 @@ Entity **không** extends `BaseEntity` (tự khai báo id nanoid16): `Wishlist` 
 | `JWT_SECRET`, `JWT_EXPIRES_IN`, `JWT_REFRESH_EXPIRES_IN` | module auth |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | module auth |
 | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET` | module media |
-| `STORAGE_URL` | `utils/transform.ts` (`transformImageUrl`) |
 | `SEPAY_RECEIVING_BANK_CODE`, `SEPAY_RECEIVING_BANK_NAME`, `SEPAY_RECEIVING_ACCOUNT`, `SEPAY_RECEIVING_ACCOUNT_NAME`, `SEPAY_WEBHOOK_SECRET`, `PAYMENT_TRANSFER_PREFIX` | module payment |
 
 ### 4.11 Lệnh
@@ -270,10 +263,10 @@ yarn migration:run              # chạy migration
 - **Unit** (`yarn test`): `src/**/*.spec.ts` cạnh code, dùng mock. `src/common/dto/list-query.dto.spec.ts` là guard chuẩn list cho mọi `*-query.dto.ts` (xem 4.5); `src/common/utils/money.util.spec.ts` cho helper tiền. Test của từng module: xem file module tương ứng.
 - **Flow** (`yarn test:flows`): `test/flows/<module>/*.flow.ts`, đi qua HTTP thật (`MainModule` + `configureApp`) trên Postgres thật. Config riêng `test/jest.flows.config.js` (rootDir repo, chỉ nhận `*.flow.ts`, chạy tuần tự).
   - Mỗi lần chạy: lấy khoá advisory (`pg_try_advisory_lock`; lần chạy thứ hai cùng DB bị chặn), `DROP SCHEMA public` → chạy toàn bộ migration → `TRUNCATE` dữ liệu seed; sau mỗi test `truncateAll`.
-  - Cấu hình: file `.env.test` ở root chỉ chứa kết nối Postgres test (`POSTGRES_*`; thiếu khoá thì dùng mặc định trong `test/support/test-env.ts`); `docker-compose.test.yml` và jest cùng đọc. Secret giả của JWT/SePay là hằng số trong `test-env.ts`, `SUPABASE_*`/`GOOGLE_*`/`STORAGE_URL` luôn rỗng. Giá trị gán thẳng vào `process.env`, thắng `.env` của app. Khoá lạ trong file làm global-setup dừng với thông báo lỗi.
+  - Cấu hình: file `.env.test` ở root chỉ chứa kết nối Postgres test (`POSTGRES_*`; thiếu khoá thì dùng mặc định trong `test/support/test-env.ts`); `docker-compose.test.yml` và jest cùng đọc. Secret giả của JWT/SePay là hằng số trong `test-env.ts`, `SUPABASE_*`/`GOOGLE_*` luôn rỗng. Giá trị gán thẳng vào `process.env`, thắng `.env` của app. Khoá lạ trong file làm global-setup dừng với thông báo lỗi.
   - Chốt chặn: `POSTGRES_DATABASE` phải kết thúc `_test` (`assertTestDatabase`), nếu không dừng ngay.
   - Công cụ dùng chung ở `test/support/`: `createTestApp`, `createBuilders` (user, admin, product, cart, address), `bearer`, `sepayWebhook`, `truncateAll`.
-  - Hermetic: `test-env.ts` đặt rỗng `SUPABASE_*`, `GOOGLE_*`, `STORAGE_URL` (kể cả khi `.env` có khoá thật) và `test/support/env.ts` thay `fetch` toàn cục bằng hàm ném lỗi; test cần giả dịch vụ ngoài dùng `jest.spyOn(globalThis, 'fetch')`.
+  - Hermetic: `test-env.ts` đặt rỗng `SUPABASE_*`, `GOOGLE_*` (kể cả khi `.env` có khoá thật) và `test/support/env.ts` thay `fetch` toàn cục bằng hàm ném lỗi; test cần giả dịch vụ ngoài dùng `jest.spyOn(globalThis, 'fetch')`.
   - `test/support/routes.ts` (`discoverRoutes`) tự phát hiện route, `@Public()` và `@Permissions` từ metadata của Nest; `test/flows/access/route-table.flow.ts` giữ snapshot bảng route–quyền và các bất biến (route cần đăng nhập có quyền, route `/api/admin` không public và không dùng quyền mặc định, mã quyền hợp lệ).
   - `test/flows/access/access-matrix.flow.ts`: ma trận xác thực và phân quyền cho mọi route đã phát hiện (token thiếu/hỏng/hết hạn/refresh/user không tồn tại/disabled → 401; thiếu quyền → 403 mã 9001; đúng một quyền, admin → qua guard; user mặc định trên `/api/admin/**` → 403). Chỉ kiểm guard nên chấp nhận mọi status khác của route được vào (input rỗng).
   - `createTestApp` dọn DB đầu mỗi file flow và `app.listen(0, '127.0.0.1')` một lần; mỗi request có timeout 10s trong ma trận.
@@ -287,7 +280,7 @@ yarn migration:run              # chạy migration
 - Trong `JwtStrategy`, mỗi request đều đọc user từ DB nên role/permissions/status thay đổi có hiệu lực ngay, không cần chờ token hết hạn.
 - Danh sách quyền của một user được lưu trong cột `users.permissions`; `DEFAULT_USER_PERMISSIONS` chỉ được áp khi tạo user mới, không tự cập nhật cho user đã tồn tại.
 - Migration có dữ liệu seed (`categories`, `subcategories`, `collections`, `products`, `reviews`, `site_configs`); flow test xoá hết dữ liệu này sau khi dựng schema nên mỗi test tự dựng dữ liệu bằng builder, và phí ship/tỷ giá trong flow test là giá trị mặc định trong code (`DEFAULT_SHIPPING_CONFIG`, `DEFAULT_VND_PER_USD`) vì không có dòng `site_configs`.
-- Một số file trong `common/` hiện không được import ở đâu: `DeepPartial`, `AsTypeSort`, `BaseListProps` (`base/base.interface.ts`), `GConstructor` (`types/baseType.ts`) và toàn bộ `validator/BaseValidate.ts`. `Paging` trong `base.interface.ts` thì được `typeorm-list-query.util.ts` dùng.
+- `@ApiEndpoint` (`decorator/api-endpoint.decorator.ts`) chưa module nào dùng; skill `.agent/skills/nest-best-practices` quy định dùng nó thay cho `@ApiOperation`.
 - `common/guards/permissions.guard.ts` import entity `User` từ `src/modules/user`; ngoài ra `common/` và `core/` không import `modules/`.
 - Một số service vẫn ném exception HTTP thô (`BadRequestException`, `NotFoundException`...) thay vì `throwAppError`: `order`, `auth` (`auth.service`, `google-auth.service`), `cart`, `address`, `review`.
 - Trạng thái đơn: cột `orders.status`/`payment_status` khai báo kiểu `string` trong entity và bảng chuyển trạng thái đơn là `Record<string, string[]>` trong `OrderService`; `return` dùng `assertStatus` với type union `ReturnStatus`, `payment`/`refund` khai báo trạng thái bằng `as const` ở `payment.constant.ts`.
