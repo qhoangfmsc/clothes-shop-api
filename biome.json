@@ -48,7 +48,7 @@
     }
   },
   "files": {
-    "includes": ["src/**", "!src/migrations"]
+    "includes": ["src/**", "test/**", "!src/migrations"]
   },
   "vcs": {
     "enabled": true,

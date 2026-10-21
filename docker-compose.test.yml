@@ -1,0 +1,18 @@
+# Postgres chỉ dành cho flow test (`yarn test:flows`). Cổng 55432 để không đụng DB dev (5432).
+# Dữ liệu nằm trong tmpfs: tắt container là mất, mỗi lần chạy test dựng lại schema từ migration.
+services:
+  postgres-test:
+    image: postgres:16-alpine
+    ports:
+      - '55432:5432'
+    environment:
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test
+      POSTGRES_DB: clothes_shop_test
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U test -d clothes_shop_test']
+      interval: 2s
+      timeout: 3s
+      retries: 20
