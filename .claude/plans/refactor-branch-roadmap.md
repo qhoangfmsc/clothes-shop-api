@@ -1,0 +1,32 @@
+# Lộ trình nhánh `refactor/engineering-workflow`
+
+Nhánh refactor lớn tách từ `main` (commit `aa97259`). Người dùng tự quyết định có merge vào `main` hay không. Chưa push.
+
+## Nhịp làm việc (bắt buộc)
+
+Mỗi phần: làm theo quy trình `.claude/rules/feature-workflow.md` (đọc → spec → code + test → docs) → **kiểm tra toàn bộ** → commit trên nhánh → báo cáo tóm tắt → **chờ người dùng xác nhận** rồi mới sang phần kế tiếp.
+
+Kiểm tra toàn bộ sau mỗi phần (phải qua cả, và sau mỗi thay đổi đáng kể trong phần):
+`npx tsc --noEmit` · `yarn lint` (không thêm cảnh báo; hiện có 5 cảnh báo cũ trong `src`) · `yarn test` (hiện 729 test) · `yarn test:flows` chạy ≥ 3 lần liên tiếp (hiện 11 test) · `npx nest build`. Sau khi commit: `git status` sạch.
+
+Báo cáo mỗi phần: đã đổi gì (file), số liệu trước/sau, pattern/nguyên lý đã áp dụng và vì sao, docs/spec/test đã cập nhật, điều cần lưu ý, phần kế tiếp.
+
+## Các phần
+
+| # | Phần | Trạng thái |
+|---|---|---|
+| 1 | Tạo nhánh, mang code đang dở của `main` sang, quy trình (rules/skills), khung flow test + 11 flow đặt hàng–thanh toán–hoàn tiền, docs/spec/test matrix | Xong (4 commit) |
+| 2 | P0-1: test hermetic (chặn mạng, env dịch vụ ngoài rỗng) + `routes.ts` tự phát hiện route + snapshot bảng route–quyền | Chưa làm |
+| 3 | P0-2: ma trận auth/quyền cho mọi route (401 các kiểu, 403, đủ quyền, admin, public) + invariants | Chưa làm |
+| 4 | P0-3: recorder độ phủ + `coverage-report.ts` + `coverage-baseline.json` (ratchet) + nối vào `yarn test:flows`; P0-4: đóng spec 0002 | Chưa làm |
+| 5 | Xoá code chết ở `common/` (`BaseValidate.ts`, `base.interface.ts` phần không dùng, `types/baseType.ts`) | Chưa làm |
+| 6 | Quy ước được máy ép: test kiến trúc (`common/` không import `modules/`, không exception thô trong service mới, không `forwardRef`) với allowlist chỉ co lại | Chưa làm |
+| 7 | Chuẩn hoá lỗi: exception thô → `throwAppError` + error code (order, auth, cart, address, review), theo từng module, có flow/unit bảo vệ | Chưa làm |
+| 8 | Trạng thái: `as const` + type union cho `orders.status`/`payment_status`; bảng chuyển trạng thái dùng chung (State machine) áp dụng cho order, return | Chưa làm |
+| 9 | Helper `withLock` gom khung transaction + khoá dòng (return, review, order, payment, refund) | Chưa làm |
+| 10 | Tách `OrderService` theo use case (checkout, status, query) — có flow test bảo vệ | Chưa làm |
+| 11 | Ranh giới module: bỏ việc module khác với tay vào bảng `orders`/`products` (qua service export) — thiết kế trong spec, quyết định cùng người dùng | Chưa làm |
+| 12+ | Chiến dịch test toàn diện: 25 batch theo `test/PROGRESS.md` (nhóm theo module, mỗi lần một batch) | Chưa làm |
+| Cuối | Đối chiếu toàn bộ docs/spec/test matrix với code, chạy kiểm tra toàn bộ, báo cáo tổng kết | Chưa làm |
+
+Thứ tự phần 5–11 có thể đổi theo ý người dùng. Phần 7–11 đụng code production nên mỗi phần có spec riêng ở `docs/specs/<module>/` và cần người dùng duyệt thiết kế trước khi code.
