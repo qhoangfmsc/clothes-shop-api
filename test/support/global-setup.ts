@@ -51,7 +51,7 @@ async function acquireRunLock(): Promise<void> {
     await client.connect();
   } catch (error) {
     throw new Error(
-      `Cannot connect to the flow-test database (${process.env.POSTGRES_HOST}:${process.env.POSTGRES_PORT}). Run "yarn test:db:up" first. ${(error as Error).message}`,
+      `Cannot connect to the flow-test database (${process.env.POSTGRES_HOST}:${process.env.POSTGRES_PORT}). Run "yarn test:db:up" first, or fix POSTGRES_* in .env.test (then "yarn test:db:down && yarn test:db:up"). ${(error as Error).message}`,
     );
   }
   const { rows } = await client.query('SELECT pg_try_advisory_lock($1) AS locked', [RUN_LOCK_KEY]);

@@ -1,6 +1,7 @@
 # 0001 — Khung flow test chạy trên Postgres thật
 
 > Module: `testing` (hạ tầng test, dùng chung) · Trạng thái: Implemented · Ngày: 2026-10-21
+> Cấu hình cổng/tài khoản DB và secret giả nêu trong spec này nay đọc từ `.env.test` (xem 0003); phần còn lại vẫn đúng.
 
 ## 1. Bối cảnh & vấn đề
 

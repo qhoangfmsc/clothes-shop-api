@@ -256,8 +256,9 @@ npx nest build                  # build
 npx tsc --noEmit                # type check
 yarn lint                       # biome check ./src ./test
 yarn test                       # unit test: jest (rootDir src, regex *.spec.ts / *e2e-spec.ts), mock, không cần DB
-yarn test:db:up                 # bật Postgres test (docker compose, cổng 55432, DB clothes_shop_test)
-yarn test:flows                 # flow test trên Postgres thật (tự gọi test:db:up)
+yarn test:db:up                 # bật Postgres test (docker compose đọc .env.test; mặc định cổng 55432, DB clothes_shop_test)
+yarn test:flows                 # flow test trên Postgres thật (tự gọi test:db:up rồi test:flows:run)
+yarn test:flows:run             # chỉ chạy jest của flow test, không bật docker
 yarn test:db:down               # tắt Postgres test
 yarn migration:run              # chạy migration
 ```
@@ -267,7 +268,8 @@ yarn migration:run              # chạy migration
 - **Unit** (`yarn test`): `src/**/*.spec.ts` cạnh code, dùng mock. `src/common/dto/list-query.dto.spec.ts` là guard chuẩn list cho mọi `*-query.dto.ts` (xem 4.5); `src/common/utils/money.util.spec.ts` cho helper tiền. Test của từng module: xem file module tương ứng.
 - **Flow** (`yarn test:flows`): `test/flows/<module>/*.flow.ts`, đi qua HTTP thật (`MainModule` + `configureApp`) trên Postgres thật. Config riêng `test/jest.flows.config.js` (rootDir repo, chỉ nhận `*.flow.ts`, chạy tuần tự).
   - Mỗi lần chạy: lấy khoá advisory (`pg_try_advisory_lock`; lần chạy thứ hai cùng DB bị chặn), `DROP SCHEMA public` → chạy toàn bộ migration → `TRUNCATE` dữ liệu seed; sau mỗi test `truncateAll`.
-  - Chốt chặn: tên DB phải kết thúc `_test` (`test/support/test-env.ts`), nếu không dừng ngay. Biến môi trường test (DB `127.0.0.1:55432`, secret JWT/SePay giả) gán thẳng vào `process.env`, thắng `.env`.
+  - Cấu hình: file `.env.test` ở root (cổng/tài khoản Postgres test, secret JWT/SePay giả; khoá thiếu thì dùng mặc định trong `test/support/test-env.ts`). `docker-compose.test.yml` và jest cùng đọc file này; giá trị gán thẳng vào `process.env`, thắng `.env` của app. Khai báo `SUPABASE_*`/`GOOGLE_*`/`STORAGE_URL` hoặc khoá lạ trong file làm global-setup dừng với thông báo lỗi.
+  - Chốt chặn: `POSTGRES_DATABASE` phải kết thúc `_test` (`assertTestDatabase`), nếu không dừng ngay.
   - Công cụ dùng chung ở `test/support/`: `createTestApp`, `createBuilders` (user, admin, product, cart, address), `bearer`, `sepayWebhook`, `truncateAll`.
   - Hermetic: `test-env.ts` đặt rỗng `SUPABASE_*`, `GOOGLE_*`, `STORAGE_URL` (kể cả khi `.env` có khoá thật) và `test/support/env.ts` thay `fetch` toàn cục bằng hàm ném lỗi; test cần giả dịch vụ ngoài dùng `jest.spyOn(globalThis, 'fetch')`.
   - `test/support/routes.ts` (`discoverRoutes`) tự phát hiện route, `@Public()` và `@Permissions` từ metadata của Nest; `test/flows/access/route-table.flow.ts` giữ snapshot bảng route–quyền và các bất biến (route cần đăng nhập có quyền, route `/api/admin` không public và không dùng quyền mặc định, mã quyền hợp lệ).

@@ -331,6 +331,7 @@ Trạng thái: **Chưa làm** · Ghi chú: —
 |---|---|---|---|---|---|---|
 | — | 2026-10-21 | Lập quy trình + chia 25 batch | 0 | — | — | Số liệu độ phủ chỉ có sau P0-3 |
 | P0-1 | 2026-10-21 | Hermetic + tự phát hiện route + snapshot quyền | +9 (flow 11 → 20) | chưa đo (P0-3) | chưa đo (P0-3) | 98 route phát hiện (15 public, 83 cần đăng nhập), không có route thiếu quyền. Phá thử 4 lần (bỏ `@Permissions`, đổi quyền, bỏ chặn `fetch`, bỏ env rỗng) đều bị bắt. `.env` của máy có `SUPABASE_URL`, `GOOGLE_CLIENT_ID` thật nên phần hermetic có tác dụng thật |
+| P0-1b | 2026-10-21 | Cấu hình flow test gom vào `.env.test` (spec 0003) | 0 | — | — | Cổng đổi 55433 thử thành công; 4 cấu hình sai đều báo đúng lỗi |
 
 ## Phát hiện cần người dùng quyết định
 

@@ -55,11 +55,12 @@ describe('Flow: <tên luồng>', () => {
 
 ```bash
 yarn test:flows                              # tự bật Postgres test (docker), dựng schema từ migration, chạy tất cả flow
+yarn test:flows:run                          # chỉ chạy jest (không bật docker), khi dùng Postgres có sẵn
 yarn -s jest --config test/jest.flows.config.js --runInBand -t "<tên test>"   # chạy một test (cần DB đã up)
 yarn test:db:down                            # tắt DB test
 ```
 
-Không chạy hai lệnh flow cùng lúc (khoá advisory sẽ chặn). Docker không chạy → nói rõ trong báo cáo, không tuyên bố xong.
+Cấu hình (cổng, tài khoản DB, secret giả) ở `.env.test` ở root. Không chạy hai lệnh flow cùng lúc (khoá advisory sẽ chặn). Docker không chạy → nói rõ trong báo cáo, không tuyên bố xong.
 
 ## 4. Cập nhật test matrix
 

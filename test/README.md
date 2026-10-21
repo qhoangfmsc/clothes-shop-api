@@ -13,8 +13,11 @@ Cập nhật lần cuối: 2026-10-21 · Luật: `.claude/rules/testing.md` · T
 
 ## Chạy flow test
 
+**Cấu hình nằm ở [`.env.test`](../.env.test) (root)** — file duy nhất bạn chỉnh (cổng/tài khoản Postgres test, secret giả của JWT và SePay). Cả docker và jest cùng đọc nó. Cần chỉnh khi: cổng 55432 bị chiếm (đổi `POSTGRES_PORT`), hoặc muốn dùng Postgres có sẵn (trỏ `POSTGRES_*` tới nó rồi chạy `yarn test:flows:run`). Đổi `POSTGRES_*` xong phải `yarn test:db:down && yarn test:db:up`. `POSTGRES_DATABASE` bắt buộc kết thúc `_test`. `SUPABASE_*`, `GOOGLE_*`, `STORAGE_URL` không cấu hình được (luôn rỗng).
+
 ```bash
 yarn test:flows        # bật Postgres test (docker compose), dựng schema từ migration, chạy mọi flow
+yarn test:flows:run    # chỉ chạy jest, không bật docker (khi dùng Postgres có sẵn)
 yarn test:db:down      # tắt DB test khi xong
 yarn -s jest --config test/jest.flows.config.js --runInBand -t "<tên test>"   # chạy một test (DB đã up)
 ```
@@ -31,7 +34,7 @@ test/
 ├── README.md                    file này (test matrix)
 ├── jest.flows.config.js         config jest riêng cho flow
 ├── support/
-│   ├── test-env.ts              env test (DB, JWT, SePay giả; dịch vụ ngoài để rỗng) + chốt chặn tên DB `_test`
+│   ├── test-env.ts              nạp `.env.test` (+ mặc định), dịch vụ ngoài luôn rỗng, chốt chặn tên DB `_test`
 │   ├── env.ts                   setupFiles: áp env test và chặn `fetch` ra mạng
 │   ├── global-setup.ts          khoá chạy, dựng schema từ migration, dọn seed
 │   ├── global-teardown.ts       nhả khoá
