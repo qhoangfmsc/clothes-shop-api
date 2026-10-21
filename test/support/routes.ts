@@ -6,14 +6,13 @@ import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 import { DiscoveryService, Reflector } from '@nestjs/core';
 
 export interface RouteInfo {
-  /** `GET`, `POST`, `PATCH`... */
   method: string;
-  /** Đường dẫn đầy đủ dạng Express, vd `/api/orders/:orderId` (không có `/` cuối, trừ route gốc `/`) */
+  /** Dạng Express, vd `/api/orders/:orderId`, không có `/` cuối */
   path: string;
   isPublic: boolean;
-  /** Quyền khai báo bằng `@Permissions(...)`; user cần ít nhất một trong số này. Rỗng với route public */
+  /** Cần ít nhất một trong các quyền này; rỗng với route public */
   permissions: number[];
-  /** `ControllerName.methodName`, để thông báo lỗi chỉ thẳng tới code */
+  /** `ControllerName.methodName` */
   handler: string;
 }
 
@@ -26,10 +25,7 @@ const normalizePath = (...parts: string[]): string => {
   return path.length > 1 ? path.replace(/\/$/, '') : path;
 };
 
-/**
- * Tự phát hiện mọi route từ metadata của Nest (không đọc file controller): nguồn sự thật là chính app đang chạy,
- * nên route/quyền thêm sau này tự được kiểm. Kết quả sắp theo `path` rồi `method` để ổn định giữa các lần chạy.
- */
+/** Tự phát hiện route từ metadata của Nest; sắp theo path rồi method để ổn định. */
 export function discoverRoutes(app: INestApplication): RouteInfo[] {
   const discovery = app.get(DiscoveryService);
   const reflector = app.get(Reflector);
@@ -41,7 +37,7 @@ export function discoverRoutes(app: INestApplication): RouteInfo[] {
     const basePaths = Reflect.getMetadata(PATH_METADATA, metatype) as string | string[] | undefined;
     if (basePaths === undefined) continue;
 
-    // Duyệt cả chuỗi prototype để không sót handler của controller kế thừa
+    // cả chuỗi prototype để không sót handler kế thừa
     const handlers = new Set<string>();
     for (let proto = Object.getPrototypeOf(instance); proto && proto !== Object.prototype; proto = Object.getPrototypeOf(proto)) {
       for (const name of Object.getOwnPropertyNames(proto)) if (name !== 'constructor') handlers.add(name);
@@ -74,10 +70,15 @@ export function discoverRoutes(app: INestApplication): RouteInfo[] {
   return routes.sort((a, b) => a.path.localeCompare(b.path) || a.method.localeCompare(b.method));
 }
 
-/** Tên quyền đọc được: `ORDER_VIEW_LIST(3000)`; mã không có trong enum hiện là `UNKNOWN(1234)` để lộ ra ở snapshot */
+export const SAMPLE_ID = 'aaaaaaaaaaaaaaaa';
+
+/** Thay mọi `:param` bằng id mẫu để gọi thử route. */
+export const concretePath = (path: string): string => path.replace(/:[A-Za-z]+/g, SAMPLE_ID);
+
+/** `ORDER_VIEW_LIST(3000)`; mã không có trong enum hiện là `UNKNOWN(...)`. */
 export const permissionLabel = (code: number): string => `${(Permission as unknown as Record<number, string>)[code] ?? 'UNKNOWN'}(${code})`;
 
-/** Bảng route–quyền dạng text để làm snapshot: đổi quyền hay thêm/bớt route nào thì diff nêu đúng dòng đó */
+/** Bảng route–quyền dạng text cho snapshot. */
 export function formatRouteTable(routes: RouteInfo[]): string {
   return routes
     .map((route) => {

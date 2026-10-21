@@ -46,7 +46,7 @@ test/support/coverage-report.ts  script chạy sau jest: in bảng, áp ratchet 
 test/support/test-app.ts         (P0-3) gắn recorder trước app.init(); ghi routes.json mỗi lần boot
 test/support/auth.ts             bearer(t, user, options): ký token đúng hoặc cố ý hỏng (sai secret, hết hạn, refresh)
 test/flows/access/route-table.flow.ts     snapshot bảng route–quyền + bất biến tĩnh + kiểm hermetic (P0-1)
-test/flows/access/access-matrix.flow.ts   ma trận auth/quyền qua HTTP (P0-2)
+test/flows/access/access-matrix.flow.ts   ma trận auth/quyền qua HTTP (P0-2, đã xong)
 test/coverage-baseline.json      route hiện chưa có ca thành công / ca lỗi (chỉ được thu nhỏ)
 ```
 

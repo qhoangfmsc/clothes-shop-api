@@ -13,7 +13,7 @@ Cập nhật lần cuối: 2026-10-21 · Luật: `.claude/rules/testing.md` · T
 
 ## Chạy flow test
 
-**Cấu hình nằm ở [`.env.test`](../.env.test) (root)** — file duy nhất bạn chỉnh (cổng/tài khoản Postgres test, secret giả của JWT và SePay). Cả docker và jest cùng đọc nó. Cần chỉnh khi: cổng 55432 bị chiếm (đổi `POSTGRES_PORT`), hoặc muốn dùng Postgres có sẵn (trỏ `POSTGRES_*` tới nó rồi chạy `yarn test:flows:run`). Đổi `POSTGRES_*` xong phải `yarn test:db:down && yarn test:db:up`. `POSTGRES_DATABASE` bắt buộc kết thúc `_test`. `SUPABASE_*`, `GOOGLE_*`, `STORAGE_URL` không cấu hình được (luôn rỗng).
+**Cấu hình ở [`.env.test`](../.env.test) (root)**: chỉ có kết nối Postgres test (`POSTGRES_*`), docker và jest cùng đọc. Chỉnh khi cổng 55432 bị chiếm hoặc muốn dùng Postgres có sẵn (rồi chạy `yarn test:flows:run`). Đổi xong: `yarn test:db:down && yarn test:db:up`. `POSTGRES_DATABASE` phải kết thúc `_test`. Phần còn lại là hằng số giả trong `test/support/test-env.ts` (JWT, SePay) hoặc luôn rỗng (`SUPABASE_*`, `GOOGLE_*`, `STORAGE_URL`), không cấu hình.
 
 ```bash
 yarn test:flows        # bật Postgres test (docker compose), dựng schema từ migration, chạy mọi flow
@@ -25,6 +25,7 @@ yarn -s jest --config test/jest.flows.config.js --runInBand -t "<tên test>"   #
 - Mỗi lần chạy: `DROP SCHEMA public` → chạy **toàn bộ migration** → xoá dữ liệu seed → chạy flow; sau mỗi test dữ liệu được dọn. Migration hỏng hoặc thiếu constraint làm cả bộ đỏ.
 - Chỉ chạy trên DB có tên kết thúc `_test`. Hai lần chạy đồng thời bị chặn bằng khoá advisory.
 - Cần Docker đang chạy.
+- Mỗi file flow bắt đầu từ DB trống (`createTestApp` tự dọn) và app listen một lần trên `127.0.0.1` cổng ngẫu nhiên; không đổi hai điều này (xem ghi chú ở `PROGRESS.md`, lượt P0-2).
 - Hermetic: biến `SUPABASE_*`, `GOOGLE_*`, `STORAGE_URL` bị đặt rỗng (kể cả khi `.env` của máy có khoá thật) và `fetch` toàn cục bị chặn; test cần giả dịch vụ ngoài thì `jest.spyOn(globalThis, 'fetch')`.
 
 ## Cấu trúc
@@ -34,7 +35,7 @@ test/
 ├── README.md                    file này (test matrix)
 ├── jest.flows.config.js         config jest riêng cho flow
 ├── support/
-│   ├── test-env.ts              nạp `.env.test` (+ mặc định), dịch vụ ngoài luôn rỗng, chốt chặn tên DB `_test`
+│   ├── test-env.ts              nạp `.env.test` (chỉ `POSTGRES_*`), hằng số giả JWT/SePay, dịch vụ ngoài rỗng, chốt chặn tên DB `_test`
 │   ├── env.ts                   setupFiles: áp env test và chặn `fetch` ra mạng
 │   ├── global-setup.ts          khoá chạy, dựng schema từ migration, dọn seed
 │   ├── global-teardown.ts       nhả khoá
@@ -43,7 +44,7 @@ test/
 │   ├── auth.ts                  bearer(t, user): header JWT
 │   ├── builders.ts              createBuilders(ds): user, admin, product, cart, address...
 │   ├── sepay.ts                 sepayWebhook(): webhook ký HMAC đúng chuẩn
-│   └── routes.ts                discoverRoutes(app): tự phát hiện route + quyền từ metadata của Nest; formatRouteTable
+│   └── routes.ts                discoverRoutes(app): tự phát hiện route + quyền từ metadata của Nest; formatRouteTable; concretePath
 └── flows/<module>/
     ├── <luồng>.flow.ts          một file một luồng nghiệp vụ
     └── steps.ts                 bước dùng lại của luồng (không phải test)
@@ -57,7 +58,8 @@ Trạng thái: **Có** = đã có test cover luồng · **Unit** = chỉ có uni
 
 | Module | Luồng | Tầng | File | Trạng thái |
 |---|---|---|---|---|
-| auth / guard | Không token → 401; thiếu quyền → 403 (mới trên `GET /api/orders`) | Flow | `flows/order-payment/checkout-and-pay.flow.ts` | Có |
+| auth / guard (mọi route) | Ma trận cho cả 98 route: không/rỗng/sai scheme credential → 401; token sai secret, hết hạn, loại refresh, user không tồn tại, user disabled → 401; không quyền / đủ mọi quyền trừ quyền cần → 403 (9001); đúng một trong các quyền cần → qua guard; admin không cần quyền → qua guard; user mặc định trên `/api/admin/**` → 403; route public vào được không token và với token rác | Flow | `flows/access/access-matrix.flow.ts` | Có |
+| auth / guard | Không token → 401; thiếu quyền → 403 trên `GET /api/orders` | Flow | `flows/order-payment/checkout-and-pay.flow.ts` | Có |
 | mọi module (bảng quyền) | Tự phát hiện 98 route; snapshot route–quyền; mọi route cần đăng nhập có quyền; route public không có quyền; route `/api/admin` không public và không dùng quyền mặc định; mã quyền hợp lệ; không trùng method+path | Flow | `flows/access/route-table.flow.ts` | Có |
 | hạ tầng test | Hermetic: env dịch vụ ngoài rỗng, `fetch` bị chặn, media chưa cấu hình → 503/1601 | Flow | `flows/access/route-table.flow.ts` | Có |
 | order + cart + address + payment | Giỏ → báo giá → checkout → mã QR → webhook SePay → đơn `paid`/`confirmed` | Flow | `flows/order-payment/checkout-and-pay.flow.ts` | Có |
