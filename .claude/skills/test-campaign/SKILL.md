@@ -14,10 +14,10 @@ Luật liên quan: `.claude/rules/testing.md`, `.claude/rules/feature-workflow.m
 | Nguồn | Chứa | Ai ghi |
 |---|---|---|
 | `test/PROGRESS.md` | Kế hoạch (P0 + 25 batch), trạng thái từng batch, nhật ký, phát hiện cần quyết định | Bạn, cuối mỗi lượt |
-| Báo cáo độ phủ + `test/coverage-baseline.json` (có sau bước P0-3) | Route nào còn thiếu ca thành công / ca lỗi — **số do máy đo** | Máy (`yarn test:flows`) |
+| Báo cáo độ phủ (cuối `yarn test:flows`) + `test/coverage-baseline.json` | Route nào còn thiếu ca thành công / ca lỗi, "batch kế tiếp" — **số do máy đo** | Máy |
 | `test/README.md` | Test matrix theo luồng/module | Bạn, khi thêm/đổi test |
 
-Trước P0-3 chưa có số máy đo: đếm bằng danh sách route trong batch và tên test (`jest --verbose`), ghi rõ cách đếm trong nhật ký.
+Hạ tầng đo độ phủ đã xong (P0-1..P0-4): dùng số của báo cáo, không đếm tay.
 
 ## Giao thức một lượt
 
@@ -45,7 +45,7 @@ Trước P0-3 chưa có số máy đo: đếm bằng danh sách route trong batc
 **Bước 6 — Tự đong đếm** (ghi số vào nhật ký)
 - Số route trong batch đạt ✔ thành công và ✔ lỗi (phải là N/N; ngoại lệ chỉ khi route không thể có lỗi nghiệp vụ, vd `GET /health` → ghi `exempt` kèm lý do).
 - Số test thêm (so với trước lượt), tổng flow test sau lượt.
-- Sau P0-3: độ phủ toàn cục trước → sau (báo cáo tự in), baseline đã co lại đúng bằng số route vừa phủ (`--update-baseline`).
+- Độ phủ toàn cục trước → sau (báo cáo tự in); chạy `yarn test:coverage:update` để baseline co lại đúng bằng số route vừa phủ, rồi `yarn test:coverage` phải báo `Ratchet: OK`.
 
 **Bước 7 — Phát hiện lỗi thật**: test đỏ vì **code có vẻ sai** (không phải test sai) → ghi vào mục "Phát hiện cần người dùng quyết định" trong PROGRESS.md (route, quan sát, mong đợi + nguồn) và đánh batch `Chặn` hoặc bỏ ca đó ra kèm ghi chú. **Không sửa code production lặng lẽ** (đổi hành vi cần spec riêng) và không viết test khẳng định hành vi nghi là lỗi như thể nó đúng.
 

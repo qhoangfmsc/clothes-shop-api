@@ -62,7 +62,11 @@ yarn test:db:down                            # tắt DB test
 
 Cấu hình (cổng, tài khoản DB, secret giả) ở `.env.test` ở root. Không chạy hai lệnh flow cùng lúc (khoá advisory sẽ chặn). Docker không chạy → nói rõ trong báo cáo, không tuyên bố xong.
 
-## 4. Cập nhật test matrix
+## 4. Độ phủ và test matrix
+
+Sau `yarn test:flows` đọc dòng "Độ phủ endpoint"; route vừa phủ thì `yarn test:coverage:update` để gỡ khỏi baseline. Route mới bắt buộc có cả ca thành công và ca lỗi (ratchet).
+
+Cập nhật test matrix:
 
 Thêm/sửa dòng trong `test/README.md`: module · luồng · tầng · file. Thêm cả hàng "chưa có" cho luồng chính phát hiện còn thiếu để thấy khoảng trống.
 

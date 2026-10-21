@@ -40,6 +40,10 @@ Hạ tầng flow test (spec): `docs/specs/testing/0001-flow-test-infrastructure.
 - Flow test hermetic: không ra mạng. Biến dịch vụ ngoài (`SUPABASE_*`, `GOOGLE_*`, `STORAGE_URL`) bị đặt rỗng và `fetch` bị chặn; cần giả dịch vụ ngoài thì `jest.spyOn(globalThis, 'fetch')` trong chính test đó. Thêm biến môi trường dịch vụ ngoài mới vào code → thêm vào `test-env.ts` (giá trị rỗng).
 - Không chạy hai lần `yarn test:flows` đồng thời (khoá advisory sẽ chặn lần thứ hai).
 
+## Độ phủ endpoint (ratchet)
+
+`yarn test:flows` đo route nào đã có ca thành công và ca lỗi nghiệp vụ (`test/coverage-baseline.json`). Route mới phải kèm cả hai loại test trong cùng lượt, nếu không `yarn test:flows` đỏ. Phủ thêm route cũ thì chạy `yarn test:coverage:update` để gỡ khỏi baseline. Không thêm mục vào baseline để "qua" ratchet; chỉ miễn trừ (`exempt`) khi route không thể có ca đó, kèm lý do.
+
 ## Chiến dịch test toàn diện
 
 Phủ ca đúng + ca lỗi + auth/quyền cho **mọi route** được làm theo từng lượt nhỏ (1 batch ≤ 5 route/lượt), có đong đếm và nối lại được giữa các phiên: skill `test-campaign`, tiến độ ở `test/PROGRESS.md`. Làm việc test lớn thì mở PROGRESS.md trước, không làm ngoài batch đang đến lượt.

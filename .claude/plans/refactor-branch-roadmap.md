@@ -18,7 +18,7 @@ Báo cáo mỗi phần: đã đổi gì (file), số liệu trước/sau, patter
 | 1 | Tạo nhánh, mang code đang dở của `main` sang, quy trình (rules/skills), khung flow test + 11 flow đặt hàng–thanh toán–hoàn tiền, docs/spec/test matrix | Xong (4 commit) |
 | 2 | P0-1: test hermetic (chặn mạng, env dịch vụ ngoài rỗng) + `routes.ts` tự phát hiện route + snapshot bảng route–quyền | Xong |
 | 3 | P0-2: ma trận auth/quyền cho mọi route (401 các kiểu, 403, đủ quyền, admin, public) + invariants | Xong |
-| 4 | P0-3: recorder độ phủ + `coverage-report.ts` + `coverage-baseline.json` (ratchet) + nối vào `yarn test:flows`; P0-4: đóng spec 0002 | Chưa làm |
+| 4 | P0-3: recorder độ phủ + `coverage-report.ts` + `coverage-baseline.json` (ratchet) + nối vào `yarn test:flows`; P0-4: đóng spec 0002 | Xong |
 | 5 | Xoá code chết ở `common/` (`BaseValidate.ts`, `base.interface.ts` phần không dùng, `types/baseType.ts`) | Chưa làm |
 | 6 | Quy ước được máy ép: test kiến trúc (`common/` không import `modules/`, không exception thô trong service mới, không `forwardRef`) với allowlist chỉ co lại | Chưa làm |
 | 7 | Chuẩn hoá lỗi: exception thô → `throwAppError` + error code (order, auth, cart, address, review), theo từng module, có flow/unit bảo vệ | Chưa làm |

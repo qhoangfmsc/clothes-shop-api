@@ -259,6 +259,8 @@ yarn test                       # unit test: jest (rootDir src, regex *.spec.ts 
 yarn test:db:up                 # bật Postgres test (docker compose đọc .env.test; mặc định cổng 55432, DB clothes_shop_test)
 yarn test:flows                 # flow test trên Postgres thật (tự gọi test:db:up rồi test:flows:run)
 yarn test:flows:run             # chỉ chạy jest của flow test, không bật docker
+yarn test:coverage              # báo cáo độ phủ endpoint + ratchet từ lần chạy gần nhất
+yarn test:coverage:update       # gỡ khỏi test/coverage-baseline.json các route đã đủ ca
 yarn test:db:down               # tắt Postgres test
 yarn migration:run              # chạy migration
 ```
@@ -275,6 +277,7 @@ yarn migration:run              # chạy migration
   - `test/support/routes.ts` (`discoverRoutes`) tự phát hiện route, `@Public()` và `@Permissions` từ metadata của Nest; `test/flows/access/route-table.flow.ts` giữ snapshot bảng route–quyền và các bất biến (route cần đăng nhập có quyền, route `/api/admin` không public và không dùng quyền mặc định, mã quyền hợp lệ).
   - `test/flows/access/access-matrix.flow.ts`: ma trận xác thực và phân quyền cho mọi route đã phát hiện (token thiếu/hỏng/hết hạn/refresh/user không tồn tại/disabled → 401; thiếu quyền → 403 mã 9001; đúng một quyền, admin → qua guard; user mặc định trên `/api/admin/**` → 403). Chỉ kiểm guard nên chấp nhận mọi status khác của route được vào (input rỗng).
   - `createTestApp` dọn DB đầu mỗi file flow và `app.listen(0, '127.0.0.1')` một lần; mỗi request có timeout 10s trong ma trận.
+  - Độ phủ endpoint: `createTestApp` gắn middleware ghi `{route, status}` của request thật (bỏ qua header `x-test-probe` của ma trận) vào `test/.coverage/` (gitignore); `test/support/coverage-report.ts` chạy sau jest trong `yarn test:flows`, in số route có ca thành công / ca lỗi và áp ratchet với `test/coverage-baseline.json` (route mới thiếu ca → lỗi; mục đã đủ ca còn trong baseline → lỗi; baseline chỉ co lại).
   - Hiện có: `test/flows/order-payment/` (đặt hàng – thanh toán, huỷ – hoàn tiền), `test/flows/access/` (bảng quyền, hermetic, ma trận auth/quyền). Bảng luồng nào có test nào: `test/README.md`. Thiết kế: `docs/specs/testing/0001-flow-test-infrastructure.md`.
 
 ### 4.13 Lưu ý hiện trạng

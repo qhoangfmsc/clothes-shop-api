@@ -1,7 +1,7 @@
 # Tiến độ chiến dịch test toàn diện
 
 > Quy trình: skill `test-campaign` (`.claude/skills/test-campaign/SKILL.md`) — **đọc skill trước khi làm bất kỳ lượt nào**.
-> Đây là file điều phối: kế hoạch + nhật ký. Sự thật do máy đo (độ phủ endpoint) nằm ở báo cáo của `yarn test:flows` và `test/coverage-baseline.json` (sau bước P0-3).
+> Đây là file điều phối: kế hoạch + nhật ký. Sự thật do máy đo (độ phủ endpoint) nằm ở báo cáo cuối `yarn test:flows` và `test/coverage-baseline.json`.
 
 Cập nhật lần cuối: 2026-10-21 · Tổng: **98 route** (15 public, 83 cần đăng nhập), **25 batch** + 4 bước hạ tầng (P0)
 
@@ -19,8 +19,8 @@ Trạng thái: `Chưa làm` · `Đang làm` · `Xong` · `Chặn` (kèm lý do �
 |---|---|---|---|
 | P0-1 | Test hermetic (`SUPABASE_*`, `GOOGLE_*`, `STORAGE_URL` rỗng; `fetch` bị chặn) + `routes.ts` (tự phát hiện route) + snapshot bảng route–quyền + bất biến tĩnh về quyền (`flows/access/route-table.flow.ts`) | Xong | Việc ghi `routes.json` dời sang P0-3 (chỉ bộ đo độ phủ mới dùng). Bất biến tĩnh nằm ở `route-table.flow.ts`, ma trận HTTP ở P0-2 |
 | P0-2 | Ma trận auth/quyền cho mọi route (401 các kiểu, 403, đúng quyền, admin, route public) + invariants; `bearer()` hỗ trợ token hỏng | Xong | Ma trận ở `flows/access/access-matrix.flow.ts`. Ghi cho spec 0002 mục 6: lỗi chập chờn khi triển khai (xem nhật ký P0-2) |
-| P0-3 | Recorder độ phủ (middleware, header `x-test-probe` bị bỏ qua) + `coverage-report.ts` + `coverage-baseline.json` (ratchet) + nối vào `yarn test:flows`; báo cáo in "batch kế tiếp" | Chưa làm | |
-| P0-4 | Cập nhật `rules/testing.md`, `test/README.md`, `docs/modules/common.md`, spec 0002 → Implemented | Chưa làm | |
+| P0-3 | Recorder độ phủ (middleware, header `x-test-probe` bị bỏ qua) + `coverage-report.ts` + `coverage-baseline.json` (ratchet) + nối vào `yarn test:flows`; báo cáo in "batch kế tiếp" | Xong | Baseline giữ thứ tự ưu tiên của 25 batch; "batch kế tiếp" của báo cáo là 5 route thiếu ca đầu tiên nên có thể lệch nhẹ với ranh giới batch dưới đây |
+| P0-4 | Cập nhật `rules/testing.md`, `test/README.md`, `docs/modules/common.md`, spec 0002 → Implemented | Xong | |
 
 ## Giai đoạn 1 — Ca thành công + ca lỗi nghiệp vụ theo module
 
@@ -333,6 +333,7 @@ Trạng thái: **Chưa làm** · Ghi chú: —
 | P0-1 | 2026-10-21 | Hermetic + tự phát hiện route + snapshot quyền | +9 (flow 11 → 20) | chưa đo (P0-3) | chưa đo (P0-3) | 98 route phát hiện (15 public, 83 cần đăng nhập), không có route thiếu quyền. Phá thử 4 lần (bỏ `@Permissions`, đổi quyền, bỏ chặn `fetch`, bỏ env rỗng) đều bị bắt. `.env` của máy có `SUPABASE_URL`, `GOOGLE_CLIENT_ID` thật nên phần hermetic có tác dụng thật |
 | P0-1b | 2026-10-21 | Cấu hình flow test gom vào `.env.test` (spec 0003) | 0 | — | — | Cổng đổi 55433 thử thành công; 4 cấu hình sai đều báo đúng lỗi |
 | P0-2 | 2026-10-21 | Ma trận auth/quyền cho 98 route | +8 (flow 20 → 28) | chưa đo (P0-3) | chưa đo (P0-3) | Phá thử 7 lần (nhận token refresh, nhận user disabled, any-of thành all-of, bỏ bypass admin, mở public `GET /api/cart`, đổi quyền admin sang quyền mặc định, bỏ kiểm quyền) đều bị bắt đúng ca. Chạy lặp 25 lần liên tiếp không lỗi. **Sự cố khi làm:** (1) chạy cả bộ lúc treo lúc fail ngẫu nhiên: supertest tự `listen`/`close` mỗi request, hàng nghìn request liên tiếp thì đua; sửa bằng `app.listen(0, '127.0.0.1')` một lần trong `createTestApp`; (2) fail chẵn/lẻ vì ma trận để user lại DB, file sau đụng `UQ_users_email`; sửa bằng `truncateAll` ở đầu `createTestApp`. Tắt keep-alive không cần thiết (thử loại trừ). Thêm timeout 10s mỗi request để treo thành lỗi có tên route |
+| P0-3/4 | 2026-10-21 | Đo độ phủ endpoint + ratchet; đóng spec 0002 | 0 (hạ tầng) | 9/98 | 4/96 (miễn 2) | Ratchet thử 6 tình huống đều đúng. Baseline: 95 route thiếu ca (181 mục). Batch 01 (payment) là việc kế tiếp |
 
 ## Phát hiện cần người dùng quyết định
 

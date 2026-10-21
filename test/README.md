@@ -18,6 +18,8 @@ Cập nhật lần cuối: 2026-10-21 · Luật: `.claude/rules/testing.md` · T
 ```bash
 yarn test:flows        # bật Postgres test (docker compose), dựng schema từ migration, chạy mọi flow
 yarn test:flows:run    # chỉ chạy jest, không bật docker (khi dùng Postgres có sẵn)
+yarn test:coverage     # in lại báo cáo độ phủ + ratchet từ lần chạy gần nhất
+yarn test:coverage:update  # gỡ khỏi baseline các mục đã đủ ca
 yarn test:db:down      # tắt DB test khi xong
 yarn -s jest --config test/jest.flows.config.js --runInBand -t "<tên test>"   # chạy một test (DB đã up)
 ```
@@ -28,12 +30,22 @@ yarn -s jest --config test/jest.flows.config.js --runInBand -t "<tên test>"   #
 - Mỗi file flow bắt đầu từ DB trống (`createTestApp` tự dọn) và app listen một lần trên `127.0.0.1` cổng ngẫu nhiên; không đổi hai điều này (xem ghi chú ở `PROGRESS.md`, lượt P0-2).
 - Hermetic: biến `SUPABASE_*`, `GOOGLE_*`, `STORAGE_URL` bị đặt rỗng (kể cả khi `.env` của máy có khoá thật) và `fetch` toàn cục bị chặn; test cần giả dịch vụ ngoài thì `jest.spyOn(globalThis, 'fetch')`.
 
+## Độ phủ endpoint (ratchet)
+
+`yarn test:flows` chạy xong thì in: `Độ phủ endpoint (98 route): ca thành công X/N, ca lỗi Y/N`, danh sách "Batch kế tiếp" (5 route đầu còn thiếu theo thứ tự ưu tiên trong baseline) và kết quả ratchet.
+
+- **Ca thành công** = route có request trả 2xx/3xx. **Ca lỗi** = có request trả ≥ 400; với route cần đăng nhập thì không tính 401/403 (đó là kết quả của guard, ma trận auth đã phủ). Request thăm dò của ma trận (header `x-test-probe`) không được đếm.
+- `coverage-baseline.json` liệt kê route đang thiếu ca. Ratchet **thất bại** khi: route mới thiếu ca mà không có trong baseline (route mới phải kèm test); route đã đủ ca mà còn trong baseline (chạy `yarn test:coverage:update` để gỡ); baseline chứa route không còn tồn tại. `update` chỉ gỡ mục đã đủ, không bao giờ thêm; thêm mục vào baseline phải sửa tay và có lý do.
+- Miễn trừ (`exempt`) cho route không thể có ca đó, kèm lý do (hiện `GET /` và `GET /health` không có ca lỗi).
+- Chỉ chạy đủ bộ mới có số liệu đúng; chạy lọc `-t` bằng jest trực tiếp thì không báo cáo.
+
 ## Cấu trúc
 
 ```
 test/
 ├── README.md                    file này (test matrix)
 ├── jest.flows.config.js         config jest riêng cho flow
+├── coverage-baseline.json       route hiện còn thiếu ca (chỉ được co lại) + mục miễn kèm lý do
 ├── support/
 │   ├── test-env.ts              nạp `.env.test` (chỉ `POSTGRES_*`), hằng số giả JWT/SePay, dịch vụ ngoài rỗng, chốt chặn tên DB `_test`
 │   ├── env.ts                   setupFiles: áp env test và chặn `fetch` ra mạng
@@ -44,7 +56,10 @@ test/
 │   ├── auth.ts                  bearer(t, user): header JWT
 │   ├── builders.ts              createBuilders(ds): user, admin, product, cart, address...
 │   ├── sepay.ts                 sepayWebhook(): webhook ký HMAC đúng chuẩn
-│   └── routes.ts                discoverRoutes(app): tự phát hiện route + quyền từ metadata của Nest; formatRouteTable; concretePath
+│   ├── routes.ts                discoverRoutes(app): tự phát hiện route + quyền từ metadata của Nest; formatRouteTable; concretePath
+│   ├── route-path.ts            normalizePath (dùng chung, không import alias)
+│   ├── coverage.ts              ghi request lúc chạy flow, tính route thiếu ca thành công / ca lỗi
+│   └── coverage-report.ts       in độ phủ + ratchet (chạy sau jest trong `yarn test:flows`)
 └── flows/<module>/
     ├── <luồng>.flow.ts          một file một luồng nghiệp vụ
     └── steps.ts                 bước dùng lại của luồng (không phải test)

@@ -1,6 +1,6 @@
 # 0002 — Ma trận auth/quyền tự phát hiện và đo độ phủ endpoint
 
-> Module: `testing` (hạ tầng test, dùng chung) · Trạng thái: Approved · Ngày: 2026-10-21
+> Module: `testing` (hạ tầng test, dùng chung) · Trạng thái: Implemented · Ngày: 2026-10-21
 
 ## 1. Bối cảnh & vấn đề
 
@@ -133,4 +133,12 @@ Không đổi API. Lệnh: `yarn test:flows` chạy jest rồi `coverage-report.
 
 ## 6. Kết quả triển khai
 
-<Điền sau khi làm xong.>
+- **File:** `test/support/{routes,route-path,coverage,coverage-report}.ts`, `test/flows/access/{route-table,access-matrix}.flow.ts` (+ snapshot), `test/coverage-baseline.json`; sửa `auth.ts` (token hỏng), `test-app.ts`, `global-setup.ts`, `env.ts`, `test-env.ts`, `package.json` (`test:coverage`, `test:coverage:update`; `test:flows` chạy báo cáo sau jest), `.gitignore`.
+- **Khác thiết kế:**
+  - Bất biến tĩnh nằm ở `route-table.flow.ts`, ma trận HTTP ở `access-matrix.flow.ts`.
+  - Baseline có dạng `{ exempt, missing }`; `missing` giữ thứ tự ưu tiên để báo cáo in "batch kế tiếp" = 5 route thiếu ca đầu tiên. Miễn trừ (`GET /`, `GET /health` không có ca lỗi) nằm ngay trong baseline kèm lý do.
+  - `routes.json` được `createTestApp` ghi mỗi lần boot (không phải bước riêng).
+  - Thêm: timeout 10s mỗi request của ma trận (treo thành lỗi nêu tên route), chỉ in cảnh báo của Nest để báo cáo dễ đọc.
+- **Sự cố khi triển khai và cách xử lý:** (1) supertest tự `listen`/`close` mỗi request nên đua khi gửi hàng nghìn request: chạy cả bộ lúc treo, lúc trả 400 sai → `app.listen(0, '127.0.0.1')` một lần; thử tắt keep-alive thì không cần. (2) Ma trận để user lại DB, file chạy sau đụng `UQ_users_email` (lỗi chẵn/lẻ vì jest đổi thứ tự file) → `createTestApp` dọn DB đầu mỗi file.
+- **Kiểm chứng:** 28 flow test xanh, chạy lặp 25 lần liên tiếp không lỗi. Phá thử 7 lần (nhận token refresh, nhận user disabled, any-of thành all-of, bỏ bypass admin, mở public `GET /api/cart`, quyền admin thành quyền mặc định, bỏ kiểm quyền) đều bị ma trận bắt đúng ca. Ratchet thử đủ 6 tình huống: route mới thiếu test, mục thừa trong baseline, route không còn tồn tại, `update` chỉ co lại, test mới phủ thêm được phát hiện, gỡ test thì fail. Độ phủ đo được lúc đóng: ca thành công 9/98, ca lỗi 4/96 (miễn 2).
+- **Docs:** `docs/modules/common.md` (4.11, 4.12), `test/README.md`, `test/PROGRESS.md`, `.claude/rules/testing.md`, skill `test-campaign` và `module-test`, `CLAUDE.md`.
