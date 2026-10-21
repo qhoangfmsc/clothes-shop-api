@@ -24,3 +24,5 @@ Thumbs.db
 
 # Test
 coverage/
+# Flow-test coverage recorder output
+test/.coverage/

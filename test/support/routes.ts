@@ -4,6 +4,7 @@ import { Permission } from '@common/permissions/permissions.constant';
 import { type INestApplication, RequestMethod } from '@nestjs/common';
 import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 import { DiscoveryService, Reflector } from '@nestjs/core';
+import { normalizePath } from './route-path';
 
 export interface RouteInfo {
   method: string;
@@ -19,11 +20,6 @@ export interface RouteInfo {
 const toArray = (value: string | string[] | undefined): string[] => (Array.isArray(value) ? value : [value ?? '']);
 
 export const routeKey = (route: Pick<RouteInfo, 'method' | 'path'>) => `${route.method} ${route.path}`;
-
-const normalizePath = (...parts: string[]): string => {
-  const path = `/${parts.join('/')}`.replace(/\/+/g, '/');
-  return path.length > 1 ? path.replace(/\/$/, '') : path;
-};
 
 /** Tự phát hiện route từ metadata của Nest; sắp theo path rồi method để ổn định. */
 export function discoverRoutes(app: INestApplication): RouteInfo[] {

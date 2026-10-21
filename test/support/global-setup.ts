@@ -1,11 +1,13 @@
 import { Client } from 'pg';
 import { DataSource } from 'typeorm';
+import { resetCoverage } from './coverage';
 import { truncateAll } from './db';
 import { applyTestEnv } from './test-env';
 
 /** Mỗi lần chạy: dựng schema sạch từ migration rồi xoá dữ liệu seed. Dùng import tương đối vì không qua moduleNameMapper. */
 export default async function globalSetup(): Promise<void> {
   applyTestEnv();
+  resetCoverage();
   await acquireRunLock();
 
   const dataSource = new DataSource({
