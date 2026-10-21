@@ -1,7 +1,7 @@
 import { DataSource } from 'typeorm';
 import { assertTestDatabase } from './test-env';
 
-/** Xoá toàn bộ dữ liệu (giữ schema và bảng migration). Dùng ở `afterEach` để mỗi test bắt đầu từ DB trống */
+/** Xoá mọi dữ liệu, giữ schema. */
 export async function truncateAll(dataSource: DataSource): Promise<void> {
   assertTestDatabase();
   const tables: { tablename: string }[] = await dataSource.query(

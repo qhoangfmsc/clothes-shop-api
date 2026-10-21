@@ -1,10 +1,7 @@
 import { type Builders, bearer, createBuilders, createTestApp, sepayWebhook, type TestApp, truncateAll } from '../../support';
 import { createQr, placeAndPayOrder, placeOrder, sendTransfer } from './steps';
 
-/**
- * Luồng chính: giỏ hàng → báo giá → checkout → mã QR → webhook SePay → đơn đã trả và được xác nhận.
- * Kèm các chốt chặn của luồng: guard, chữ ký webhook, idempotency, sai số tiền.
- */
+/** Luồng: giỏ → báo giá → checkout → QR → webhook SePay → đơn paid + confirmed. */
 describe('Flow: checkout and pay', () => {
   let t: TestApp;
   let b: Builders;
@@ -37,7 +34,7 @@ describe('Flow: checkout and pay', () => {
     await b.cart(customer, [{ product, quantity: 2 }]);
     const address = await b.address(customer);
 
-    // Báo giá: 2 × 350.000 + 30.000 phí ship tiêu chuẩn (dưới ngưỡng miễn phí 1.500.000)
+    // 2 × 350.000 + 30.000 phí ship (dưới ngưỡng miễn phí)
     const quote = await t.api.post('/api/orders/quote').set(bearer(t, customer)).send({}).expect(200);
     expect(quote.body.data).toMatchObject({ subtotalVnd: 700_000, shippingFeeVnd: 30_000, totalVnd: 730_000 });
 
@@ -45,7 +42,7 @@ describe('Flow: checkout and pay', () => {
     const order = checkout.body.data;
     expect(order).toMatchObject({ status: 'pending', paymentStatus: 'unpaid', totalVnd: 730_000 });
     expect(order.items).toHaveLength(1);
-    // Giỏ đã được dọn
+    // giỏ đã dọn
     expect(await t.dataSource.query('SELECT 1 FROM cart_items')).toHaveLength(0);
 
     const qr = await createQr(t, customer, order.id);

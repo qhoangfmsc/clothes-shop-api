@@ -1,8 +1,6 @@
 import { type Builders, bearer, sepayWebhook, type TestApp } from '../../support';
 
-/** Các bước dùng lại của luồng đặt hàng – thanh toán. Mỗi bước đi qua HTTP thật và kiểm status code ngay tại chỗ. */
-
-/** Khách có giỏ (1 sản phẩm 350.000đ × quantity) + địa chỉ, rồi checkout giao tiêu chuẩn: tổng = 350.000 × quantity + 30.000 phí ship */
+/** Giỏ 1 sản phẩm 350.000đ × quantity + địa chỉ, checkout giao tiêu chuẩn (phí ship 30.000). */
 export async function placeOrder(t: TestApp, b: Builders, options: { quantity?: number } = {}) {
   const customer = await b.user();
   const product = await b.product();
@@ -13,13 +11,13 @@ export async function placeOrder(t: TestApp, b: Builders, options: { quantity?: 
   return { customer, product, order: res.body.data as { id: string; status: string; totalVnd: number; paymentStatus: string } };
 }
 
-/** Khách xin mã QR cho đơn; trả `transferContent` (mã `DH...`) và `amountVnd` phải chuyển */
+/** Xin mã QR; trả `transferContent` và `amountVnd`. */
 export async function createQr(t: TestApp, customer: Parameters<typeof bearer>[1], orderId: string) {
   const res = await t.api.post('/api/payments/qr').set(bearer(t, customer)).send({ orderId }).expect(201);
   return res.body.data as { transferContent: string; amountVnd: number; status: string };
 }
 
-/** Ngân hàng báo tiền vào qua webhook SePay (ký đúng chuẩn). `amount` mặc định đúng số QR yêu cầu */
+/** Webhook tiền vào; `amount` mặc định đúng số QR. */
 export function sendTransfer(
   t: TestApp,
   qr: { transferContent: string; amountVnd: number },
@@ -33,7 +31,7 @@ export function sendTransfer(
   return t.api.post('/api/webhooks/sepay').set(hook.headers).send(hook.body);
 }
 
-/** Đặt hàng → xin QR → chuyển đủ tiền: trả đơn đã `paid` + `confirmed` */
+/** Đặt hàng → QR → chuyển đủ tiền. */
 export async function placeAndPayOrder(t: TestApp, b: Builders) {
   const placed = await placeOrder(t, b);
   const qr = await createQr(t, placed.customer, placed.order.id);

@@ -1,4 +1,4 @@
-/** Jest config riêng cho flow test (Postgres thật). Unit test (`yarn test`) dùng config trong package.json, rootDir = src. */
+/** Jest config riêng cho flow test; unit test dùng config trong package.json. */
 module.exports = {
   rootDir: '..',
   roots: ['<rootDir>/test'],
@@ -15,7 +15,7 @@ module.exports = {
   globalSetup: '<rootDir>/test/support/global-setup.ts',
   globalTeardown: '<rootDir>/test/support/global-teardown.ts',
   setupFiles: ['<rootDir>/test/support/env.ts'],
-  // Chung một DB nên chạy tuần tự
+  // chung một DB nên chạy tuần tự
   maxWorkers: 1,
   testTimeout: 30000,
 };

@@ -3,11 +3,7 @@ import { DataSource } from 'typeorm';
 import { truncateAll } from './db';
 import { applyTestEnv } from './test-env';
 
-/**
- * Chạy 1 lần mỗi lần `yarn test:flows`: dựng schema sạch bằng toàn bộ migration (không `synchronize`),
- * nên migration hỏng hoặc thiếu constraint cũng làm cả bộ flow đỏ ngay từ đầu. Xong thì dọn sạch dữ liệu seed.
- * Dùng đường dẫn tương đối: global setup không đi qua `moduleNameMapper`.
- */
+/** Mỗi lần chạy: dựng schema sạch từ migration rồi xoá dữ liệu seed. Dùng import tương đối vì không qua moduleNameMapper. */
 export default async function globalSetup(): Promise<void> {
   applyTestEnv();
   await acquireRunLock();
@@ -29,14 +25,14 @@ export default async function globalSetup(): Promise<void> {
     await dataSource.query('DROP SCHEMA IF EXISTS public CASCADE');
     await dataSource.query('CREATE SCHEMA public');
     await dataSource.runMigrations();
-    // Migration có dữ liệu seed (danh mục, sản phẩm...): xoá hết để mọi test bắt đầu từ DB trống, không phụ thuộc thứ tự chạy file
+    // migration có seed: bắt đầu từ DB trống
     await truncateAll(dataSource);
   } finally {
     await dataSource.destroy();
   }
 }
 
-/** Khoá advisory giữ suốt lần chạy (nhả khi `global-teardown` đóng kết nối): hai lần chạy cùng DB sẽ phá schema của nhau */
+// Khoá advisory chặn hai lần chạy cùng DB (nhả khi teardown đóng kết nối)
 const RUN_LOCK_KEY = 20_261_021;
 
 async function acquireRunLock(): Promise<void> {

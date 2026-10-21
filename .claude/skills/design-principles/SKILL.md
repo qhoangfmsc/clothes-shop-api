@@ -118,7 +118,7 @@ Cách đếm nhanh SRP: **số dependency của constructor** và **số mock c�
 
 - [ ] Lỗi dùng `throwAppError` + error code; không exception thô.
 - [ ] Trạng thái/enum là `as const` + type union dùng chung DTO ↔ entity.
-- [ ] Không magic number/string; không code chết; không comment lặp lại code.
+- [ ] Không magic number/string; không code chết; comment ít và ngắn (rule `comments.md`).
 - [ ] Tên file/class/hàm đúng vai trò (`x.service.ts`, `presentX`, `assertX`, `applyX`).
 - [ ] Tiền theo cặp `Vnd/Usd`, qua `money()`; không trả entity thô.
 - [ ] `yarn lint` không thêm cảnh báo; quy ước quan trọng có test/lint ép.

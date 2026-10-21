@@ -1,6 +1,4 @@
-# Postgres chỉ dành cho flow test (`yarn test:flows`). Mọi giá trị đọc từ `.env.test` ở root
-# (mặc định cổng 55432 để không đụng DB dev ở 5432). Dữ liệu nằm trong tmpfs: tắt container là mất,
-# mỗi lần chạy test dựng lại schema từ migration.
+# Postgres cho flow test, cấu hình đọc từ .env.test. Dữ liệu nằm trong tmpfs nên tắt container là mất.
 services:
   postgres-test:
     image: postgres:16-alpine

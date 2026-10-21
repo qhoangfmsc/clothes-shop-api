@@ -62,7 +62,7 @@ Chuẩn đã có ở `CLAUDE.md` (validation 3 tầng, list API, tiền, error c
 - **Trạng thái/enum:** khai báo `as const` + type union trong file constant, cột entity dùng đúng type union đó (không `string` kèm comment liệt kê); DTO và entity cùng import một nguồn.
 - **Tên:** file `kebab-case` theo vai trò (`x.service.ts`, `x.entity.ts`, `x.presenter.ts`, `x-query.dto.ts`, `x.util.ts`); class `PascalCase`; hàm bắt đầu bằng động từ; hằng `UPPER_SNAKE_CASE`. Không viết tắt khó hiểu.
 - **Hàm:** ưu tiên ≤ ~50 dòng, dùng early return, không magic number/string (đưa vào constant có tên).
-- **Comment:** giải thích **vì sao**, bất biến, thứ tự khoá, quy tắc nghiệp vụ; không lặp lại điều code đã nói. Tiếng Việt, cùng giọng với code hiện có.
+- **Comment:** ít và ngắn, đúng luật `.claude/rules/comments.md` (mặc định không comment; một dòng cho lý do/bất biến/thứ tự khoá).
 - **Import:** alias `@common/*`, `@core/*`, `@/*` cho thứ ở ngoài module; đường dẫn tương đối trong cùng module.
 - **Không để code chết:** xoá thay vì để lại "phòng khi cần".
 - **Máy kiểm tra, không phải trí nhớ:** Biome là nguồn sự thật format/lint (`yarn lint` không được thêm cảnh báo mới). Quy ước quan trọng phải được ép bằng test hoặc lint (mẫu: `list-query.dto.spec.ts`).
@@ -70,5 +70,5 @@ Chuẩn đã có ở `CLAUDE.md` (validation 3 tầng, list API, tiền, error c
 ## 5. Giải thích cho người đọc / người học
 
 - Spec ghi pattern và SOLID đã áp dụng cùng lý do (mục 3.3, 3.4).
-- Chỗ định nghĩa pattern có 1 dòng comment: tên pattern + vấn đề nó giải.
+- Chỗ định nghĩa pattern có 1 dòng comment: tên pattern + vấn đề nó giải (phần giải thích dài nằm ở spec).
 - Báo cáo cuối nêu **1–3 dòng**: pattern/nguyên lý đã dùng ở đâu và vì sao (hoặc vì sao cố ý không dùng).

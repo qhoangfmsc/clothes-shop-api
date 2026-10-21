@@ -11,10 +11,7 @@ import { User } from '../../src/modules/user/user.entity';
 let seq = 0;
 const next = () => ++seq;
 
-/**
- * Test Data Builder: dựng dữ liệu hợp lệ với mặc định hợp lý, test chỉ nêu phần khác biệt, vd `product({ price: 350_000 })`.
- * Ghi thẳng DB (không qua HTTP) vì đây là dữ liệu đầu vào, hành vi cần kiểm thì đi qua HTTP.
- */
+/** Test Data Builder: dữ liệu hợp lệ với mặc định hợp lý, test chỉ nêu phần khác biệt. Ghi thẳng DB. */
 export function createBuilders(dataSource: DataSource) {
   const users = dataSource.getRepository(User);
   const categories = dataSource.getRepository(Category);
@@ -39,7 +36,6 @@ export function createBuilders(dataSource: DataSource) {
     );
   }
 
-  /** Admin: `role = 'admin'` tự pass mọi permission */
   const admin = (overrides: Partial<User> = {}) => user({ role: 'admin', permissions: [], ...overrides });
 
   async function category(): Promise<Category> {
@@ -54,7 +50,7 @@ export function createBuilders(dataSource: DataSource) {
     );
   }
 
-  /** Mặc định: sản phẩm `active`, giá 350.000 VND, có ảnh/size/màu (DB có CHECK không cho rỗng), thuộc một category + subcategory mới */
+  // mặc định thoả CHECK của DB (images/sizes/colors không rỗng)
   async function product(overrides: Partial<Product> = {}): Promise<Product> {
     const n = next();
     const parent = await category();
@@ -78,7 +74,6 @@ export function createBuilders(dataSource: DataSource) {
     );
   }
 
-  /** Giỏ của `owner` với các dòng cho trước; trả cả id từng dòng để chọn `cartItemIds` khi checkout */
   async function cart(owner: User, lines: { product: Product; quantity?: number; size?: string; color?: string }[]) {
     const saved = await carts.save(carts.create({ userId: owner.id }));
     const items: CartItem[] = [];

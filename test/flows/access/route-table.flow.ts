@@ -3,11 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { bearer, createBuilders, createTestApp, type TestApp, truncateAll } from '../../support';
 import { discoverRoutes, formatRouteTable, type RouteInfo, routeKey } from '../../support/routes';
 
-/**
- * Bảng route–quyền của toàn app, tự phát hiện từ metadata của Nest (không có HTTP ở các test tĩnh bên dưới):
- * snapshot để mọi thay đổi quyền thành diff phải duyệt, và các bất biến mà route nào cũng phải giữ.
- * Cập nhật snapshot sau khi đã xem diff: `yarn -s jest --config test/jest.flows.config.js --runInBand route-table -u`.
- */
+/** Snapshot bảng route–quyền và các bất biến tĩnh. Cập nhật snapshot sau khi xem diff: thêm `-u` khi chạy riêng file này. */
 describe('Route table: discovery, snapshot and invariants', () => {
   let t: TestApp;
   let routes: RouteInfo[];

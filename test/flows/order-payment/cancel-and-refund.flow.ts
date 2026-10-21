@@ -1,10 +1,7 @@
 import { type Builders, bearer, createBuilders, createTestApp, type TestApp, truncateAll } from '../../support';
 import { createQr, placeAndPayOrder, placeOrder } from './steps';
 
-/**
- * Luồng chính: huỷ đơn và hoàn tiền. Khách chỉ tự huỷ được đơn chưa trả; đơn đã trả do admin huỷ,
- * khi đó hệ thống tự sinh yêu cầu hoàn đủ tiền và admin ghi nhận khi đã chuyển khoản trả khách.
- */
+/** Luồng: huỷ đơn và hoàn tiền. */
 describe('Flow: cancel and refund', () => {
   let t: TestApp;
   let b: Builders;
@@ -45,7 +42,7 @@ describe('Flow: cancel and refund', () => {
     await t.api.patch(`/api/admin/orders/${order.id}/status`).set(bearer(t, admin)).send({ status: 'cancelled' }).expect(200);
     expect(await orderRow(order.id)).toMatchObject({ status: 'cancelled', payment_status: 'paid' });
 
-    // Huỷ đơn đã trả tự sinh yêu cầu hoàn đúng bằng số tiền ngân hàng đã nhận
+    // huỷ đơn đã trả tự sinh yêu cầu hoàn đủ
     const pending = await t.api.get('/api/admin/refunds').query({ status: 'REQUESTED' }).set(bearer(t, admin)).expect(200);
     expect(pending.body.data).toHaveLength(1);
     const refund = pending.body.data[0];

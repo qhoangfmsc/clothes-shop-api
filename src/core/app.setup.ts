@@ -3,12 +3,9 @@ import { type INestApplication, type RawBodyRequest, ValidationPipe } from '@nes
 import { json, urlencoded } from 'express';
 import { AllExceptionFilter } from '../common/filter/exception.filter';
 
-/**
- * Cấu hình HTTP dùng chung cho app thật (`main.ts`) và flow test (`test/support/test-app.ts`):
- * một nguồn duy nhất để test chạy đúng pipeline production. Gọi TRƯỚC `app.init()` / `app.listen()`.
- */
+/** Cấu hình HTTP dùng chung cho `main.ts` và flow test; gọi trước `app.init()`. */
 export function configureApp(app: INestApplication): void {
-  // Webhook SePay ký trên bytes gốc của body → giữ lại `req.rawBody` cho route webhook
+  // Webhook SePay ký trên bytes gốc → giữ `req.rawBody`
   app.use(
     json({
       limit: '5mb',
@@ -19,7 +16,7 @@ export function configureApp(app: INestApplication): void {
   );
   app.use(urlencoded({ extended: true, limit: '5mb' }));
 
-  // Strict validation: strip unknown fields, reject them
+  // Field lạ bị loại và từ chối
   app.useGlobalPipes(
     new ValidationPipe({
       transform: true,
