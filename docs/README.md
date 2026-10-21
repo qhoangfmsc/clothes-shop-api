@@ -4,7 +4,17 @@ Thư mục này là tài liệu thực tế của backend: mỗi module một fi
 
 Quy tắc viết: `.claude/rules/module-docs.md` · Quy trình: skill `module-docs` · Template: `.claude/skills/module-docs/TEMPLATE.md`.
 
-Cập nhật lần cuối: 2026-10-16
+Cập nhật lần cuối: 2026-10-21
+
+## Ba loại tài liệu
+
+| Loại | Nơi | Trả lời |
+|---|---|---|
+| Docs module (thư mục này) | [`modules/`](modules/common.md) | Hiện giờ hệ thống làm gì (viết sau khi code) |
+| Tech spec | [`specs/`](specs/README.md) | Vì sao và thiết kế thế nào (viết trước khi code, theo module) |
+| Test matrix | [`../test/README.md`](../test/README.md) | Luồng nào đã có test nào (unit cạnh code, flow ở `test/flows/`) |
+
+Quy trình làm việc: `.claude/rules/feature-workflow.md` (Đọc → Spec → Code + Test → Docs).
 
 ## Hệ thống
 
@@ -16,7 +26,7 @@ Toàn bộ module được khai báo trong `src/main.module.ts`. Hai guard toàn
 
 | Module | Thư mục | Route prefix | Loại | Mô tả ngắn |
 |---|---|---|---|---|
-| [common & core](modules/common.md) | `src/common`, `src/core`, `src/migrations` | `/`, `/health`, `/api-docs` | Hạ tầng | Guard, phân trang/sort/search, error code, permission, bootstrap, migration |
+| [common & core](modules/common.md) | `src/common`, `src/core`, `src/migrations`, `test/` | `/`, `/health`, `/api-docs` | Hạ tầng | Guard, phân trang/sort/search, error code, permission, bootstrap, migration, hạ tầng flow test |
 | [auth](modules/auth.md) | `src/modules/auth` | `/api/auth` | DB (qua `users`) | Đăng nhập Google, JWT access/refresh, thông tin phiên |
 | [user](modules/user.md) | `src/modules/user` | `/api/admin/users` | DB | Entity người dùng, quản trị role/status/permissions |
 | [product](modules/product.md) | `src/modules/product` | `/api/products`, `/api/admin/products` | DB | Sản phẩm: list/detail/autocomplete, CRUD admin |

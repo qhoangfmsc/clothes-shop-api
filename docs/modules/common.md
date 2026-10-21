@@ -1,6 +1,6 @@
 # common & core (`src/common`, `src/core`, `src/main*.ts`, `src/migrations`)
 
-> Cập nhật lần cuối: 2026-10-17
+> Cập nhật lần cuối: 2026-10-21
 
 ## 1. Tổng quan
 
@@ -8,7 +8,7 @@ Phần hạ tầng dùng chung cho mọi module: bootstrap ứng dụng, guard x
 
 | Mục | Giá trị |
 |---|---|
-| Thư mục | `src/common`, `src/core`, `src/main.ts`, `src/main.module.ts`, `src/main.controller.ts`, `src/migrations`, `data-source.ts` |
+| Thư mục | `src/common`, `src/core`, `src/main.ts`, `src/main.module.ts`, `src/main.controller.ts`, `src/migrations`, `data-source.ts`, `test/` (hạ tầng flow test), `docker-compose.test.yml` |
 | Route prefix | `/` , `/health` (`MainController`), `/api-docs` (Swagger) |
 | Bảng DB | `typeorm_migrations` (bảng theo dõi migration); các bảng nghiệp vụ thuộc module tương ứng |
 | Path alias | `@common/*` → `src/common/*`, `@core/*` → `src/core/*`, `@/*` → `src/modules/*` |
@@ -25,7 +25,8 @@ Phần hạ tầng dùng chung cho mọi module: bootstrap ứng dụng, guard x
 
 | Submodule | Vị trí | Chức năng |
 |---|---|---|
-| Bootstrap | `src/main.ts`, `src/main.module.ts` | Tạo app, middleware, pipe, filter, Swagger, đăng ký module và guard toàn cục |
+| Bootstrap | `src/main.ts`, `src/core/app.setup.ts`, `src/main.module.ts` | Tạo app, middleware, Swagger, đăng ký module và guard toàn cục; `configureApp` gom body parser, ValidationPipe, filter dùng chung với flow test |
+| Flow test | `test/`, `docker-compose.test.yml` | Hạ tầng test luồng chính trên Postgres thật (xem 4.12 và `test/README.md`) |
 | Health | `src/main.controller.ts` | `GET /` và `GET /health` (public) |
 | CoreModule | `src/core/core.module.ts` | `ConfigModule` toàn cục + kết nối TypeORM + log thống kê bảng khi khởi động |
 | Swagger | `src/core/swagger/swagger.config.ts` | Tài liệu API tại `/api-docs` |
@@ -43,7 +44,9 @@ Phần hạ tầng dùng chung cho mọi module: bootstrap ứng dụng, guard x
 
 ## 4. Chi tiết
 
-### 4.1 Bootstrap (`src/main.ts`)
+### 4.1 Bootstrap (`src/main.ts`, `src/core/app.setup.ts`)
+
+`main.ts` tạo app, bật CORS, `helmet`, `RequestIdMiddleware`, rồi gọi `configureApp(app)` (`src/core/app.setup.ts`) cho phần body parser + `ValidationPipe` + `AllExceptionFilter`; flow test gọi cùng `configureApp` nên chạy đúng pipeline production.
 
 | Thành phần | Giá trị |
 |---|---|
@@ -57,7 +60,7 @@ Phần hạ tầng dùng chung cho mọi module: bootstrap ứng dụng, guard x
 | Shutdown hooks | bật |
 | Swagger | `/api-docs`, title "Clothes Shop API", `persistAuthorization`, `docExpansion: none`; tag mô tả: Products, Categories, Collections, Reviews, Shipping, Size Guides |
 
-`MainModule` import: `CoreModule`, `AuthModule`, `UserModule`, `ProductModule`, `CategoryModule`, `CollectionModule`, `ReviewModule`, `ShippingModule`, `SizeGuideModule`, `SiteConfigModule`, `MediaModule`, `AddressModule`, `WishlistModule`, `CartModule`, `OrderModule`, `PaymentModule`. Hai `APP_GUARD` theo thứ tự: `JwtAuthGuard` → `PermissionsGuard`.
+`MainModule` import: `CoreModule`, `AuthModule`, `UserModule`, `ProductModule`, `CategoryModule`, `CollectionModule`, `ReviewModule`, `CurrencyModule`, `ShippingModule`, `SizeGuideModule`, `SiteConfigModule`, `MediaModule`, `AddressModule`, `WishlistModule`, `CartModule`, `OrderModule`, `PaymentModule`, `ReturnModule`, `PendingCountModule`. Hai `APP_GUARD` theo thứ tự: `JwtAuthGuard` → `PermissionsGuard`.
 
 `MainController` (`@Public`, ẩn khỏi Swagger):
 
@@ -251,15 +254,22 @@ Entity **không** extends `BaseEntity` (tự khai báo id nanoid16): `Wishlist` 
 yarn dev                       # dev server (nest start --watch)
 npx nest build                  # build
 npx tsc --noEmit                # type check
-npx biome check src/            # lint
-yarn test                       # jest (rootDir src, regex *.spec.ts / *e2e-spec.ts)
+yarn lint                       # biome check ./src ./test
+yarn test                       # unit test: jest (rootDir src, regex *.spec.ts / *e2e-spec.ts), mock, không cần DB
+yarn test:db:up                 # bật Postgres test (docker compose, cổng 55432, DB clothes_shop_test)
+yarn test:flows                 # flow test trên Postgres thật (tự gọi test:db:up)
+yarn test:db:down               # tắt Postgres test
 yarn migration:run              # chạy migration
 ```
 
 ### 4.12 Test
 
-- `src/common/dto/list-query.dto.spec.ts`: guard chuẩn list cho mọi `*-query.dto.ts` (xem 4.5).
-- Test của từng module: xem file module tương ứng.
+- **Unit** (`yarn test`): `src/**/*.spec.ts` cạnh code, dùng mock. `src/common/dto/list-query.dto.spec.ts` là guard chuẩn list cho mọi `*-query.dto.ts` (xem 4.5); `src/common/utils/money.util.spec.ts` cho helper tiền. Test của từng module: xem file module tương ứng.
+- **Flow** (`yarn test:flows`): `test/flows/<module>/*.flow.ts`, đi qua HTTP thật (`MainModule` + `configureApp`) trên Postgres thật. Config riêng `test/jest.flows.config.js` (rootDir repo, chỉ nhận `*.flow.ts`, chạy tuần tự).
+  - Mỗi lần chạy: lấy khoá advisory (`pg_try_advisory_lock`; lần chạy thứ hai cùng DB bị chặn), `DROP SCHEMA public` → chạy toàn bộ migration → `TRUNCATE` dữ liệu seed; sau mỗi test `truncateAll`.
+  - Chốt chặn: tên DB phải kết thúc `_test` (`test/support/test-env.ts`), nếu không dừng ngay. Biến môi trường test (DB `127.0.0.1:55432`, secret JWT/SePay giả) gán thẳng vào `process.env`, thắng `.env`.
+  - Công cụ dùng chung ở `test/support/`: `createTestApp`, `createBuilders` (user, admin, product, cart, address), `bearer`, `sepayWebhook`, `truncateAll`.
+  - Hiện có: `test/flows/order-payment/` (đặt hàng – thanh toán, huỷ – hoàn tiền). Bảng luồng nào có test nào: `test/README.md`. Thiết kế: `docs/specs/testing/0001-flow-test-infrastructure.md`.
 
 ### 4.13 Lưu ý hiện trạng
 
@@ -267,3 +277,9 @@ yarn migration:run              # chạy migration
 - `PermissionsGuard` trả HTTP 500 (`NO_PERMISSION_DEFINED`) cho route không public mà quên `@Permissions` (với user không phải admin); admin vẫn truy cập được route đó.
 - Trong `JwtStrategy`, mỗi request đều đọc user từ DB nên role/permissions/status thay đổi có hiệu lực ngay, không cần chờ token hết hạn.
 - Danh sách quyền của một user được lưu trong cột `users.permissions`; `DEFAULT_USER_PERMISSIONS` chỉ được áp khi tạo user mới, không tự cập nhật cho user đã tồn tại.
+- Migration có dữ liệu seed (`categories`, `subcategories`, `collections`, `products`, `reviews`, `site_configs`); flow test xoá hết dữ liệu này sau khi dựng schema nên mỗi test tự dựng dữ liệu bằng builder, và phí ship/tỷ giá trong flow test là giá trị mặc định trong code (`DEFAULT_SHIPPING_CONFIG`, `DEFAULT_VND_PER_USD`) vì không có dòng `site_configs`.
+- Một số file trong `common/` hiện không được import ở đâu: `DeepPartial`, `AsTypeSort`, `BaseListProps` (`base/base.interface.ts`), `GConstructor` (`types/baseType.ts`) và toàn bộ `validator/BaseValidate.ts`. `Paging` trong `base.interface.ts` thì được `typeorm-list-query.util.ts` dùng.
+- `common/guards/permissions.guard.ts` import entity `User` từ `src/modules/user`; ngoài ra `common/` và `core/` không import `modules/`.
+- Một số service vẫn ném exception HTTP thô (`BadRequestException`, `NotFoundException`...) thay vì `throwAppError`: `order`, `auth` (`auth.service`, `google-auth.service`), `cart`, `address`, `review`.
+- Trạng thái đơn: cột `orders.status`/`payment_status` khai báo kiểu `string` trong entity và bảng chuyển trạng thái đơn là `Record<string, string[]>` trong `OrderService`; `return` dùng `assertStatus` với type union `ReturnStatus`, `payment`/`refund` khai báo trạng thái bằng `as const` ở `payment.constant.ts`.
+- Entity `Order` được import và đăng ký `TypeOrmModule.forFeature` trực tiếp ở module `payment`, `return`, `review`; entity `Product` ở `cart`, `wishlist`, `collection` (bên cạnh module `product`). Các module này truy cập bảng của nhau không qua service.

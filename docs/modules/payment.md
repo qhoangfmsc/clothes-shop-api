@@ -1,6 +1,6 @@
 # payment (`src/modules/payment`)
 
-> Cập nhật lần cuối: 2026-10-17
+> Cập nhật lần cuối: 2026-10-21
 
 ## 1. Tổng quan
 
@@ -328,7 +328,10 @@ Dùng mã giao dịch SePay làm `reference` (provider `sepay`) thì khi SePay g
 - `refund.service.spec.ts` — `completeAdmin` (ghi mã giao dịch, đơn → `refunded` và giữ `paid_at`, khoá order trước refund, view admin có thông tin khoản đã nhận, từng trạng thái không hoàn được → 1713, mã trùng → 1714 kể cả lỗi UNIQUE đồng thời, không hoàn quá số đã trả → 1712, hoàn từng phần giữ `paid` đến khi đủ), `rejectAdmin` (đơn giữ `paid`, tạo lại được), `createAdmin` (đơn đã huỷ + đã trả; đơn chưa huỷ/chưa trả/đã hoàn/đã có yêu cầu đang chờ → 1712; đơn lạ → 1301), `listForCustomer` (chỉ field an toàn, mới nhất trước), `findAdmin` (filter, search, sort, phân trang, không lộ tài khoản nhận/`raw_payload`), đơn `refunded` không tạo QR/không xác nhận thủ công được và `getStatus` vẫn `PAID`, và các DTO hoàn tiền.
 - `refund.service.spec.ts` (tiếp) — hoàn theo số tiền thực nhận khi admin xác nhận thủ công kèm chấp nhận lệch (khoản hoàn bằng số thực nhận, hoàn xong thì đơn `refunded`, khoản lớn hơn số thực nhận bị từ chối); `prorateRefundAmount` (giá trị VND); khoản hoàn từ trả hàng: hoàn xong → yêu cầu trả hàng `REFUNDED` (đơn chỉ `refunded` khi đủ số đã trả), khoản không từ trả hàng không đụng yêu cầu trả hàng, từ chối → yêu cầu về `APPROVED` và xoá số lượng chấp nhận, `returnId`/`returnRequestId` trong view khách/admin.
 - `payment.test-utils.ts` — `EntityManager` giả trong bộ nhớ dùng chung cho các spec trên (không phải test).
-- Các test trên dùng manager giả; hành vi với Postgres thật (migration, UNIQUE, khoá dòng, webhook trùng song song, huỷ/hoàn đồng thời) không có test tự động trong repo.
+- Các spec trên dùng manager giả. Flow test trên Postgres thật (`test/flows/order-payment/`, xem `test/README.md`):
+  - `checkout-and-pay.flow.ts` — giỏ → báo giá → checkout → QR → webhook SePay ký HMAC → đơn `paid`/`confirmed` và giao dịch `MATCHED`; webhook trùng id tuần tự chỉ ghi một giao dịch; sai chữ ký → 401 + 1704, không ghi gì; sai số tiền → `AMOUNT_MISMATCH`, đơn vẫn `unpaid`; tiền đến lần hai → `DUPLICATE_PAYMENT`; không token → 401, thiếu quyền → 403.
+  - `cancel-and-refund.flow.ts` — khách huỷ đơn chưa trả (phiên QR → `CANCELLED`); khách huỷ đơn đã trả → 1307; admin huỷ đơn đã trả → khoản hoàn `REQUESTED` đúng số đã nhận → hoàn xong → đơn `refunded`; hoàn lần hai → 1713, mã tham chiếu trùng → 1714.
+  - Chưa có test tự động cho các tình huống đồng thời (hai webhook cùng id chạy song song, huỷ và thanh toán cùng lúc) và cho xác nhận thủ công (`confirmPaymentAdmin`), mã QR admin, QR hết hạn trên Postgres thật.
 
 ### 4.8 Lưu ý hiện trạng
 

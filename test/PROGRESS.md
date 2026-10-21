@@ -1,0 +1,340 @@
+# Tiến độ chiến dịch test toàn diện
+
+> Quy trình: skill `test-campaign` (`.claude/skills/test-campaign/SKILL.md`) — **đọc skill trước khi làm bất kỳ lượt nào**.
+> Đây là file điều phối: kế hoạch + nhật ký. Sự thật do máy đo (độ phủ endpoint) nằm ở báo cáo của `yarn test:flows` và `test/coverage-baseline.json` (sau bước P0-3).
+
+Cập nhật lần cuối: 2026-10-21 · Tổng: **98 route** (15 public, 83 cần đăng nhập), **25 batch** + 4 bước hạ tầng (P0)
+
+Trạng thái: `Chưa làm` · `Đang làm` · `Xong` · `Chặn` (kèm lý do ở cột Ghi chú)
+
+## Nguyên tắc nhịp làm việc
+
+- **Một lượt = một batch** (tối đa 5 route, không vượt ranh giới module). Làm xong thì dừng, ghi nhật ký, báo cáo ngắn; không tự làm batch kế tiếp.
+- Mỗi lượt bắt đầu từ file này, không từ trí nhớ. Chỉ đọc docs/code của đúng module trong batch.
+- Chính xác hơn nhanh: mọi giá trị mong đợi lấy từ code, migration, docs; không đoán.
+
+## Giai đoạn 0 — Hạ tầng (spec `docs/specs/testing/0002-access-matrix-and-endpoint-coverage.md`)
+
+| Bước | Nội dung | Trạng thái | Ghi chú |
+|---|---|---|---|
+| P0-1 | Test hermetic (`SUPABASE_*`, `GOOGLE_*`, `STORAGE_URL` rỗng; `fetch` bị chặn) + `routes.ts` (tự phát hiện route) + test-app ghi `routes.json` + snapshot bảng route–quyền | Chưa làm | |
+| P0-2 | Ma trận auth/quyền cho mọi route (401 các kiểu, 403, đúng quyền, admin, route public) + invariants; `bearer()` hỗ trợ token hỏng | Chưa làm | |
+| P0-3 | Recorder độ phủ (middleware, header `x-test-probe` bị bỏ qua) + `coverage-report.ts` + `coverage-baseline.json` (ratchet) + nối vào `yarn test:flows`; báo cáo in "batch kế tiếp" | Chưa làm | |
+| P0-4 | Cập nhật `rules/testing.md`, `test/README.md`, `docs/modules/common.md`, spec 0002 → Implemented | Chưa làm | |
+
+## Giai đoạn 1 — Ca thành công + ca lỗi nghiệp vụ theo module
+
+Thứ tự theo rủi ro: tiền → đơn → trả hàng → giỏ → đánh giá → catalog → khách → còn lại. Ma trận auth/quyền (P0-2) đã phủ 401/403 cho mọi route, nên mỗi batch chỉ lo ca đúng và ca lỗi nghiệp vụ.
+
+
+### Batch 01 — payment (5 route)
+
+| # | Method | Path | Truy cập | Quyền |
+|---|---|---|---|---|
+| 1 | GET | `/api/payments/:orderId/status` | JWT | 13001 |
+| 2 | POST | `/api/payments/qr` | JWT | 13000 |
+| 3 | POST | `/api/webhooks/sepay` | Public | — |
+| 4 | GET | `/api/admin/payments/attempts` | JWT | 14000 |
+| 5 | GET | `/api/admin/payments/orders/:orderId` | JWT | 14000 |
+
+Trạng thái: **Chưa làm** · Ghi chú: —
+
+
+### Batch 02 — payment (5 route)
+
+| # | Method | Path | Truy cập | Quyền |
+|---|---|---|---|---|
+| 1 | POST | `/api/admin/payments/orders/:orderId/confirm` | JWT | 14001 |
+| 2 | POST | `/api/admin/payments/orders/:orderId/qr` | JWT | 14003 |
+| 3 | GET | `/api/admin/payments/transactions` | JWT | 14000 |
+| 4 | GET | `/api/admin/refunds` | JWT | 14000 |
+| 5 | POST | `/api/admin/refunds` | JWT | 14002 |
+
+Trạng thái: **Chưa làm** · Ghi chú: —
+
+
+### Batch 03 — payment (2 route)
+
+| # | Method | Path | Truy cập | Quyền |
+|---|---|---|---|---|
+| 1 | POST | `/api/admin/refunds/:refundId/complete` | JWT | 14002 |
+| 2 | POST | `/api/admin/refunds/:refundId/reject` | JWT | 14002 |
+
+Trạng thái: **Chưa làm** · Ghi chú: —
+
+
+### Batch 04 — order (5 route)
+
+| # | Method | Path | Truy cập | Quyền |
+|---|---|---|---|---|
+| 1 | GET | `/api/orders` | JWT | 3000 |
+| 2 | POST | `/api/orders` | JWT | 3002 |
+| 3 | GET | `/api/orders/:orderId` | JWT | 3001 |
+| 4 | PATCH | `/api/orders/:orderId/cancel` | JWT | 3003 |
+| 5 | POST | `/api/orders/quote` | JWT | 3002 |
+
+Trạng thái: **Chưa làm** · Ghi chú: —
+
+
+### Batch 05 — order (3 route)
+
+| # | Method | Path | Truy cập | Quyền |
+|---|---|---|---|---|
+| 1 | GET | `/api/admin/orders` | JWT | 9000 |
+| 2 | GET | `/api/admin/orders/:orderId` | JWT | 9000 |
+| 3 | PATCH | `/api/admin/orders/:orderId/status` | JWT | 9001 |
+
+Trạng thái: **Chưa làm** · Ghi chú: —
+
+
+### Batch 06 — return (5 route)
+
+| # | Method | Path | Truy cập | Quyền |
+|---|---|---|---|---|
+| 1 | GET | `/api/returns` | JWT | 15001 |
+| 2 | POST | `/api/returns` | JWT | 15000 |
+| 3 | GET | `/api/returns/:returnId` | JWT | 15001 |
+| 4 | PATCH | `/api/returns/:returnId/cancel` | JWT | 15000 |
+| 5 | GET | `/api/returns/eligibility/:orderId` | JWT | 15001 |
+
+Trạng thái: **Chưa làm** · Ghi chú: —
+
+
+### Batch 07 — return (5 route)
+
+| # | Method | Path | Truy cập | Quyền |
+|---|---|---|---|---|
+| 1 | GET | `/api/admin/returns` | JWT | 16000 |
+| 2 | GET | `/api/admin/returns/:returnId` | JWT | 16000 |
+| 3 | POST | `/api/admin/returns/:returnId/approve` | JWT | 16001 |
+| 4 | POST | `/api/admin/returns/:returnId/receive` | JWT | 16001 |
+| 5 | POST | `/api/admin/returns/:returnId/reject` | JWT | 16001 |
+
+Trạng thái: **Chưa làm** · Ghi chú: —
+
+
+### Batch 08 — cart (5 route)
+
+| # | Method | Path | Truy cập | Quyền |
+|---|---|---|---|---|
+| 1 | GET | `/api/cart` | JWT | 2000 |
+| 2 | DELETE | `/api/cart/clear` | JWT | 2004 |
+| 3 | POST | `/api/cart/items` | JWT | 2001 |
+| 4 | DELETE | `/api/cart/items/:itemId` | JWT | 2003 |
+| 5 | PATCH | `/api/cart/items/:itemId` | JWT | 2002 |
+
+Trạng thái: **Chưa làm** · Ghi chú: —
+
+
+### Batch 09 — review (5 route)
+
+| # | Method | Path | Truy cập | Quyền |
+|---|---|---|---|---|
+| 1 | POST | `/api/reviews` | JWT | 17000 |
+| 2 | GET | `/api/reviews/:productId` | Public | — |
+| 3 | GET | `/api/reviews/:productId/summary` | Public | — |
+| 4 | PATCH | `/api/reviews/:reviewId` | JWT | 17000 |
+| 5 | DELETE | `/api/reviews/:reviewId/helpful` | JWT | 17002 |
+
+Trạng thái: **Chưa làm** · Ghi chú: —
+
+
+### Batch 10 — review (5 route)
+
+| # | Method | Path | Truy cập | Quyền |
+|---|---|---|---|---|
+| 1 | POST | `/api/reviews/:reviewId/helpful` | JWT | 17002 |
+| 2 | POST | `/api/reviews/images` | JWT | 17000 |
+| 3 | GET | `/api/my-reviews` | JWT | 17001 |
+| 4 | GET | `/api/my-reviews/pending` | JWT | 17001 |
+| 5 | GET | `/api/my-reviews/votes` | JWT | 17001 |
+
+Trạng thái: **Chưa làm** · Ghi chú: —
+
+
+### Batch 11 — review (5 route)
+
+| # | Method | Path | Truy cập | Quyền |
+|---|---|---|---|---|
+| 1 | GET | `/api/admin/reviews` | JWT | 18000 |
+| 2 | GET | `/api/admin/reviews/:reviewId` | JWT | 18000 |
+| 3 | POST | `/api/admin/reviews/:reviewId/hide` | JWT | 18001 |
+| 4 | POST | `/api/admin/reviews/:reviewId/publish` | JWT | 18001 |
+| 5 | DELETE | `/api/admin/reviews/:reviewId/reply` | JWT | 18002 |
+
+Trạng thái: **Chưa làm** · Ghi chú: —
+
+
+### Batch 12 — review (1 route)
+
+| # | Method | Path | Truy cập | Quyền |
+|---|---|---|---|---|
+| 1 | PUT | `/api/admin/reviews/:reviewId/reply` | JWT | 18002 |
+
+Trạng thái: **Chưa làm** · Ghi chú: —
+
+
+### Batch 13 — product (5 route)
+
+| # | Method | Path | Truy cập | Quyền |
+|---|---|---|---|---|
+| 1 | GET | `/api/products` | Public | — |
+| 2 | GET | `/api/products/:id` | Public | — |
+| 3 | GET | `/api/products/autocomplete` | Public | — |
+| 4 | GET | `/api/admin/products` | JWT | 6003 |
+| 5 | POST | `/api/admin/products` | JWT | 6000 |
+
+Trạng thái: **Chưa làm** · Ghi chú: —
+
+
+### Batch 14 — product (2 route)
+
+| # | Method | Path | Truy cập | Quyền |
+|---|---|---|---|---|
+| 1 | DELETE | `/api/admin/products/:id` | JWT | 6002 |
+| 2 | PATCH | `/api/admin/products/:id` | JWT | 6001 |
+
+Trạng thái: **Chưa làm** · Ghi chú: —
+
+
+### Batch 15 — category (5 route)
+
+| # | Method | Path | Truy cập | Quyền |
+|---|---|---|---|---|
+| 1 | GET | `/api/categories` | Public | — |
+| 2 | GET | `/api/admin/categories` | JWT | 7003 |
+| 3 | POST | `/api/admin/categories` | JWT | 7000 |
+| 4 | DELETE | `/api/admin/categories/:id` | JWT | 7002 |
+| 5 | PATCH | `/api/admin/categories/:id` | JWT | 7001 |
+
+Trạng thái: **Chưa làm** · Ghi chú: —
+
+
+### Batch 16 — category (1 route)
+
+| # | Method | Path | Truy cập | Quyền |
+|---|---|---|---|---|
+| 1 | PATCH | `/api/admin/categories/reorder` | JWT | 7001 |
+
+Trạng thái: **Chưa làm** · Ghi chú: —
+
+
+### Batch 17 — collection (5 route)
+
+| # | Method | Path | Truy cập | Quyền |
+|---|---|---|---|---|
+| 1 | GET | `/api/collections` | Public | — |
+| 2 | GET | `/api/admin/collections` | JWT | 8003 |
+| 3 | POST | `/api/admin/collections` | JWT | 8000 |
+| 4 | DELETE | `/api/admin/collections/:id` | JWT | 8002 |
+| 5 | PATCH | `/api/admin/collections/:id` | JWT | 8001 |
+
+Trạng thái: **Chưa làm** · Ghi chú: —
+
+
+### Batch 18 — address (4 route)
+
+| # | Method | Path | Truy cập | Quyền |
+|---|---|---|---|---|
+| 1 | GET | `/api/addresses` | JWT | 4000 |
+| 2 | POST | `/api/addresses` | JWT | 4001 |
+| 3 | DELETE | `/api/addresses/:id` | JWT | 4003 |
+| 4 | PATCH | `/api/addresses/:id` | JWT | 4002 |
+
+Trạng thái: **Chưa làm** · Ghi chú: —
+
+
+### Batch 19 — wishlist (4 route)
+
+| # | Method | Path | Truy cập | Quyền |
+|---|---|---|---|---|
+| 1 | GET | `/api/wishlist` | JWT | 5000 |
+| 2 | DELETE | `/api/wishlist/:productId` | JWT | 5002 |
+| 3 | POST | `/api/wishlist/:productId` | JWT | 5001 |
+| 4 | GET | `/api/wishlist/check/:productId` | JWT | 5003 |
+
+Trạng thái: **Chưa làm** · Ghi chú: —
+
+
+### Batch 20 — auth+user (5 route)
+
+| # | Method | Path | Truy cập | Quyền |
+|---|---|---|---|---|
+| 1 | POST | `/api/auth/google` | Public | — |
+| 2 | GET | `/api/auth/me` | JWT | 1000 |
+| 3 | GET | `/api/auth/permissions` | JWT | 10000 |
+| 4 | POST | `/api/auth/refresh` | Public | — |
+| 5 | GET | `/api/admin/users` | JWT | 10000 |
+
+Trạng thái: **Chưa làm** · Ghi chú: —
+
+
+### Batch 21 — auth+user (2 route)
+
+| # | Method | Path | Truy cập | Quyền |
+|---|---|---|---|---|
+| 1 | GET | `/api/admin/users/:id` | JWT | 10000 |
+| 2 | PATCH | `/api/admin/users/:id` | JWT | 10001 |
+
+Trạng thái: **Chưa làm** · Ghi chú: —
+
+
+### Batch 22 — site-config+shipping+size-guide (5 route)
+
+| # | Method | Path | Truy cập | Quyền |
+|---|---|---|---|---|
+| 1 | GET | `/api/site-config` | Public | — |
+| 2 | GET | `/api/admin/site-config` | JWT | 11000 |
+| 3 | DELETE | `/api/admin/site-config/:key` | JWT | 11002 |
+| 4 | PUT | `/api/admin/site-config/:key` | JWT | 11001 |
+| 5 | GET | `/api/admin/site-config/keys` | JWT | 11000 |
+
+Trạng thái: **Chưa làm** · Ghi chú: —
+
+
+### Batch 23 — site-config+shipping+size-guide (2 route)
+
+| # | Method | Path | Truy cập | Quyền |
+|---|---|---|---|---|
+| 1 | GET | `/api/shipping` | Public | — |
+| 2 | GET | `/api/size-guides/:category` | Public | — |
+
+Trạng thái: **Chưa làm** · Ghi chú: —
+
+
+### Batch 24 — media+pending-count+health (5 route)
+
+| # | Method | Path | Truy cập | Quyền |
+|---|---|---|---|---|
+| 1 | GET | `/api/admin/media` | JWT | 12000 |
+| 2 | POST | `/api/admin/media` | JWT | 12001 |
+| 3 | DELETE | `/api/admin/media/:fileId` | JWT | 12002 |
+| 4 | GET | `/api/admin/media/ping` | JWT | 12000 |
+| 5 | GET | `/api/admin/pending-counts` | JWT | 9000,14000,16000,18000 |
+
+Trạng thái: **Chưa làm** · Ghi chú: —
+
+
+### Batch 25 — media+pending-count+health (2 route)
+
+| # | Method | Path | Truy cập | Quyền |
+|---|---|---|---|---|
+| 1 | GET | `/` | Public | — |
+| 2 | GET | `/health` | Public | — |
+
+Trạng thái: **Chưa làm** · Ghi chú: —
+
+
+## Nhật ký (thêm một dòng sau mỗi lượt, mới nhất ở dưới)
+
+| Lượt | Ngày | Phạm vi | Test thêm | Phủ thành công | Phủ lỗi | Phát hiện / ghi chú |
+|---|---|---|---|---|---|---|
+| — | 2026-10-21 | Lập quy trình + chia 25 batch | 0 | — | — | Số liệu độ phủ chỉ có sau P0-3 |
+
+## Phát hiện cần người dùng quyết định
+
+Test lộ ra hành vi nghi là lỗi trong code thì ghi ở đây (route, hành vi quan sát được, hành vi mong đợi theo docs), **không sửa code lặng lẽ** — sửa là thay đổi hành vi, cần spec riêng.
+
+| Batch | Route | Quan sát | Mong đợi (nguồn) | Trạng thái |
+|---|---|---|---|---|
+| — | — | — | — | — |

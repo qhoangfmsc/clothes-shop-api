@@ -1,6 +1,6 @@
 # order (`src/modules/order`)
 
-> Cập nhật lần cuối: 2026-10-16
+> Cập nhật lần cuối: 2026-10-21
 
 ## 1. Tổng quan
 
@@ -44,7 +44,9 @@ Thanh toán (VietQR/SePay) và hoàn tiền của đơn do module [payment](paym
 | GET | `/api/admin/orders/:orderId` | `ORDER_ADMIN_VIEW` | Chi tiết bất kỳ đơn |
 | PATCH | `/api/admin/orders/:orderId/status` | `ORDER_ADMIN_UPDATE_STATUS` | Đổi trạng thái |
 
-**Field tiền của đơn** (khách và admin, ở list, chi tiết, checkout, huỷ, đổi trạng thái): `subtotalVnd/subtotalUsd`, `shippingFeeVnd/shippingFeeUsd`, `totalVnd/totalUsd`, mỗi dòng `items[].priceVnd/priceUsd`, và `exchangeRate` (số VND cho 1 USD lúc đặt đơn). Không còn field `subtotal`/`shippingFee`/`total`/`items[].price`. `...Usd` = `round(…Vnd / exchangeRate, 2)` nên không đổi khi admin đổi tỷ giá sau đó.
+**Field tiền của đơn** (khách và admin, ở list, chi tiết, checkout, huỷ, đổi trạng thái): `subtotalVnd/subtotalUsd`, `shippingFeeVnd/shippingFeeUsd`, `totalVnd/totalUsd`, mỗi dòng `items[].priceVnd/priceUsd`, và `exchangeRate` (số VND cho 1 USD lúc đặt đơn). Không còn field `subtotal`/`shippingFee`/`total`/`items[].price`.
+
+**Dòng hàng `items[]`** (mọi response có đơn: list/chi tiết của khách và admin, checkout, huỷ, đổi trạng thái): `productId`, `productName`, `productImage`, `priceVnd/priceUsd` là ảnh chụp lúc đặt, không đổi theo sản phẩm; thêm `product` là `ProductSummary` của sản phẩm hiện tại (`{ id, name, slug, image, badge, category { id, slug, title }, subcategory { id, slug, label } }`, xem [product](product.md)) để dựng link, `null` khi sản phẩm đã bị xoá (`productId` = `null`). Đơn luôn nạp `items`, `items.product`, `items.product.category`, `items.product.subcategory`. `...Usd` = `round(…Vnd / exchangeRate, 2)` nên không đổi khi admin đổi tỷ giá sau đó.
 
 **GET `/api/orders`** — `PublicOrderQueryDto` (extends `PaginationQueryDto`): `status` (`IsIn(ORDER_STATUSES)`), `sort` (whitelist `createdAt`; mặc định `-createdAt`). Response `paginated(...)`, mỗi đơn kèm `items`.
 
@@ -241,12 +243,14 @@ Phía khách các lỗi còn lại là HTTP thô: `NotFoundException` (`Order no
 
 ### 4.7 Test
 
+- `order.presenter.spec.ts` / `order.service.spec.ts` (tiếp) — `items[].product` là `ProductSummary` cạnh phần ảnh chụp (không lộ entity sản phẩm), `null` khi sản phẩm đã xoá hoặc chưa nạp; `findOne` nạp `items.product.category` và `items.product.subcategory`.
 - `order.service.spec.ts` — `OrderService.checkout`: đặt theo `cartItemIds` (chỉ xoá dòng đã đặt), đặt cả giỏ khi bỏ `cartItemIds`, gửi đủ id, miễn phí ship tính theo subtotal các dòng đã chọn (không theo cả giỏ) và áp dụng khi subtotal đã chọn đạt ngưỡng, phí theo từng phương thức lấy từ shipping config (mặc định, giá cấu hình, ngưỡng cấu hình, ngưỡng `null` không bao giờ miễn phí, config được đọc trong checkout), từ chối sản phẩm inactive, bỏ qua sản phẩm inactive/`sold_out`/`custom_order` không được chọn, từ chối giỏ có `sold_out`, giỏ rỗng.
 - `order.service.spec.ts` (tiếp) — tổ hợp phương thức/địa chỉ/`pickupContact` (tạo được, snapshot `{ fullName, phone }`, không tra địa chỉ, các tổ hợp bị từ chối với 1304/1305/1306 và không ghi gì), tổng tiền từng phương thức dưới/đạt ngưỡng và ngưỡng `null`, cộng VND nguyên, `quote` (số liệu VND/USD, mặc định, `cartItemIds`, `freeShipping`, ngưỡng `null`, trùng kết quả checkout, USD theo tỷ giá hiện tại, không còn `vndPerUnit`/`amountVnd`, không tác dụng phụ, kiểm tra giỏ như checkout, `totalVnd` bằng số tiền QR tạo cho đơn cùng đầu vào), checkout chốt `exchangeRate` và trả đủ field `...Vnd`/`...Usd`, và số tiền QR của đơn `express` = `subtotal + phí express` (qua `PaymentService.createQr`).
 - `order.service.spec.ts` (tiếp) — luật huỷ với thanh toán: khách huỷ đơn chưa trả thì các mã chờ bị huỷ theo, đơn đã trả (mọi trạng thái) → 1307 và không đổi gì, đơn đã `confirmed` chưa trả vẫn lỗi thường, admin chuyển `cancelled` thì huỷ các mã chờ còn các chuyển khác thì không.
 - `order.service.spec.ts` (tiếp) — `findOne`/`cancel` kèm `paymentAttempts`: trả đúng thứ tự do payment cung cấp, `[]` khi chưa có phiên, đơn của người khác/không tồn tại → 404 và không truy vấn phiên, `cancel` trả cùng shape.
 - `order.service.spec.ts` (tiếp) — luật huỷ với hoàn tiền (dùng `RefundService` thật trên manager giả): khách huỷ đơn chưa trả (không có hoàn tiền, mã chờ → `CANCELLED`), khách không huỷ được đơn đã trả ở bất kỳ trạng thái nào (1307, không tạo hoàn), đơn đã huỷ không tạo hoàn lần hai, đơn của người khác → 404, admin huỷ đơn đã trả không có phiên `PAID` → 1712 và trạng thái giữ nguyên, admin huỷ đơn đã trả (`ADMIN_CANCELLED`, `requested_by` admin), admin huỷ đơn chưa trả, chuyển trạng thái khác không đụng thanh toán, bước chuyển sai (huỷ từ `shipping`) → 1302 không tạo hoàn, đơn lạ → 1301.
 - `dtos/order.dto.spec.ts` — `CreateOrderDto` và `QuoteOrderDto`: `cartItemIds` hợp lệ/không hợp lệ, từng `shippingMethod`, phương thức lạ → 400, `pickupContact` hợp lệ/trim/thiếu/rỗng/quá dài/key lạ.
+- Flow test trên Postgres thật (`test/flows/order-payment/`, xem `test/README.md`): `checkout-and-pay.flow.ts` — báo giá (2 × 350.000 + phí ship tiêu chuẩn 30.000 = 730.000), checkout tạo đơn `pending`/`unpaid` và dọn giỏ, đơn sang `confirmed`/`paid` sau webhook SePay; `cancel-and-refund.flow.ts` — khách huỷ đơn chưa trả, khách huỷ đơn đã trả → 1307, admin huỷ đơn đã trả → yêu cầu hoàn đủ tiền → đơn `refunded`. Chưa có flow test cho đổi trạng thái đơn theo chuỗi `pending → … → completed` và cho checkout với `store-pickup`.
 
 ### 4.8 Lưu ý hiện trạng
 
