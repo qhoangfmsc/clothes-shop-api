@@ -47,7 +47,7 @@ describe('Flow: <tên luồng>', () => {
 
 3. **Dữ liệu:** dùng/ mở rộng `test/support/builders.ts` (`b.user`, `b.admin`, `b.product`, `b.cart`, `b.address`). Builder phải thoả mọi CHECK/NOT NULL của DB; thêm builder mới thay vì INSERT tay trong test. Nhớ DB bắt đầu **trống** (global-setup đã xoá dữ liệu seed của migration).
 4. **Bước lặp lại** của luồng → `steps.ts` cạnh file flow.
-5. **Đầu vào ngoài** (webhook, API ngoài) giả ở biên, như `sepayWebhook(...)`; không mock service nội bộ.
+5. **Đầu vào ngoài** (webhook, API ngoài) giả ở biên, như `sepayWebhook(...)`; không mock service nội bộ. `fetch` ra mạng bị chặn sẵn: cần giả dịch vụ ngoài thì `jest.spyOn(globalThis, 'fetch').mockResolvedValue(...)` trong chính test.
 6. **Nhánh lỗi:** assert `res.body.errorCode`, không chỉ status HTTP.
 7. **Luồng tiền mới:** thử phá một dòng logic để chắc test bắt được, rồi khôi phục (không commit phần phá).
 

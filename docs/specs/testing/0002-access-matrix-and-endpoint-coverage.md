@@ -40,12 +40,13 @@ Hiện trạng đã đọc: `JwtAuthGuard` (401 do Passport, không có `errorCo
 ### 3.2 Kiến trúc & ranh giới
 
 ```
-test/support/routes.ts           discoverRoutes(app): [{method, path, isPublic, permissions}], routeKey, concretePath
+test/support/routes.ts           discoverRoutes(app): [{method, path, isPublic, permissions, handler}], routeKey, formatRouteTable (P0-2 thêm concretePath)
 test/support/coverage.ts         recorder (middleware) + ghi/đọc test/.coverage/*.jsonl|json, hàm tính độ phủ
 test/support/coverage-report.ts  script chạy sau jest: in bảng, áp ratchet theo baseline
-test/support/test-app.ts         gắn recorder trước app.init(); ghi routes.json mỗi lần boot
+test/support/test-app.ts         (P0-3) gắn recorder trước app.init(); ghi routes.json mỗi lần boot
 test/support/auth.ts             bearer(t, user, options): ký token đúng hoặc cố ý hỏng (sai secret, hết hạn, refresh)
-test/flows/access/access-matrix.flow.ts   ma trận auth/quyền + invariants + snapshot
+test/flows/access/route-table.flow.ts     snapshot bảng route–quyền + bất biến tĩnh + kiểm hermetic (P0-1)
+test/flows/access/access-matrix.flow.ts   ma trận auth/quyền qua HTTP (P0-2)
 test/coverage-baseline.json      route hiện chưa có ca thành công / ca lỗi (chỉ được thu nhỏ)
 ```
 
@@ -96,7 +97,7 @@ Không đổi API. Lệnh: `yarn test:flows` chạy jest rồi `coverage-report.
 
 "Không bị guard chặn" nghĩa là không phải (401 không `errorCode`) và không phải (403 + 9001); mọi status khác (200, 400, 404, 503...) đều chấp nhận vì đây là ma trận quyền, không phải test nghiệp vụ.
 
-**Invariants** (mỗi cái một test): route không public đều khai báo ≥ 1 quyền; mọi route `/api/admin/**` không public và quyền của nó không nằm trong `DEFAULT_USER_PERMISSIONS`; mọi mã quyền được dùng đều tồn tại trong enum `Permission`.
+**Invariants** (mỗi cái một test, nằm ở `route-table.flow.ts` vì không cần HTTP): route không public đều khai báo ≥ 1 quyền; mọi route `/api/admin/**` không public và quyền của nó không nằm trong `DEFAULT_USER_PERMISSIONS`; mọi mã quyền được dùng đều tồn tại trong enum `Permission`.
 
 **Độ phủ**: recorder ghi `{method, routePattern, status}` cho request không mang `x-test-probe`. Route "có ca thành công" = có status 2xx/3xx; "có ca lỗi" = có status ≥ 400 (với route cần đăng nhập thì loại 401/403, vì đó là kết quả của guard; hệ quả: lỗi nghiệp vụ 401/403 hiếm gặp ở route cần đăng nhập không được tính). `GET /` và `GET /health` được miễn ca lỗi (không có input). Ratchet: thất bại nếu route **không có trong baseline** mà thiếu ca; hoặc route **có trong baseline** nhưng nay đã đủ ca (phải gỡ khỏi baseline); hoặc baseline chứa route không còn tồn tại. Baseline lần đầu được sinh từ trạng thái hiện tại; `--update-baseline` chỉ gỡ mục đã đủ, thêm mục phải sửa tay (có chủ đích).
 
@@ -119,8 +120,9 @@ Không đổi API. Lệnh: `yarn test:flows` chạy jest rồi `coverage-report.
 | Flow (ma trận) | 401 do thiếu/hỏng credential cho mọi route cần đăng nhập | `test/flows/access/access-matrix.flow.ts` |
 | Flow (ma trận) | 403 khi không có quyền cần; qua guard khi có đúng một quyền; admin qua guard | cùng file |
 | Flow (ma trận) | Route public truy cập được khi không token và token rác | cùng file |
-| Flow (invariants) | Mọi route cần đăng nhập có quyền; admin route không dùng quyền mặc định; mã quyền hợp lệ | cùng file |
+| Flow (invariants) | Mọi route cần đăng nhập có quyền; route public không có quyền; admin route không public và không dùng quyền mặc định; mã quyền hợp lệ; không trùng method+path | `test/flows/access/route-table.flow.ts` |
 | Flow (snapshot) | Bảng route–quyền | cùng file |
+| Flow (hermetic) | Env dịch vụ ngoài rỗng; `fetch` bị chặn; media chưa cấu hình → 503/1601 | cùng file |
 | Công cụ | Ratchet độ phủ (chạy trong `yarn test:flows`) | `test/support/coverage-report.ts` |
 
 ## 5. Rủi ro & rollback

@@ -17,7 +17,7 @@ Trạng thái: `Chưa làm` · `Đang làm` · `Xong` · `Chặn` (kèm lý do �
 
 | Bước | Nội dung | Trạng thái | Ghi chú |
 |---|---|---|---|
-| P0-1 | Test hermetic (`SUPABASE_*`, `GOOGLE_*`, `STORAGE_URL` rỗng; `fetch` bị chặn) + `routes.ts` (tự phát hiện route) + test-app ghi `routes.json` + snapshot bảng route–quyền | Chưa làm | |
+| P0-1 | Test hermetic (`SUPABASE_*`, `GOOGLE_*`, `STORAGE_URL` rỗng; `fetch` bị chặn) + `routes.ts` (tự phát hiện route) + snapshot bảng route–quyền + bất biến tĩnh về quyền (`flows/access/route-table.flow.ts`) | Xong | Việc ghi `routes.json` dời sang P0-3 (chỉ bộ đo độ phủ mới dùng). Bất biến tĩnh nằm ở `route-table.flow.ts`, ma trận HTTP ở P0-2 |
 | P0-2 | Ma trận auth/quyền cho mọi route (401 các kiểu, 403, đúng quyền, admin, route public) + invariants; `bearer()` hỗ trợ token hỏng | Chưa làm | |
 | P0-3 | Recorder độ phủ (middleware, header `x-test-probe` bị bỏ qua) + `coverage-report.ts` + `coverage-baseline.json` (ratchet) + nối vào `yarn test:flows`; báo cáo in "batch kế tiếp" | Chưa làm | |
 | P0-4 | Cập nhật `rules/testing.md`, `test/README.md`, `docs/modules/common.md`, spec 0002 → Implemented | Chưa làm | |
@@ -330,6 +330,7 @@ Trạng thái: **Chưa làm** · Ghi chú: —
 | Lượt | Ngày | Phạm vi | Test thêm | Phủ thành công | Phủ lỗi | Phát hiện / ghi chú |
 |---|---|---|---|---|---|---|
 | — | 2026-10-21 | Lập quy trình + chia 25 batch | 0 | — | — | Số liệu độ phủ chỉ có sau P0-3 |
+| P0-1 | 2026-10-21 | Hermetic + tự phát hiện route + snapshot quyền | +9 (flow 11 → 20) | chưa đo (P0-3) | chưa đo (P0-3) | 98 route phát hiện (15 public, 83 cần đăng nhập), không có route thiếu quyền. Phá thử 4 lần (bỏ `@Permissions`, đổi quyền, bỏ chặn `fetch`, bỏ env rỗng) đều bị bắt. `.env` của máy có `SUPABASE_URL`, `GOOGLE_CLIENT_ID` thật nên phần hermetic có tác dụng thật |
 
 ## Phát hiện cần người dùng quyết định
 

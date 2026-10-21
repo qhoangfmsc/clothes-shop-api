@@ -22,6 +22,7 @@ yarn -s jest --config test/jest.flows.config.js --runInBand -t "<tên test>"   #
 - Mỗi lần chạy: `DROP SCHEMA public` → chạy **toàn bộ migration** → xoá dữ liệu seed → chạy flow; sau mỗi test dữ liệu được dọn. Migration hỏng hoặc thiếu constraint làm cả bộ đỏ.
 - Chỉ chạy trên DB có tên kết thúc `_test`. Hai lần chạy đồng thời bị chặn bằng khoá advisory.
 - Cần Docker đang chạy.
+- Hermetic: biến `SUPABASE_*`, `GOOGLE_*`, `STORAGE_URL` bị đặt rỗng (kể cả khi `.env` của máy có khoá thật) và `fetch` toàn cục bị chặn; test cần giả dịch vụ ngoài thì `jest.spyOn(globalThis, 'fetch')`.
 
 ## Cấu trúc
 
@@ -30,14 +31,16 @@ test/
 ├── README.md                    file này (test matrix)
 ├── jest.flows.config.js         config jest riêng cho flow
 ├── support/
-│   ├── test-env.ts              env test + chốt chặn tên DB `_test`
+│   ├── test-env.ts              env test (DB, JWT, SePay giả; dịch vụ ngoài để rỗng) + chốt chặn tên DB `_test`
+│   ├── env.ts                   setupFiles: áp env test và chặn `fetch` ra mạng
 │   ├── global-setup.ts          khoá chạy, dựng schema từ migration, dọn seed
 │   ├── global-teardown.ts       nhả khoá
 │   ├── test-app.ts              createTestApp(): boot MainModule thật, dùng configureApp như production
 │   ├── db.ts                    truncateAll
 │   ├── auth.ts                  bearer(t, user): header JWT
 │   ├── builders.ts              createBuilders(ds): user, admin, product, cart, address...
-│   └── sepay.ts                 sepayWebhook(): webhook ký HMAC đúng chuẩn
+│   ├── sepay.ts                 sepayWebhook(): webhook ký HMAC đúng chuẩn
+│   └── routes.ts                discoverRoutes(app): tự phát hiện route + quyền từ metadata của Nest; formatRouteTable
 └── flows/<module>/
     ├── <luồng>.flow.ts          một file một luồng nghiệp vụ
     └── steps.ts                 bước dùng lại của luồng (không phải test)
@@ -51,7 +54,9 @@ Trạng thái: **Có** = đã có test cover luồng · **Unit** = chỉ có uni
 
 | Module | Luồng | Tầng | File | Trạng thái |
 |---|---|---|---|---|
-| auth / guard | Không token → 401; thiếu quyền → 403 | Flow | `flows/order-payment/checkout-and-pay.flow.ts` | Có |
+| auth / guard | Không token → 401; thiếu quyền → 403 (mới trên `GET /api/orders`) | Flow | `flows/order-payment/checkout-and-pay.flow.ts` | Có |
+| mọi module (bảng quyền) | Tự phát hiện 98 route; snapshot route–quyền; mọi route cần đăng nhập có quyền; route public không có quyền; route `/api/admin` không public và không dùng quyền mặc định; mã quyền hợp lệ; không trùng method+path | Flow | `flows/access/route-table.flow.ts` | Có |
+| hạ tầng test | Hermetic: env dịch vụ ngoài rỗng, `fetch` bị chặn, media chưa cấu hình → 503/1601 | Flow | `flows/access/route-table.flow.ts` | Có |
 | order + cart + address + payment | Giỏ → báo giá → checkout → mã QR → webhook SePay → đơn `paid`/`confirmed` | Flow | `flows/order-payment/checkout-and-pay.flow.ts` | Có |
 | payment (webhook) | Webhook trùng idempotent; sai chữ ký (1704); sai số tiền (`AMOUNT_MISMATCH`); tiền đến lần 2 (`DUPLICATE_PAYMENT`) | Flow | `flows/order-payment/checkout-and-pay.flow.ts` | Có |
 | order | Khách huỷ đơn chưa trả (huỷ QR); khách không huỷ được đơn đã trả (1307) | Flow | `flows/order-payment/cancel-and-refund.flow.ts` | Có |

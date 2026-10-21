@@ -269,7 +269,9 @@ yarn migration:run              # chạy migration
   - Mỗi lần chạy: lấy khoá advisory (`pg_try_advisory_lock`; lần chạy thứ hai cùng DB bị chặn), `DROP SCHEMA public` → chạy toàn bộ migration → `TRUNCATE` dữ liệu seed; sau mỗi test `truncateAll`.
   - Chốt chặn: tên DB phải kết thúc `_test` (`test/support/test-env.ts`), nếu không dừng ngay. Biến môi trường test (DB `127.0.0.1:55432`, secret JWT/SePay giả) gán thẳng vào `process.env`, thắng `.env`.
   - Công cụ dùng chung ở `test/support/`: `createTestApp`, `createBuilders` (user, admin, product, cart, address), `bearer`, `sepayWebhook`, `truncateAll`.
-  - Hiện có: `test/flows/order-payment/` (đặt hàng – thanh toán, huỷ – hoàn tiền). Bảng luồng nào có test nào: `test/README.md`. Thiết kế: `docs/specs/testing/0001-flow-test-infrastructure.md`.
+  - Hermetic: `test-env.ts` đặt rỗng `SUPABASE_*`, `GOOGLE_*`, `STORAGE_URL` (kể cả khi `.env` có khoá thật) và `test/support/env.ts` thay `fetch` toàn cục bằng hàm ném lỗi; test cần giả dịch vụ ngoài dùng `jest.spyOn(globalThis, 'fetch')`.
+  - `test/support/routes.ts` (`discoverRoutes`) tự phát hiện route, `@Public()` và `@Permissions` từ metadata của Nest; `test/flows/access/route-table.flow.ts` giữ snapshot bảng route–quyền và các bất biến (route cần đăng nhập có quyền, route `/api/admin` không public và không dùng quyền mặc định, mã quyền hợp lệ).
+  - Hiện có: `test/flows/order-payment/` (đặt hàng – thanh toán, huỷ – hoàn tiền), `test/flows/access/` (bảng quyền, hermetic). Bảng luồng nào có test nào: `test/README.md`. Thiết kế: `docs/specs/testing/0001-flow-test-infrastructure.md`.
 
 ### 4.13 Lưu ý hiện trạng
 
