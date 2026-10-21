@@ -1,19 +1,18 @@
 ---
 name: module-docs
-description: Quy trình khép kín Docs → Feature → Docs cho từng module của clothes-shop-api. BẮT BUỘC dùng trước khi sửa/tạo bất kỳ thứ gì trong src/modules, src/common, src/core, src/migrations (đọc docs/modules/<module>.md + code để hiểu module) và sau khi làm xong (viết/cập nhật docs rồi mới được báo hoàn thành). Không dùng cho tài liệu FE, roadmap hay kế hoạch.
+description: Bước ĐỌC và bước DOCS của quy trình làm việc clothes-shop-api (xem skill feature-workflow cho cả quy trình Đọc → Spec → Code + Test → Docs). Dùng để đọc docs/modules/<module>.md + code trước khi sửa src/modules, src/common, src/core, src/migrations, và để viết/cập nhật docs hiện trạng sau khi code xong. Không dùng cho tài liệu FE, roadmap hay kế hoạch; thiết kế trước khi code thuộc skill tech-spec.
 ---
 
-# module-docs — vòng khép kín Docs → Feature → Docs
+# module-docs — đọc hiểu trước, viết docs hiện trạng sau
 
-Luật gốc: `.claude/rules/module-docs.md`. Skill này là quy trình thao tác. `docs/` chỉ chứa những gì **đã có** trong code, mỗi module một file `docs/modules/<module>.md`.
+Luật gốc: `.claude/rules/module-docs.md` (nội dung docs) và `.claude/rules/feature-workflow.md` (quy trình tổng). Skill này là phần thao tác của **bước ① Đọc & hiểu** và **bước ④ Docs**. `docs/modules/` chỉ chứa những gì **đã có** trong code, mỗi module một file.
 
 ```
- GIAI ĐOẠN A            GIAI ĐOẠN B          GIAI ĐOẠN C                GIAI ĐOẠN D
- Đọc & hiểu      →      Làm feature   →      Viết / cập nhật docs  →    Đối chiếu & báo xong
- (docs + code)          (code + test)        (docs/modules/*.md)        (checklist DoD)
+ ① Đọc & hiểu → ② Tech spec → ③ Code + Test → ④ Docs hiện trạng → ⑤ Đối chiếu & báo xong
+   (giai đoạn A)  (tech-spec)    (giai đoạn B)    (giai đoạn C)       (giai đoạn D)
 ```
 
-Không được nhảy cóc: không làm B khi chưa xong A; không báo xong khi chưa xong C và D.
+Không nhảy cóc: không code khi chưa đọc xong; không báo xong khi chưa xong docs.
 
 ---
 
@@ -27,7 +26,7 @@ Liệt kê module bị ảnh hưởng: module chính + module phụ thuộc/tham
 
 | Tình huống | Phải đọc |
 |---|---|
-| Cập nhật module có sẵn | `docs/modules/<module>.md` (đủ 4 phần) + `docs/modules/common.md` các mục liên quan |
+| Cập nhật module có sẵn | `docs/modules/<module>.md` (đủ 4 phần) + `docs/modules/common.md` các mục liên quan + các spec của module ở `docs/specs/<module>/` (hiểu vì sao hiện thiết kế như vậy) |
 | Tạo module mới | `docs/README.md`, `docs/modules/common.md`, docs của module sẽ phụ thuộc |
 | Việc chạm nhiều module | docs của **tất cả** module trong phạm vi |
 | Chạm hạ tầng dùng chung | `docs/modules/common.md` + docs của các module đang dùng phần đó |
@@ -43,7 +42,7 @@ Với từng module trong phạm vi, đọc code thực tế:
 | Luồng & business rule | `*.service.ts` |
 | Dữ liệu | `*.entity.ts` **và** migration trong `src/migrations/` (CHECK, UNIQUE, FK ON DELETE, INDEX chỉ có trong migration) |
 | Error code | `src/common/exceptions/error-codes.ts` + chỗ gọi `throwAppError` |
-| Test hiện có | `*.spec.ts` |
+| Test hiện có | `*.spec.ts` cạnh code và `test/flows/<module>/` (xem `test/README.md`) |
 
 ### A4. Chốt hiểu biết trước khi code
 
@@ -53,13 +52,13 @@ Với từng module trong phạm vi, đọc code thực tế:
 
 ---
 
-## Giai đoạn B — Làm feature
+## Giai đoạn B — Code + test (theo tech spec)
 
-Theo `CLAUDE.md`: validation 3 tầng (DTO → service → migration), skill `list-api` cho API list, error code `[MM][EE]`, migration timestamp `Date.now()`.
+Viết spec trước (skill `tech-spec`), rồi code theo spec, `CLAUDE.md` (validation 3 tầng, skill `list-api`, error code `[MM][EE]`, migration timestamp `Date.now()`) và `.claude/rules/engineering-principles.md`. Viết test cùng lượt (skill `module-test`).
 
 Trong lúc làm, ghi nhanh (trong đầu hoặc scratchpad, **không** vào `docs/`) danh sách thay đổi để dùng ở giai đoạn C: endpoint, DTO field, cột/constraint/migration, error code, permission, env, business rule, test.
 
-Kiểm tra: `npx tsc --noEmit && npx biome check src/ && yarn test && npx nest build`.
+Kiểm tra: `npx tsc --noEmit && yarn lint && yarn test && yarn test:flows && npx nest build`.
 
 ---
 
@@ -107,12 +106,15 @@ Lấy danh sách thay đổi bằng `git diff` / `git status` thay vì nhớ.
 Chỉ được báo hoàn thành khi tick đủ:
 
 - [ ] Giai đoạn A đã làm: đã đọc docs + code của mọi module trong phạm vi trước khi sửa.
-- [ ] Type check, lint, test, build qua.
+- [ ] Type check, lint, unit test, flow test, build qua.
+- [ ] Spec của việc này (nếu thuộc cỡ cần spec) ở trạng thái Implemented, mục 6 đã điền.
+- [ ] `test/README.md` có dòng cho test mới/đổi; mục 4.7 của module khớp.
+- [ ] Mục 4.9 (thiết kế & pattern) của module phản ánh đúng code vừa làm.
 - [ ] Mỗi endpoint trong controller đều có trong bảng API của docs (và ngược lại, không còn endpoint ma).
 - [ ] Mọi cột/constraint trong phần Dữ liệu đối chiếu được với entity + migration.
 - [ ] Mọi error code / permission / env mới hoặc đổi đã có trong docs (module + `common.md` nếu dùng chung).
 - [ ] Module mới: có file `docs/modules/<module>.md` đủ 4 phần và dòng trong `docs/README.md`.
 - [ ] `Cập nhật lần cuối` đã đổi; không có nội dung kế hoạch hay tài liệu FE.
-- [ ] Báo cáo cuối cho người dùng **liệt kê file docs đã tạo/sửa**.
+- [ ] Báo cáo cuối cho người dùng **liệt kê file spec, docs, test đã tạo/sửa** và 1–3 dòng về pattern/nguyên lý đã áp dụng.
 
 Ngoại lệ không cần docs (phải nói rõ trong báo cáo): đổi tên biến nội bộ, format, sửa comment, thêm test thuần không đổi code chạy.

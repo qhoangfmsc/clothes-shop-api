@@ -26,6 +26,10 @@ src/
 │   ├── shipping/    # Static data, no DB
 │   └── size-guide/  # Static data, no DB
 └── migrations/      # TypeORM migrations
+test/                # Flow test (Postgres thật): flows/<module>/*.flow.ts, support/, README.md = test matrix
+docs/
+├── modules/         # Docs hiện trạng, mỗi module một file (viết SAU khi code)
+└── specs/           # Tech spec theo module: <module>/NNNN-slug.md (viết TRƯỚC khi code)
 ```
 
 ## Auth & Permission
@@ -108,19 +112,42 @@ Khi tạo hoặc sửa API list, dùng skill `list-api` (`.claude/skills/list-ap
 - Tỷ giá lấy từ `CurrencyService.getVndPerUsd()` (dòng `EXCHANGE_RATE` của site_configs). Dữ liệu danh mục/giỏ dùng tỷ giá hiện tại; dữ liệu gắn với đơn (đơn, thanh toán, hoàn tiền, trả hàng) dùng `orders.exchange_rate` đã chốt lúc checkout.
 - Entity trả thẳng ra API phải đi qua presenter (`presentProduct`, `presentOrder`, `payment.presenter`) — không trả entity có cột tiền thô.
 
-## Docs (`docs/`) — quy trình khép kín Docs → Feature → Docs (BẮT BUỘC)
+## Quy trình làm việc: Đọc → Spec → Code + Test → Docs (BẮT BUỘC)
 
-`docs/` là tài liệu BE thực tế theo **từng module**: `docs/modules/<module>.md` (mục lục `docs/README.md`, hạ tầng dùng chung ở `docs/modules/common.md`). Chỉ ghi những gì đã có trong code; KHÔNG viết tài liệu FE, roadmap, kế hoạch.
+Mọi việc chạm `src/modules`, `src/common`, `src/core`, `src/migrations` phải đi đủ 5 bước, đúng thứ tự. Dùng skill `feature-workflow` (`.claude/skills/feature-workflow/`) để làm theo checklist; luật ở `.claude/rules/feature-workflow.md`.
 
-Mọi việc chạm `src/modules`, `src/common`, `src/core`, `src/migrations` phải đi đủ 3 bước, đúng thứ tự:
+1. **Đọc & hiểu trước**: đọc `docs/modules/<module>.md`, code thực tế, spec cũ `docs/specs/<module>/` của mọi module bị ảnh hưởng (tạo module mới thì đọc `docs/README.md` + `common.md`). Chưa hiểu thì hỏi, không đoán, không code.
+2. **Tech spec trước khi code** (skill `tech-spec`): `docs/specs/<module>/NNNN-slug.md` — vấn đề, phương án, kiến trúc, design pattern, kiểm tra SOLID, dữ liệu, luồng, lỗi, kế hoạch test. Cỡ đầy đủ / rút gọn / miễn theo bảng trong rule. Quyết định thiết kế đáng kể thì trình người dùng trước khi code.
+3. **Code + test cùng lượt**: theo spec, `.claude/rules/engineering-principles.md` và các chuẩn trong file này; test theo `.claude/rules/testing.md` (skill `module-test`).
+4. **Docs hiện trạng**: `docs/modules/<module>.md` (+ `common.md` nếu chạm phần chung, `docs/README.md` nếu thêm module); spec điền mục 6 và chuyển Implemented; cập nhật `test/README.md`.
+5. **Đối chiếu & báo xong**: type check, lint, `yarn test`, `yarn test:flows` đều qua; docs/spec/test khớp code.
 
-1. **Đọc & hiểu trước**: đọc `docs/modules/<module>.md` + code thực tế của mọi module bị ảnh hưởng (tạo module mới thì đọc `docs/README.md` + `common.md`). Chưa hiểu thì hỏi, không đoán, không code.
-2. **Làm feature**: theo các chuẩn trong file này.
-3. **Viết / cập nhật docs ngay trong cùng lượt**: tạo `docs/modules/<module>.md` (module mới) hoặc sửa các mục bị ảnh hưởng (module cũ) + `common.md` nếu chạm phần dùng chung.
+**Chưa đủ 5 bước = chưa xong.** Báo cáo cuối nêu: file spec, docs, test đã tạo/sửa + 1–3 dòng về pattern/nguyên lý đã áp dụng và vì sao. Chỉ được bỏ qua khi thay đổi không đổi hành vi (đổi tên biến nội bộ, format, comment, test thuần) và phải nói rõ.
 
-**Chưa cập nhật docs = chưa xong.** Báo cáo cuối phải nêu file docs đã tạo/sửa. Chỉ được bỏ qua docs khi thay đổi không đổi hành vi (đổi tên biến nội bộ, format, comment, test thuần) và phải nói rõ.
+| Loại tài liệu | Nơi | Trả lời | Viết khi |
+|---|---|---|---|
+| Docs module | `docs/modules/<module>.md` | Hiện giờ hệ thống làm gì | Sau code, luôn khớp code |
+| Tech spec | `docs/specs/<module>/NNNN-slug.md` | Vì sao, thiết kế thế nào | Trước code |
+| Test | `src/**.spec.ts`, `test/flows/` | Còn đúng không | Cùng code |
 
-Luật: `.claude/rules/module-docs.md` · Quy trình + template + checklist: skill `module-docs` (`.claude/skills/module-docs/`).
+`docs/modules/` chỉ ghi cái đã có trong code; KHÔNG viết tài liệu FE, roadmap, kế hoạch. Luật docs: `.claude/rules/module-docs.md` · Template + checklist: skill `module-docs`.
+
+## Nguyên tắc kỹ thuật: Design pattern · Kiến trúc · Convention · SOLID (BẮT BUỘC)
+
+Luật đầy đủ: `.claude/rules/engineering-principles.md` · Kiến thức, mẫu code, checklist: skill `design-principles`.
+
+- **Pattern là công cụ, không phải mục tiêu**: chỉ dùng khi gọi tên được vấn đề cụ thể; "không dùng pattern" là hợp lệ; rule of three (lần 3 mới gom). Ghi pattern và cái giá ở spec mục 3.3 và một dòng comment ở chỗ định nghĩa.
+- **Kiến trúc**: Controller (mỏng) → Service (use case) → Repository/EntityManager, Presenter map response; phụ thuộc một chiều, không vòng, `common/` không import `modules/`; module khác dùng nhau qua service được export; logic thuần tách thành `*.util.ts`; ghi tiền/trạng thái trong một transaction với thứ tự khoá cố định; service > ~300 dòng hoặc > ~5 dependency thì dừng và cân nhắc tách.
+- **Convention**: lỗi luôn `throwAppError` + error code; trạng thái/enum là `as const` + type union dùng chung DTO ↔ entity; không magic value, không code chết; comment giải thích "vì sao"; Biome là nguồn sự thật format; quy ước quan trọng phải được test/lint ép.
+- **SOLID**: S (một lý do để đổi), O (thêm dữ liệu thay vì thêm nhánh `if`), L (kế thừa chỉ để dùng chung cột/DTO), I (nhận kiểu hẹp đúng nhu cầu), D (phụ thuộc interface ở biên ngoài như cổng thanh toán/storage). Mỗi spec điền bảng SOLID.
+- Code cũ lệch chuẩn: sửa phần mình chạm tới, không refactor hàng loạt ngoài phạm vi; điểm còn lệch ghi ở `docs/modules/common.md` mục 4.13.
+
+## Test (BẮT BUỘC đi kèm mọi thay đổi hành vi)
+
+- **Unit** (`yarn test`): `src/**/*.spec.ts` cạnh code, mock, không DB.
+- **Flow** (`yarn test:flows`): `test/flows/<module>/*.flow.ts`, HTTP thật + Postgres thật (docker, cổng 55432, DB `*_test`, schema dựng từ migration). Bắt buộc cho luồng chính; chạm luồng tiền/trạng thái đơn/thanh toán/hoàn tiền/trả hàng/auth thì phải mở rộng flow tương ứng. Sửa bug: viết test tái hiện trước.
+- Bảng luồng nào có test nào: `test/README.md` — cập nhật cùng lượt khi thêm/đổi test. Hạ tầng: `docs/specs/testing/0001-flow-test-infrastructure.md`.
+- Test toàn diện cho mọi route (ca đúng, ca lỗi, auth, quyền) làm theo từng lượt 1 batch ≤ 5 route: skill `test-campaign`, tiến độ `test/PROGRESS.md` (đọc trước khi làm việc test lớn).
 
 ## Migration Convention
 
@@ -136,6 +163,9 @@ node -e "console.log(Date.now())"
 yarn start:dev        # Dev server (port 7001)
 npx nest build        # Build
 npx tsc --noEmit      # Type check
-npx biome check src/  # Lint
+yarn lint             # Lint (biome: src + test)
+yarn test             # Unit test (mock)
+yarn test:flows       # Flow test (tự bật Postgres test bằng docker; cần Docker chạy)
+yarn test:db:down     # Tắt Postgres test
 npx typeorm migration:run -d data-source.ts  # Run migrations
 ```
