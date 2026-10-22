@@ -37,7 +37,7 @@ Thứ tự theo rủi ro: tiền → đơn → trả hàng → giỏ → đánh 
 | 4 | GET | `/api/admin/payments/attempts` | JWT | 14000 |
 | 5 | GET | `/api/admin/payments/orders/:orderId` | JWT | 14000 |
 
-Trạng thái: **Chưa làm** · Ghi chú: —
+Trạng thái: **Xong** · Ghi chú: 2026-10-22; 31 flow mới (`flows/payment/payment-session.flow.ts`, `payment-admin-queries.flow.ts`); 5/5 route đủ ca thành công và ca lỗi
 
 
 ### Batch 02 — payment (5 route)
@@ -338,6 +338,7 @@ Trạng thái: **Chưa làm** · Ghi chú: —
 | Phần 8 | 2026-10-22 | Chuỗi trạng thái đơn của admin (spec order/0001) | +5 flow (39 → 44), +5 unit (`order.constant.spec.ts`) | 9/98 | 12/96 (miễn 2) | Baseline 94 → 93 route: `PATCH /api/admin/orders/:orderId/status` đã có ca thành công từ trước, nay thêm ca lỗi nên ra khỏi baseline |
 | Phần 9 | 2026-10-22 | Gom khoá dòng (spec common/0004): flow song song + hợp đồng khoá | +8 flow (44 → 52), +2 unit (`lock.util.spec.ts`), +1 luật kiến trúc | 9/98 | 13/96 (miễn 2) | Baseline 93 → 92 (`POST /api/payments/qr` có ca lỗi). Test đua ngẫu nhiên bỏ sót việc thiếu khoá ở huỷ đơn; test giữ khoá từ ngoài bắt được cả 4 điểm |
 | Phần 10 | 2026-10-22 | Tách OrderService (spec order/0002): flow đặc tả truy vấn đơn | +4 flow (52 → 56); unit giữ 755 (spec được chia) | 14/98 | 13/96 (miễn 2) | Baseline 92 → 91 route: `GET /api/orders`, `GET /api/orders/:orderId`, `GET /api/admin/orders`, `GET /api/admin/orders/:orderId`, `GET /api/admin/pending-counts` có ca thành công |
+| Batch 01 | 2026-10-22 | payment: status, qr, webhook, admin attempts, admin orders/:orderId | +32 flow (56 → 88) | 14 → 16/98 | 13 → 16/96 (miễn 2) | Baseline 91 → 88 route. Phá thử 5 điểm: 3 bị bắt ngay; 2 không: (a) SQL `CASE` trạng thái hiệu lực ở danh sách admin là đột biến tương đương (DB đã được đánh dấu `EXPIRED` trước khi liệt kê), (b) kiểm tài khoản nhận của webhook có hai lớp → thêm ca "phiên cấp cho tài khoản không còn là tài khoản cấu hình", phá thử lại thì bị bắt |
 
 ## Phát hiện cần người dùng quyết định
 

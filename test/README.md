@@ -82,6 +82,8 @@ Trạng thái: **Có** = đã có test cover luồng · **Unit** = chỉ có uni
 | hạ tầng test | Hermetic: env dịch vụ ngoài rỗng, `fetch` bị chặn, media chưa cấu hình → 503/1601 | Flow | `flows/access/route-table.flow.ts` | Có |
 | order + cart + address + payment | Giỏ → báo giá → checkout → mã QR → webhook SePay → đơn `paid`/`confirmed` | Flow | `flows/order-payment/checkout-and-pay.flow.ts` | Có |
 | payment (webhook) | Webhook trùng idempotent; sai chữ ký (1704); sai số tiền (`AMOUNT_MISMATCH`); tiền đến lần 2 (`DUPLICATE_PAYMENT`) | Flow | `flows/order-payment/checkout-and-pay.flow.ts` | Có |
+| payment (phiên khách) | Trạng thái PENDING/EXPIRED/CANCELLED/PAID; QR (thông tin, dùng lại, cấp mã mới, từ chối đơn đã trả/huỷ/của người khác); webhook IGNORED, ACCOUNT_MISMATCH, UNMATCHED, LATE, lowercase, payload sai (1705), timestamp cũ/thiếu chữ ký (1704) | Flow | `flows/payment/payment-session.flow.ts` | Có (batch 01) |
+| payment (admin tra cứu) | Danh sách phiên (lọc trạng thái hiệu lực, orderId, tìm kiếm, sắp xếp, phân trang, tham số sai) và toàn cảnh thanh toán của đơn | Flow | `flows/payment/payment-admin-queries.flow.ts` | Có (batch 01) |
 | order | Khách huỷ đơn chưa trả (huỷ QR); khách không huỷ được đơn đã trả (1307) | Flow | `flows/order-payment/cancel-and-refund.flow.ts` | Có |
 | order + payment (refund) | Admin huỷ đơn đã trả → tự sinh hoàn tiền đủ → hoàn xong → `refunded`; hoàn lần hai (1713); trùng mã tham chiếu (1714) | Flow | `flows/order-payment/cancel-and-refund.flow.ts` | Có |
 | order + payment (song song) | 6 QR cùng lúc → 1 phiên PENDING; webhook trùng id song song; hai chuyển khoản khác id; huỷ vs thanh toán đua nhau | Flow | `flows/order-payment/concurrency.flow.ts` | Có |
