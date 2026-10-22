@@ -8,17 +8,6 @@
     }
   },
   "missing": {
-    "GET /api/payments/:orderId/status": [
-      "error"
-    ],
-    "GET /api/admin/payments/attempts": [
-      "success",
-      "error"
-    ],
-    "GET /api/admin/payments/orders/:orderId": [
-      "success",
-      "error"
-    ],
     "POST /api/admin/payments/orders/:orderId/confirm": [
       "success",
       "error"
