@@ -4,7 +4,6 @@ import {
   COMMON_IMPORTS_MODULES,
   MANY_DEPENDENCIES_SERVICES,
   OVERSIZED_SERVICES,
-  RAW_HTTP_EXCEPTIONS,
   SERVICE_MAX_DEPENDENCIES,
   SERVICE_MAX_LINES,
   UNUSED_EXPORTS,
@@ -109,14 +108,13 @@ describe('Architecture rules', () => {
   });
 
   it('services throw errors through throwAppError, not raw HTTP exceptions', () => {
-    const actual: Record<string, number> = {};
+    const violations: string[] = [];
     for (const file of serviceFiles) {
-      const raw = [...stripComments(read(file)).matchAll(/throw new (\w+Exception)\(/g)].filter(
-        ([, name]) => name !== 'AppException',
-      ).length;
-      if (raw) actual[file] = raw;
+      const raw = [...stripComments(read(file)).matchAll(/throw new (\w+Exception)\(/g)].filter(([, name]) => name !== 'AppException');
+      if (raw.length)
+        violations.push(`${file}: ${raw.length} throw exception thô (${raw.map(([, name]) => name).join(', ')}) — dùng throwAppError`);
     }
-    expect(compareToAllowlist(actual, RAW_HTTP_EXCEPTIONS, 'throw exception thô (dùng throwAppError)')).toEqual([]);
+    expect(violations).toEqual([]);
   });
 
   it(`keeps services within ${SERVICE_MAX_LINES} lines and ${SERVICE_MAX_DEPENDENCIES} constructor dependencies`, () => {

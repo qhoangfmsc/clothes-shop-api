@@ -284,9 +284,9 @@ describe('ReviewService.update', () => {
     await rejects(service.update('u1', 'nope', { rating: 1 }), { errorCode: 1901, status: 404 });
   });
 
-  it('rejects an empty payload and links', async () => {
+  it('rejects an empty payload (1909) and links (1905)', async () => {
     const { service } = setup({ reviews: [review()] });
-    await rejects(service.update('u1', 'r1', {}), { status: 400 });
+    await rejects(service.update('u1', 'r1', {}), { errorCode: 1909, status: 400 });
     await rejects(service.update('u1', 'r1', { content: 'www.spam.vn' }), { errorCode: 1905, status: 400 });
   });
 });

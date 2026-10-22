@@ -1,5 +1,7 @@
+import { throwAppError } from '@common/exceptions/app.exception';
+import { EAuthErrorCode } from '@common/exceptions/error-codes';
 import { DEFAULT_USER_PERMISSIONS } from '@common/permissions/permissions.constant';
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { HttpStatus, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -77,9 +79,7 @@ export class AuthService {
    */
   async getMe(userId: string) {
     const user = await this.userRepo.findOne({ where: { id: userId } });
-    if (!user) {
-      throw new UnauthorizedException('User not found');
-    }
+    if (!user) throwAppError(EAuthErrorCode.AUTH_USER_NOT_FOUND, undefined, HttpStatus.UNAUTHORIZED);
     return { user: this.sanitizeUser(user) };
   }
 
@@ -87,22 +87,21 @@ export class AuthService {
    * Refresh access token using refresh token
    */
   async refreshToken(refreshToken: string) {
+    const user = await this.findUserForRefreshToken(refreshToken);
+    if (!user) throwAppError(EAuthErrorCode.AUTH_REFRESH_TOKEN_INVALID, undefined, HttpStatus.UNAUTHORIZED);
+    return { accessToken: this.generateAccessToken(user), user: this.sanitizeUser(user) };
+  }
+
+  /** Mọi lỗi (token hỏng, sai loại, user không tồn tại/bị khoá, lỗi DB) đều quy về "không hợp lệ", như trước đây */
+  private async findUserForRefreshToken(refreshToken: string): Promise<User | null> {
     try {
       const payload = this.jwtService.verify<JwtPayload>(refreshToken, { secret: this.jwtSecret });
       // Chỉ nhận refresh token — access token (hoặc token cũ không có claim `type`) không đổi được lấy token mới
-      if (payload.type !== 'refresh') {
-        throw new UnauthorizedException('Invalid refresh token');
-      }
-
+      if (payload.type !== 'refresh') return null;
       const user = await this.userRepo.findOne({ where: { id: payload.sub } });
-      if (!user || user.status !== 'active') {
-        throw new UnauthorizedException('User not found or disabled');
-      }
-
-      const accessToken = this.generateAccessToken(user);
-      return { accessToken, user: this.sanitizeUser(user) };
+      return user?.status === 'active' ? user : null;
     } catch {
-      throw new UnauthorizedException('Invalid refresh token');
+      return null;
     }
   }
 

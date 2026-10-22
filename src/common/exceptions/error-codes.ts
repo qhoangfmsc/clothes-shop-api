@@ -52,6 +52,11 @@ export enum EOrderErrorCode {
   ORDER_PICKUP_CONTACT_REQUIRED = 1305,
   ORDER_PICKUP_CONTACT_NOT_ALLOWED = 1306,
   ORDER_CANCEL_PAID_NOT_ALLOWED = 1307,
+  ORDER_CART_ITEMS_INVALID = 1308,
+  ORDER_CART_EMPTY = 1309,
+  ORDER_PRODUCT_UNAVAILABLE = 1310,
+  ORDER_CANCEL_NOT_ALLOWED = 1311,
+  ORDER_ALREADY_CANCELLED = 1312,
 }
 
 // ============================================
@@ -127,6 +132,34 @@ export enum EReviewErrorCode {
   REVIEW_INVALID_STATE = 1906,
   REVIEW_VOTE_OWN = 1907,
   REVIEW_IMAGE_INVALID = 1908,
+  REVIEW_NOTHING_TO_UPDATE = 1909,
+}
+
+// ============================================
+// CART MODULE ERRORS (20xx)
+// ============================================
+export enum ECartErrorCode {
+  CART_NOT_FOUND = 2001,
+  CART_ITEM_NOT_FOUND = 2002,
+  CART_PRODUCT_UNAVAILABLE = 2003,
+}
+
+// ============================================
+// ADDRESS MODULE ERRORS (21xx)
+// ============================================
+export enum EAddressErrorCode {
+  ADDRESS_NOT_FOUND = 2101,
+}
+
+// ============================================
+// AUTH MODULE ERRORS (22xx)
+// ============================================
+export enum EAuthErrorCode {
+  AUTH_USER_NOT_FOUND = 2201,
+  AUTH_REFRESH_TOKEN_INVALID = 2202,
+  AUTH_GOOGLE_TOKEN_INVALID = 2210,
+  AUTH_GOOGLE_EXCHANGE_FAILED = 2211,
+  AUTH_GOOGLE_VERIFY_FAILED = 2212,
 }
 
 // ============================================
@@ -165,6 +198,11 @@ export const ErrorMessages: Record<number, string> = {
   [EOrderErrorCode.ORDER_PICKUP_CONTACT_REQUIRED]: 'pickupContact is required for store-pickup when addressId is not sent',
   [EOrderErrorCode.ORDER_PICKUP_CONTACT_NOT_ALLOWED]: 'pickupContact is only allowed for store-pickup',
   [EOrderErrorCode.ORDER_CANCEL_PAID_NOT_ALLOWED]: 'This order has been paid and cannot be cancelled online — please contact the shop',
+  [EOrderErrorCode.ORDER_CART_ITEMS_INVALID]: 'Some selected cart items do not exist in your cart',
+  [EOrderErrorCode.ORDER_CART_EMPTY]: 'Cart is empty',
+  [EOrderErrorCode.ORDER_PRODUCT_UNAVAILABLE]: 'Some products are no longer available',
+  [EOrderErrorCode.ORDER_CANCEL_NOT_ALLOWED]: 'Only pending orders can be cancelled',
+  [EOrderErrorCode.ORDER_ALREADY_CANCELLED]: 'Order has already been cancelled',
   [EUserErrorCode.USER_NOT_FOUND]: 'User not found',
   [EUserErrorCode.USER_CANNOT_MODIFY_SELF]: 'Cannot modify your own role or status',
   [ESiteConfigErrorCode.SITE_CONFIG_NOT_FOUND]: 'Site config not found',
@@ -204,4 +242,14 @@ export const ErrorMessages: Record<number, string> = {
   [EReviewErrorCode.REVIEW_INVALID_STATE]: 'This action is not allowed for the current status of the review',
   [EReviewErrorCode.REVIEW_VOTE_OWN]: 'You cannot vote on your own review',
   [EReviewErrorCode.REVIEW_IMAGE_INVALID]: 'Review images must be images you uploaded through the review upload endpoint',
+  [EReviewErrorCode.REVIEW_NOTHING_TO_UPDATE]: 'Nothing to update',
+  [ECartErrorCode.CART_NOT_FOUND]: 'Cart not found',
+  [ECartErrorCode.CART_ITEM_NOT_FOUND]: 'Cart item not found',
+  [ECartErrorCode.CART_PRODUCT_UNAVAILABLE]: 'Product is not available',
+  [EAddressErrorCode.ADDRESS_NOT_FOUND]: 'Address not found',
+  [EAuthErrorCode.AUTH_USER_NOT_FOUND]: 'User not found',
+  [EAuthErrorCode.AUTH_REFRESH_TOKEN_INVALID]: 'Invalid refresh token',
+  [EAuthErrorCode.AUTH_GOOGLE_TOKEN_INVALID]: 'Invalid Google token',
+  [EAuthErrorCode.AUTH_GOOGLE_EXCHANGE_FAILED]: 'Failed to exchange authorization code',
+  [EAuthErrorCode.AUTH_GOOGLE_VERIFY_FAILED]: 'Failed to verify Google access token',
 };

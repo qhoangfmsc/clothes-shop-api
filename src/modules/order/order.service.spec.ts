@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { EOrderErrorCode } from '@common/exceptions/error-codes';
 import { In } from 'typeorm';
 import { Address } from '../address/address.entity';
 import { Cart } from '../cart/cart.entity';
@@ -11,6 +11,9 @@ import { RefundService } from '../payment/refund.service';
 import { DEFAULT_SHIPPING_CONFIG, ShippingConfig } from '../shipping/shipping-config';
 import { Order } from './order.entity';
 import { OrderService } from './order.service';
+
+/** Lỗi `throwAppError` mặc định: HTTP 400 kèm `errorCode` */
+const rejection = (errorCode: number) => ({ status: 400, response: { errorCode } });
 
 type Item = { id: string; productId: string; quantity: number; size: string; color: string; product: any };
 
@@ -391,9 +394,13 @@ describe('OrderService.checkout', () => {
     });
 
     it('validates like checkout: unknown ids, empty cart, inactive and non-orderable products', async () => {
-      await expect(setup(lines()).service.quote('u1', { cartItemIds: ['1', 'nope'] })).rejects.toBeInstanceOf(BadRequestException);
-      await expect(setup([]).service.quote('u1', {})).rejects.toBeInstanceOf(BadRequestException);
-      await expect(setup([item('1', 200_000, 1, 'disabled')]).service.quote('u1', {})).rejects.toBeInstanceOf(BadRequestException);
+      await expect(setup(lines()).service.quote('u1', { cartItemIds: ['1', 'nope'] })).rejects.toMatchObject(
+        rejection(EOrderErrorCode.ORDER_CART_ITEMS_INVALID),
+      );
+      await expect(setup([]).service.quote('u1', {})).rejects.toMatchObject(rejection(EOrderErrorCode.ORDER_CART_EMPTY));
+      await expect(setup([item('1', 200_000, 1, 'disabled')]).service.quote('u1', {})).rejects.toMatchObject(
+        rejection(EOrderErrorCode.ORDER_PRODUCT_UNAVAILABLE),
+      );
       await expect(setup([item('1', 200_000, 1, 'active', 'sold_out')]).service.quote('u1', {})).rejects.toMatchObject({
         response: { errorCode: 1303 },
       });
@@ -433,14 +440,18 @@ describe('OrderService.checkout', () => {
     ['only unknown ids', ['nope']],
   ])('rejects %s with 400 and changes nothing', async (_name, ids) => {
     const { service, manager, deleted } = setup([item('1', 200_000), item('2', 300_000)]);
-    await expect(service.checkout('u1', { ...base, cartItemIds: ids })).rejects.toBeInstanceOf(BadRequestException);
+    await expect(service.checkout('u1', { ...base, cartItemIds: ids })).rejects.toMatchObject(
+      rejection(EOrderErrorCode.ORDER_CART_ITEMS_INVALID),
+    );
     expect(manager.save).not.toHaveBeenCalled();
     expect(deleted).toHaveLength(0);
   });
 
   it('rejects when a selected product is inactive', async () => {
     const { service } = setup([item('1', 200_000), item('2', 300_000, 1, 'disabled')]);
-    await expect(service.checkout('u1', { ...base, cartItemIds: ['1', '2'] })).rejects.toBeInstanceOf(BadRequestException);
+    await expect(service.checkout('u1', { ...base, cartItemIds: ['1', '2'] })).rejects.toMatchObject(
+      rejection(EOrderErrorCode.ORDER_PRODUCT_UNAVAILABLE),
+    );
   });
 
   it('ignores inactive products that are not selected', async () => {
@@ -478,7 +489,7 @@ describe('OrderService.checkout', () => {
 
   it('still rejects an empty cart', async () => {
     const { service } = setup([]);
-    await expect(service.checkout('u1', base)).rejects.toBeInstanceOf(BadRequestException);
+    await expect(service.checkout('u1', base)).rejects.toMatchObject(rejection(EOrderErrorCode.ORDER_CART_EMPTY));
   });
 });
 

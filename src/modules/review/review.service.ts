@@ -2,7 +2,7 @@ import { getPaging, paginated } from '@common/base/pagination.util';
 import { parseSort } from '@common/base/sort.util';
 import { throwAppError } from '@common/exceptions/app.exception';
 import { EMediaErrorCode, EReviewErrorCode } from '@common/exceptions/error-codes';
-import { BadRequestException, HttpStatus, Injectable } from '@nestjs/common';
+import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import { REVIEW_IMAGE_MAX_FILE_SIZE } from '../media/media.constant';
@@ -269,7 +269,7 @@ export class ReviewService {
       dto.fit === undefined &&
       dto.images === undefined
     ) {
-      throw new BadRequestException('Nothing to update');
+      throwAppError(EReviewErrorCode.REVIEW_NOTHING_TO_UPDATE);
     }
     if (containsLink(dto.title, dto.content)) throwAppError(EReviewErrorCode.REVIEW_CONTENT_NOT_ALLOWED);
     const images = dto.images === undefined ? undefined : await this.resolveImages(userId, dto.images);

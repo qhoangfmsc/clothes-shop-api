@@ -1,8 +1,8 @@
 import { NON_ORDERABLE_BADGES } from '@common/constants/enum-values.constant';
 import { throwAppError } from '@common/exceptions/app.exception';
-import { EOrderErrorCode, EProductErrorCode } from '@common/exceptions/error-codes';
+import { ECartErrorCode, EOrderErrorCode, EProductErrorCode } from '@common/exceptions/error-codes';
 import { money } from '@common/utils/money.util';
-import { BadRequestException, HttpStatus, Injectable, NotFoundException } from '@nestjs/common';
+import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CurrencyService } from '../currency/currency.service';
@@ -75,7 +75,7 @@ export class CartService {
     // Validate product exists and is active
     const product = await this.productRepo.findOne({ where: { id: dto.productId } });
     if (!product) throwAppError(EProductErrorCode.PRODUCT_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
-    if (product.status !== 'active') throw new BadRequestException('Product is not available');
+    if (product.status !== 'active') throwAppError(ECartErrorCode.CART_PRODUCT_UNAVAILABLE);
     // sold_out / custom_order không thêm vào giỏ được (cùng mã lỗi với checkout để FE xử lý một chỗ)
     if (product.badge && NON_ORDERABLE_BADGES.includes(product.badge)) {
       throwAppError(
@@ -108,10 +108,10 @@ export class CartService {
 
   async updateItem(userId: string, itemId: string, dto: UpdateCartItemDto) {
     const cart = await this.cartRepo.findOne({ where: { userId } });
-    if (!cart) throw new NotFoundException('Cart not found');
+    if (!cart) throwAppError(ECartErrorCode.CART_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
 
     const item = await this.cartItemRepo.findOne({ where: { id: itemId, cartId: cart.id } });
-    if (!item) throw new NotFoundException('Cart item not found');
+    if (!item) throwAppError(ECartErrorCode.CART_ITEM_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
 
     item.quantity = dto.quantity;
     await this.cartItemRepo.save(item);
@@ -121,10 +121,10 @@ export class CartService {
 
   async removeItem(userId: string, itemId: string) {
     const cart = await this.cartRepo.findOne({ where: { userId } });
-    if (!cart) throw new NotFoundException('Cart not found');
+    if (!cart) throwAppError(ECartErrorCode.CART_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
 
     const item = await this.cartItemRepo.findOne({ where: { id: itemId, cartId: cart.id } });
-    if (!item) throw new NotFoundException('Cart item not found');
+    if (!item) throwAppError(ECartErrorCode.CART_ITEM_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
 
     await this.cartItemRepo.remove(item);
 

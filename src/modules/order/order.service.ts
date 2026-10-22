@@ -2,9 +2,9 @@ import { getPaging, paginated } from '@common/base/pagination.util';
 import { parseSort } from '@common/base/sort.util';
 import { NON_ORDERABLE_BADGES } from '@common/constants/enum-values.constant';
 import { throwAppError } from '@common/exceptions/app.exception';
-import { EOrderErrorCode } from '@common/exceptions/error-codes';
+import { EAddressErrorCode, EOrderErrorCode } from '@common/exceptions/error-codes';
 import { money, moneyOrNull } from '@common/utils/money.util';
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, Repository, SelectQueryBuilder } from 'typeorm';
 import { Address } from '../address/address.entity';
@@ -91,7 +91,7 @@ export class OrderService {
       where: { id: orderId, userId },
       relations: ORDER_RELATIONS,
     });
-    if (!order) throw new NotFoundException('Order not found');
+    if (!order) throwAppError(EOrderErrorCode.ORDER_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
     // Kèm các nội dung chuyển khoản đã cấp cho đơn (kể cả đã hết hạn) để khách xem lại và đọc cho cửa hàng, và các khoản hoàn tiền
     const [paymentAttempts, refunds] = await Promise.all([
       this.paymentService.listAttemptsForCustomer(order),
@@ -140,7 +140,7 @@ export class OrderService {
         const address = await manager.findOne(Address, {
           where: { id: delivery.addressId, userId },
         });
-        if (!address) throw new NotFoundException('Address not found');
+        if (!address) throwAppError(EAddressErrorCode.ADDRESS_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
         shippingAddress = {
           fullName: address.fullName,
           phone: address.phone,
@@ -235,19 +235,19 @@ export class OrderService {
       const ids = new Set(cartItemIds);
       selectedItems = selectedItems.filter((item) => ids.has(item.id));
       if (selectedItems.length !== ids.size) {
-        throw new BadRequestException('Some selected cart items do not exist in your cart');
+        throwAppError(EOrderErrorCode.ORDER_CART_ITEMS_INVALID);
       }
     }
 
     if (!cart || !selectedItems.length) {
-      throw new BadRequestException('Cart is empty');
+      throwAppError(EOrderErrorCode.ORDER_CART_EMPTY);
     }
 
     // Validate product availability (sản phẩm bị xoá hoặc disabled)
     const missingProducts = selectedItems.filter((item) => !item.product || item.product.status !== 'active');
     if (missingProducts.length > 0) {
       const names = missingProducts.map((i) => i.product?.name || i.productId).join(', ');
-      throw new BadRequestException(`Some products are no longer available: ${names}`);
+      throwAppError(EOrderErrorCode.ORDER_PRODUCT_UNAVAILABLE, `Some products are no longer available: ${names}`);
     }
 
     // sold_out / custom_order không đặt được qua checkout thường (custom_order sẽ có luồng riêng)
@@ -285,12 +285,12 @@ export class OrderService {
     await this.dataSource.transaction(async (manager) => {
       // Khoá dòng đơn: không đua với webhook đang ghi nhận thanh toán cho đúng đơn này (thứ tự khoá order → attempt như payment)
       const order = await manager.findOne(Order, { where: { id: orderId, userId }, lock: { mode: 'pessimistic_write' } });
-      if (!order) throw new NotFoundException('Order not found');
+      if (!order) throwAppError(EOrderErrorCode.ORDER_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
 
       if (order.paymentStatus === 'unpaid') {
-        if (order.status !== 'pending') throw new BadRequestException('Only pending orders can be cancelled');
+        if (order.status !== 'pending') throwAppError(EOrderErrorCode.ORDER_CANCEL_NOT_ALLOWED);
       } else {
-        if (order.status === 'cancelled') throw new BadRequestException('Order has already been cancelled');
+        if (order.status === 'cancelled') throwAppError(EOrderErrorCode.ORDER_ALREADY_CANCELLED);
         throwAppError(EOrderErrorCode.ORDER_CANCEL_PAID_NOT_ALLOWED);
       }
 

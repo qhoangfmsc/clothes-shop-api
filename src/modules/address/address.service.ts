@@ -1,4 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { throwAppError } from '@common/exceptions/app.exception';
+import { EAddressErrorCode } from '@common/exceptions/error-codes';
+import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Address } from './address.entity';
@@ -32,7 +34,7 @@ export class AddressService {
 
   async update(userId: string, addressId: string, dto: UpdateAddressDto) {
     const address = await this.addressRepo.findOne({ where: { id: addressId, userId } });
-    if (!address) throw new NotFoundException('Address not found');
+    if (!address) throwAppError(EAddressErrorCode.ADDRESS_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
 
     if (dto.isDefault) {
       await this.addressRepo.update({ userId, isDefault: true }, { isDefault: false });
@@ -45,7 +47,7 @@ export class AddressService {
 
   async remove(userId: string, addressId: string) {
     const address = await this.addressRepo.findOne({ where: { id: addressId, userId } });
-    if (!address) throw new NotFoundException('Address not found');
+    if (!address) throwAppError(EAddressErrorCode.ADDRESS_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
     await this.addressRepo.remove(address);
     return { success: true };
   }

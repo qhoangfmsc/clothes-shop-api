@@ -11,16 +11,6 @@ export const UNUSED_EXPORTS: Record<string, string[]> = {
   'src/common/decorator/api-endpoint.decorator.ts': ['ApiEndpoint'], // quy ước trong .agent/skills/nest-best-practices
 };
 
-// Số chỗ `throw new XxxException` còn lại trong service (sẽ chuyển sang throwAppError ở phần chuẩn hoá lỗi)
-export const RAW_HTTP_EXCEPTIONS: Record<string, number> = {
-  'src/modules/address/address.service.ts': 2,
-  'src/modules/auth/auth.service.ts': 4,
-  'src/modules/auth/google-auth.service.ts': 7,
-  'src/modules/cart/cart.service.ts': 5,
-  'src/modules/order/order.service.ts': 8,
-  'src/modules/review/review.service.ts': 1,
-};
-
 // Service đang quá dài: số dòng hiện tại là trần, không được dài thêm
 export const OVERSIZED_SERVICES: Record<string, number> = {
   'src/modules/category/category.service.ts': 382,
