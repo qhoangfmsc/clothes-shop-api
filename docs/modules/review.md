@@ -201,7 +201,7 @@ Bảng `review_votes` (entity `ReviewVote extends BaseEntity`): `review_id` (NOT
 ### 4.6 Phụ thuộc & cấu hình
 
 - `TypeOrmModule.forFeature([Review, ReviewVote, Order, OrderItem])` và `MediaModule`; `ReviewService` inject `DataSource`, `Repository<Review>` và `MediaService`. Module export `ReviewService`.
-- Hằng số ở `review.constant.ts`: `REVIEW_STATUSES`, `REVIEW_FITS`, `REVIEWABLE_ORDER_STATUSES`, `REVIEWABLE_PAYMENT_STATUSES`, `REVIEW_WINDOW_DAYS = 30`, `REVIEW_EDIT_WINDOW_DAYS = 30`, `REVIEW_MAX_IMAGES = 5`; ảnh đánh giá dùng `REVIEW_IMAGE_MAX_FILE_SIZE` (5 MB) và `REVIEW_UPLOAD_LIMIT_PER_DAY` (30) ở `media.constant.ts`. Cần `SUPABASE_URL`, `SUPABASE_STORAGE_BUCKET`, `SUPABASE_SERVICE_ROLE_KEY` để upload ảnh (xem [media](media.md)).
+- Hằng số ở `review.constant.ts` (`REVIEWABLE_ORDER_STATUSES: readonly OrderStatus[]`, `REVIEWABLE_PAYMENT_STATUSES: readonly OrderPaymentStatus[]`): `REVIEW_STATUSES`, `REVIEW_FITS`, `REVIEWABLE_ORDER_STATUSES`, `REVIEWABLE_PAYMENT_STATUSES`, `REVIEW_WINDOW_DAYS = 30`, `REVIEW_EDIT_WINDOW_DAYS = 30`, `REVIEW_MAX_IMAGES = 5`; ảnh đánh giá dùng `REVIEW_IMAGE_MAX_FILE_SIZE` (5 MB) và `REVIEW_UPLOAD_LIMIT_PER_DAY` (30) ở `media.constant.ts`. Cần `SUPABASE_URL`, `SUPABASE_STORAGE_BUCKET`, `SUPABASE_SERVICE_ROLE_KEY` để upload ảnh (xem [media](media.md)).
 - Quyền: `REVIEW_CREATE 17000`, `REVIEW_VIEW 17001`, `REVIEW_VOTE 17002` (trong `DEFAULT_USER_PERMISSIONS`); `REVIEW_ADMIN_VIEW 18000`, `REVIEW_ADMIN_MODERATE 18001`, `REVIEW_ADMIN_REPLY 18002` (admin tự có, không nằm trong `DEFAULT_USER_PERMISSIONS`). Migration `AddReviewFeatures` cấp ba quyền khách cho user hiện có `ORDER_CREATE`.
 - Biến môi trường: chỉ các biến Supabase của [media](media.md) cho upload ảnh.
 

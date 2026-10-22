@@ -145,13 +145,14 @@ Enum dùng chung (`@common/constants/enum-values.constant`):
 
 | Hằng | Giá trị |
 |---|---|
-| `ACTIVE_STATUSES` | `active`, `disabled` |
+| `ACTIVE_STATUSES` (kiểu `ActiveStatus`) | `active`, `disabled` — cột `status` của `products`, `users` |
 | `USER_ROLES` | `user`, `admin` |
-| `ORDER_PAYMENT_STATUSES` | `unpaid`, `paid`, `refunded` (`orders.payment_status`) |
+| `ORDER_PAYMENT_STATUSES` (kiểu `OrderPaymentStatus`) | `unpaid`, `paid`, `refunded` (`orders.payment_status`) |
+| `ORDER_STATUSES` (kiểu `OrderStatus`) | `pending`, `confirmed`, `shipping`, `delivered`, `completed`, `cancelled` (`orders.status`) |
 | `PRODUCT_BADGES` | `new`, `sale`, `bestseller`, `sold_out`, `limited`, `custom_order` |
 | `NON_ORDERABLE_BADGES` | `sold_out`, `custom_order` (không cho thêm vào giỏ / checkout) |
 
-`ORDER_STATUSES` khai báo ở `src/modules/order/dtos/admin-order.dto.ts` (xem module order).
+Entity dùng đúng các type này cho cột trạng thái (`Order.status: OrderStatus`, `Order.paymentStatus: OrderPaymentStatus`, `Product.status`/`User.status: ActiveStatus`); luật "cột `status` không khai báo `string`" được ép bởi `architecture.spec.ts`. Bảng chuyển trạng thái của đơn: `ORDER_TRANSITIONS` ở `order/order.constant.ts`.
 
 ### 4.6 Error code & xử lý lỗi
 
@@ -268,6 +269,7 @@ yarn migration:run              # chạy migration
   - đồ thị module Nest không vòng, không `forwardRef`, không entry `imports` là `undefined`;
   - không export thừa trong `common/`, `core/`;
   - `*.service.ts` không ném exception HTTP thô, dùng `throwAppError` (không còn ngoại lệ nào);
+  - cột entity tên `status`/`paymentStatus` không khai báo `string` (dùng type union);
   - service tối đa 300 dòng và 5 dependency constructor.
   Thêm vi phạm mới hoặc để vi phạm cũ lớn thêm → đỏ; sửa xong mà chưa giảm allowlist → đỏ. `src/common/dto/list-query.dto.spec.ts` là guard chuẩn list cho mọi `*-query.dto.ts` (xem 4.5); `src/common/utils/money.util.spec.ts` cho helper tiền. Test của từng module: xem file module tương ứng.
 - **Flow** (`yarn test:flows`): `test/flows/<module>/*.flow.ts`, đi qua HTTP thật (`MainModule` + `configureApp`) trên Postgres thật. Config riêng `test/jest.flows.config.js` (rootDir repo, chỉ nhận `*.flow.ts`, chạy tuần tự).
@@ -293,5 +295,5 @@ yarn migration:run              # chạy migration
 - `common/guards/permissions.guard.ts` import entity `User` từ `src/modules/user`; ngoài ra `common/` và `core/` không import `modules/` (được ép bởi `architecture.spec.ts`, ngoại lệ nằm trong allowlist).
 - `auth/jwt.strategy.ts` cố ý ném `UnauthorizedException` thô (401 của guard không có `errorCode`, khác với 401 nghiệp vụ có `errorCode`); mọi `*.service.ts` đều dùng `throwAppError`. `throwAppError` mặc định trả HTTP 400, nên một số chỗ admin dùng `ORDER_NOT_FOUND` mà không truyền 404 sẽ trả 400 (khác khách hàng: 404).
 - Service vượt 300 dòng: `review` (558), `payment` (549), `return` (449), `order` (408), `category` (382), `refund` (362), `product` (340), `media` (333); `OrderService` và `PaymentService` có 6 dependency constructor. Trần hiện tại ghi trong allowlist, không được tăng.
-- Trạng thái đơn: cột `orders.status`/`payment_status` khai báo kiểu `string` trong entity và bảng chuyển trạng thái đơn là `Record<string, string[]>` trong `OrderService`; `return` dùng `assertStatus` với type union `ReturnStatus`, `payment`/`refund` khai báo trạng thái bằng `as const` ở `payment.constant.ts`.
+- Trạng thái dùng type union cho mọi cột `status` (xem 4.5). Chuyển trạng thái chỉ có bảng tường minh cho đơn (`ORDER_TRANSITIONS`, cạnh do admin thực hiện); `return` kiểm theo hành động (`assertStatus` với danh sách trạng thái xuất phát từng hành động) và có thêm cạnh do hệ thống (`RECEIVED → APPROVED` khi khoản hoàn bị từ chối, `RECEIVED → REFUNDED` khi hoàn xong); `refund`, `payment attempt`, `review` kiểm trực tiếp trong service.
 - Entity `Order` được import và đăng ký `TypeOrmModule.forFeature` trực tiếp ở module `payment`, `return`, `review`; entity `Product` ở `cart`, `wishlist`, `collection` (bên cạnh module `product`). Các module này truy cập bảng của nhau không qua service.

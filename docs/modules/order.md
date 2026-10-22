@@ -134,7 +134,7 @@ Response `paginated(...)`, mỗi đơn kèm `items`.
 
 **PATCH `/api/admin/orders/:orderId/status`** — `UpdateOrderStatusDto`: `status` (`IsString`, not empty, `IsIn(ORDER_STATUSES)`). Response `{ data: Order(+items) }`. Chuyển sang `cancelled` một đơn đã trả tự tạo yêu cầu hoàn tiền (xử lý ở `/api/admin/refunds`, xem [payment](payment.md)).
 
-`ORDER_STATUSES` (khai báo ở `dtos/admin-order.dto.ts`): `pending`, `confirmed`, `shipping`, `delivered`, `completed`, `cancelled`.
+`ORDER_STATUSES` (khai báo ở `@common/constants/enum-values.constant`, kiểu `OrderStatus`): `pending`, `confirmed`, `shipping`, `delivered`, `completed`, `cancelled`.
 
 ### 4.2 Dữ liệu
 
@@ -144,7 +144,7 @@ Bảng `orders` (entity `Order extends BaseEntity`):
 |---|---|---|
 | `id` | varchar(16) PK | nanoid16 (cũng là mã đơn) |
 | `user_id` | varchar(16) | nullable; FK `FK_orders_user` → `users(id)` ON DELETE SET NULL; index `IDX_orders_user_id` |
-| `status` | varchar(20) | default `pending`; `CK_orders_status` ∈ 6 trạng thái; index `IDX_orders_status` |
+| `status` | varchar(20) | default `pending`; `CK_orders_status` ∈ 6 trạng thái; index `IDX_orders_status`; entity khai báo kiểu `OrderStatus` |
 | `subtotal` | bigint | VND, default 0; `CK_orders_subtotal >= 0` (entity ép về number) |
 | `shipping_fee` | bigint | VND, default 0; `CK_orders_shipping_fee >= 0` |
 | `total` | bigint | VND, default 0; `CK_orders_total >= 0`; bằng `subtotal + shipping_fee` |
@@ -207,7 +207,7 @@ Bảng `order_items` (entity `OrderItem`, không extends `BaseEntity`, chỉ có
 
 Khi khách huỷ: đơn → `cancelled`, rồi `PaymentService.cancelPendingAttempts` đổi các mã chuyển khoản còn chờ của đơn sang `CANCELLED` (không có khoản hoàn vì chưa thu tiền). Thanh toán thành công tự chuyển đơn `pending` sang `confirmed` ([payment](payment.md)), nên đơn đã trả không còn `pending` và khách không tự huỷ được. Admin huỷ đơn đã trả (xem bên dưới) thì hệ thống tạo yêu cầu hoàn tiền **trước** khi đổi đơn sang `cancelled` (đơn đã trả mà không có phiên `PAID` → `REFUND_NOT_ALLOWED (1712)` và không đổi gì); đơn giữ `payment_status = paid` cho tới khi admin ghi đã chuyển tiền hoàn (khi đó `refunded`).
 
-**Đổi trạng thái (admin)** — `VALID_TRANSITIONS`:
+**Đổi trạng thái (admin)** — `ORDER_TRANSITIONS` (`order.constant.ts`, kiểu `Record<OrderStatus, readonly OrderStatus[]>` nên thiếu một trạng thái là lỗi biên dịch). Bảng chỉ mô tả cạnh do admin thực hiện; cạnh do hệ thống (thanh toán tự `pending → confirmed`, khách huỷ `pending → cancelled`) nằm ở nơi gây ra chúng:
 
 | Từ | Sang được |
 |---|---|
@@ -258,6 +258,8 @@ Không hợp lệ → `ORDER_STATUS_INVALID_TRANSITION (1302)` với message nê
 - Flow test trên Postgres thật (`test/flows/order-payment/`, xem `test/README.md`): `checkout-and-pay.flow.ts` — báo giá (2 × 350.000 + phí ship tiêu chuẩn 30.000 = 730.000), checkout tạo đơn `pending`/`unpaid` và dọn giỏ, đơn sang `confirmed`/`paid` sau webhook SePay; `cancel-and-refund.flow.ts` — khách huỷ đơn chưa trả, khách huỷ đơn đã trả → 1307, admin huỷ đơn đã trả → yêu cầu hoàn đủ tiền → đơn `refunded`. Chưa có flow test cho đổi trạng thái đơn theo chuỗi `pending → … → completed` và cho checkout với `store-pickup`.
 - Flow test `test/flows/order-payment/order-errors.flow.ts` (Postgres thật): đơn lạ khi xem/huỷ → 404 / 1301; checkout với địa chỉ của người khác → 404 / 2101; giỏ rỗng → 1309; `cartItemIds` không thuộc giỏ → 1308 (giỏ và đơn không đổi); sản phẩm `disabled` → 1310 kèm tên; huỷ đơn không còn `pending` → 1311; huỷ đơn đã trả mà cửa hàng đã huỷ → 1312.
 - `order.service.spec.ts`: các ca từ chối checkout/quote kiểm `errorCode` 1308/1309/1310.
+- `order.constant.spec.ts` — `ORDER_TRANSITIONS`: khớp đúng luồng đã ghi, đủ mọi trạng thái và đích hợp lệ, trạng thái cuối không có lối ra, không tự chuyển, mọi trạng thái không cuối đều tới được trạng thái cuối, không quay lại `pending`, chỉ huỷ được khi `pending`/`confirmed`.
+- Flow test `test/flows/order-payment/order-status.flow.ts` (Postgres thật): admin đi hết chuỗi `pending → confirmed → shipping → delivered → completed` (`delivered_at` chỉ được đặt khi sang `delivered`); bỏ bước → 400 / 1302 kèm danh sách chuyển tiếp hợp lệ; từ trạng thái cuối → 1302 `Allowed transitions: none`; trạng thái không tồn tại → lỗi validation; đơn lạ ở admin → 400 / 1301.
 
 ### 4.8 Lưu ý hiện trạng
 
@@ -269,7 +271,6 @@ Không hợp lệ → `ORDER_STATUS_INVALID_TRANSITION (1302)` với message nê
 - Không có tồn kho: checkout không trừ số lượng và huỷ đơn không hoàn lại gì; khả năng đặt hàng chỉ dựa vào `status` và badge.
 - `total` chỉ là `subtotal + shippingFee` (VND). Đơn tạo ra luôn `payment_status = 'unpaid'`; thanh toán xử lý ở module [payment](payment.md). Response đơn (khách và admin) có thêm `paymentStatus`, `paidAt`.
 - Checkout không đọc hay ghi `payment_status`; khi thanh toán thành công, module [payment](payment.md) đặt `payment_status = 'paid'` và tự chuyển đơn `pending` sang `confirmed` (đơn đã `confirmed` trở đi giữ nguyên). `orders.status` là trạng thái xử lý đơn (`pending` = chờ cửa hàng xác nhận), tách khỏi `payment_status`. Đơn `cancelled` không còn tạo được QR và tiền chuyển vào đơn đã huỷ chỉ được ghi nhận để đối soát.
-- `ORDER_STATUSES` được khai báo trong `dtos/admin-order.dto.ts` (cùng kiểu `OrderStatus`), không nằm trong `enum-values.constant.ts`.
 - Trả hàng sau khi giao do module [return](return.md) xử lý; module này chỉ ghi `delivered_at` khi đơn sang `delivered`.
 - Đánh giá sản phẩm do module [review](review.md) xử lý: nó đọc `orders` (`status`, `payment_status`, `delivered_at`) và `order_items` để cho khách đánh giá từng dòng hàng; `reviews.order_item_id` trỏ tới `order_items(id)` ON DELETE SET NULL nên xoá đơn không xoá đánh giá. Module này không đổi.
 - Khách chỉ huỷ được đơn chưa thanh toán còn `pending` (bằng API riêng); đơn đã thanh toán do admin chuyển `pending`/`confirmed` sang `cancelled` qua API trạng thái. Cả hai cách đều đổi các mã chuyển khoản `PENDING` của đơn sang `CANCELLED`; riêng đơn đã thanh toán (chỉ qua admin) tạo thêm yêu cầu hoàn tiền trong cùng transaction.

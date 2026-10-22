@@ -44,7 +44,7 @@ Không có endpoint tạo/xoá user (user chỉ được tạo qua đăng nhập
 |---|---|---|
 | `search` | string | ≤ 255; tìm `ILIKE %…%` trên `name`, `email` |
 | `role` | string | `IsIn(USER_ROLES)` = `user`, `admin` |
-| `status` | string | `IsIn(ACTIVE_STATUSES)` = `active`, `disabled` |
+| `status` | `ActiveStatus` | `IsIn(ACTIVE_STATUSES)` = `active`, `disabled` |
 | `sort` | string | whitelist `name`, `email`, `createdAt` (+ dạng `-field`); mặc định `-createdAt` |
 
 Response `paginated(...)`: mỗi phần tử `{ id, email, name, image, provider, role, permissions, status, createdAt, updatedAt }` (không trả `password`, `providerId`).
