@@ -15,7 +15,6 @@ export const UNUSED_EXPORTS: Record<string, string[]> = {
 export const OVERSIZED_SERVICES: Record<string, number> = {
   'src/modules/category/category.service.ts': 382,
   'src/modules/media/media.service.ts': 333,
-  'src/modules/order/order.service.ts': 408,
   'src/modules/payment/payment.service.ts': 549,
   'src/modules/payment/refund.service.ts': 363,
   'src/modules/product/product.service.ts': 340,
@@ -25,6 +24,5 @@ export const OVERSIZED_SERVICES: Record<string, number> = {
 
 // Service đang có quá nhiều dependency: số hiện tại là trần
 export const MANY_DEPENDENCIES_SERVICES: Record<string, number> = {
-  'src/modules/order/order.service.ts': 6,
   'src/modules/payment/payment.service.ts': 6,
 };

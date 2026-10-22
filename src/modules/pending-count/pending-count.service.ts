@@ -1,6 +1,6 @@
 import { Permission } from '@common/permissions/permissions.constant';
 import { Injectable } from '@nestjs/common';
-import { OrderService } from '../order/order.service';
+import { OrderQueryService } from '../order/order-query.service';
 import { PaymentService } from '../payment/payment.service';
 import { RefundService } from '../payment/refund.service';
 import { ReturnService } from '../return/return.service';
@@ -16,7 +16,7 @@ export type PendingCounts = Partial<Record<'orders' | 'payments' | 'refunds' | '
 @Injectable()
 export class PendingCountService {
   constructor(
-    private readonly orderService: OrderService,
+    private readonly orderQueryService: OrderQueryService,
     private readonly paymentService: PaymentService,
     private readonly refundService: RefundService,
     private readonly returnService: ReturnService,
@@ -29,7 +29,7 @@ export class PendingCountService {
 
     // Thiếu quyền thì bỏ hẳn key (không trả 0) và không chạy COUNT
     const jobs: [keyof PendingCounts, () => Promise<number>][] = [];
-    if (can(Permission.ORDER_ADMIN_VIEW)) jobs.push(['orders', () => this.orderService.countNeedsAction()]);
+    if (can(Permission.ORDER_ADMIN_VIEW)) jobs.push(['orders', () => this.orderQueryService.countNeedsAction()]);
     if (can(Permission.PAYMENT_ADMIN_VIEW)) {
       jobs.push(['payments', () => this.paymentService.countNeedsReview()]);
       jobs.push(['refunds', () => this.refundService.countRequested()]);

@@ -6,26 +6,32 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { User } from '../user/user.entity';
 import { CreateOrderDto, QuoteOrderDto } from './dtos/order.dto';
 import { PublicOrderQueryDto } from './dtos/public-order-query.dto';
-import { OrderService } from './order.service';
+import { OrderCheckoutService } from './order-checkout.service';
+import { OrderQueryService } from './order-query.service';
+import { OrderStatusService } from './order-status.service';
 
 @ApiTags('Orders')
 @Controller('api/orders')
 @ApiBearerAuth()
 export class OrderController {
-  constructor(private readonly orderService: OrderService) {}
+  constructor(
+    private readonly queryService: OrderQueryService,
+    private readonly checkoutService: OrderCheckoutService,
+    private readonly statusService: OrderStatusService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'Get order history with pagination and status filter' })
   @Permissions(Permission.ORDER_VIEW_LIST)
   findAll(@CurrentUser() user: User, @Query() query: PublicOrderQueryDto) {
-    return this.orderService.findAll(user.id, query);
+    return this.queryService.findAll(user.id, query);
   }
 
   @Get(':orderId')
   @ApiOperation({ summary: 'Get order detail' })
   @Permissions(Permission.ORDER_VIEW_DETAIL)
   findOne(@CurrentUser() user: User, @Param('orderId') orderId: string) {
-    return this.orderService.findOne(user.id, orderId);
+    return this.queryService.findOne(user.id, orderId);
   }
 
   @Post('quote')
@@ -37,7 +43,7 @@ export class OrderController {
   })
   @Permissions(Permission.ORDER_CREATE)
   quote(@CurrentUser() user: User, @Body() dto: QuoteOrderDto) {
-    return this.orderService.quote(user.id, dto);
+    return this.checkoutService.quote(user.id, dto);
   }
 
   @Post()
@@ -48,13 +54,13 @@ export class OrderController {
   })
   @Permissions(Permission.ORDER_CREATE)
   checkout(@CurrentUser() user: User, @Body() dto: CreateOrderDto) {
-    return this.orderService.checkout(user.id, dto);
+    return this.checkoutService.checkout(user.id, dto);
   }
 
   @Patch(':orderId/cancel')
   @ApiOperation({ summary: 'Cancel a pending order' })
   @Permissions(Permission.ORDER_CANCEL)
   cancel(@CurrentUser() user: User, @Param('orderId') orderId: string) {
-    return this.orderService.cancel(user.id, orderId);
+    return this.statusService.cancel(user.id, orderId);
   }
 }

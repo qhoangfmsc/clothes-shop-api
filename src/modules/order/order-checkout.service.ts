@@ -1,88 +1,30 @@
-import { findLocked } from '@common/base/lock.util';
-import { getPaging, paginated } from '@common/base/pagination.util';
-import { parseSort } from '@common/base/sort.util';
 import { NON_ORDERABLE_BADGES } from '@common/constants/enum-values.constant';
 import { throwAppError } from '@common/exceptions/app.exception';
 import { EAddressErrorCode, EOrderErrorCode } from '@common/exceptions/error-codes';
 import { money, moneyOrNull } from '@common/utils/money.util';
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, In, Repository, SelectQueryBuilder } from 'typeorm';
+import { InjectDataSource } from '@nestjs/typeorm';
+import { DataSource, EntityManager, In } from 'typeorm';
 import { Address } from '../address/address.entity';
 import { Cart } from '../cart/cart.entity';
 import { CartItem } from '../cart/cart-item.entity';
 import { CurrencyService } from '../currency/currency.service';
-import { PaymentService } from '../payment/payment.service';
-import { RefundService } from '../payment/refund.service';
 import { ShippingConfigService } from '../shipping/shipping-config.service';
-import { UpdateOrderStatusDto } from './dtos/admin-order.dto';
-import { AdminOrderQueryDto } from './dtos/admin-order-query.dto';
 import { CreateOrderDto, PickupContactDto, QuoteOrderDto } from './dtos/order.dto';
-import { PublicOrderQueryDto } from './dtos/public-order-query.dto';
-import { ORDER_TRANSITIONS } from './order.constant';
+import { ORDER_RELATIONS } from './order.constant';
 import { Order } from './order.entity';
 import { presentOrder } from './order.presenter';
 import { OrderItem } from './order-item.entity';
-import { applyOrderNeedsActionFilter } from './order-needs-action.util';
 
-/** Đơn kèm dòng hàng và sản phẩm hiện tại (kèm category/subcategory) của từng dòng — mọi response đơn cùng một hình dạng */
-const ORDER_RELATIONS = ['items', 'items.product', 'items.product.category', 'items.product.subcategory'];
-
-const joinItems = (qb: SelectQueryBuilder<Order>) =>
-  qb
-    .leftJoinAndSelect('o.items', 'items')
-    .leftJoinAndSelect('items.product', 'product')
-    .leftJoinAndSelect('product.category', 'cat')
-    .leftJoinAndSelect('product.subcategory', 'sub');
-
+/** Báo giá và đặt hàng từ giỏ (checkout). */
 @Injectable()
-export class OrderService {
+export class OrderCheckoutService {
   constructor(
-    @InjectRepository(Order)
-    private readonly orderRepo: Repository<Order>,
     @InjectDataSource()
     private readonly dataSource: DataSource,
     private readonly shippingConfigService: ShippingConfigService,
     private readonly currencyService: CurrencyService,
-    private readonly paymentService: PaymentService,
-    private readonly refundService: RefundService,
   ) {}
-
-  async findAll(userId: string, query: PublicOrderQueryDto = {}) {
-    const { status, sort } = query;
-    const { page, limit } = getPaging(query);
-
-    const qb = joinItems(this.orderRepo.createQueryBuilder('o')).where('o.userId = :userId', { userId });
-
-    // Filter by status
-    if (status) {
-      qb.andWhere('o.status = :status', { status });
-    }
-
-    // Sort: `field` = ASC, `-field` = DESC
-    const { field, direction } = parseSort(sort, '-createdAt');
-    qb.orderBy(`o.${field}`, direction);
-
-    qb.skip((page - 1) * limit).take(limit);
-
-    const [data, total] = await qb.getManyAndCount();
-
-    return paginated(data.map(presentOrder), total, page, limit);
-  }
-
-  async findOne(userId: string, orderId: string) {
-    const order = await this.orderRepo.findOne({
-      where: { id: orderId, userId },
-      relations: ORDER_RELATIONS,
-    });
-    if (!order) throwAppError(EOrderErrorCode.ORDER_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
-    // Kèm các nội dung chuyển khoản đã cấp cho đơn (kể cả đã hết hạn) để khách xem lại và đọc cho cửa hàng, và các khoản hoàn tiền
-    const [paymentAttempts, refunds] = await Promise.all([
-      this.paymentService.listAttemptsForCustomer(order),
-      this.refundService.listForCustomer(order),
-    ]);
-    return { data: { ...presentOrder(order), paymentAttempts, refunds } };
-  }
 
   /**
    * Báo giá: cùng kiểm tra giỏ và cùng hàm tính tiền với checkout, nhưng không tạo đơn, không xoá giỏ.
@@ -259,133 +201,5 @@ export class OrderService {
       freeShipping,
       freeShippingThresholdVnd: shipping.freeShippingThresholdVnd,
     };
-  }
-
-  /**
-   * Khách chỉ huỷ được đơn CHƯA thanh toán và còn `pending`. Đơn đã thanh toán (tự sang `confirmed` ngay khi trả tiền) khách không
-   * tự huỷ: phải liên hệ cửa hàng, admin huỷ và hoàn tiền (xem `updateStatus`).
-   */
-  async cancel(userId: string, orderId: string) {
-    await this.dataSource.transaction(async (manager) => {
-      // Khoá dòng đơn: không đua với webhook đang ghi nhận thanh toán cho đúng đơn này (thứ tự khoá order → attempt như payment)
-      const order = await findLocked(manager, Order, { id: orderId, userId });
-      if (!order) throwAppError(EOrderErrorCode.ORDER_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
-
-      if (order.paymentStatus === 'unpaid') {
-        if (order.status !== 'pending') throwAppError(EOrderErrorCode.ORDER_CANCEL_NOT_ALLOWED);
-      } else {
-        if (order.status === 'cancelled') throwAppError(EOrderErrorCode.ORDER_ALREADY_CANCELLED);
-        throwAppError(EOrderErrorCode.ORDER_CANCEL_PAID_NOT_ALLOWED);
-      }
-
-      // Đơn chưa trả nên không có khoản hoàn
-      await this.cancelLocked(manager, order, null);
-    });
-    return this.findOne(userId, orderId);
-  }
-
-  /**
-   * Huỷ một đơn đã được khoá: đổi `cancelled`, các mã chuyển khoản còn chờ → `CANCELLED`, và nếu đơn đã trả tiền (chỉ admin huỷ được)
-   * thì tạo yêu cầu hoàn tiền — tất cả trong transaction của nơi gọi, nên không bao giờ có đơn huỷ đã thu tiền mà thiếu yêu cầu hoàn.
-   */
-  private async cancelLocked(manager: EntityManager, order: Order, adminId: string | null) {
-    // Yêu cầu hoàn tiền trước: nếu không tạo được (đơn đã trả mà không có phiên PAID) thì không đổi gì cả
-    if (order.paymentStatus === 'paid') await this.refundService.createForCancelledOrder(manager, order.id, adminId);
-    await manager.update(Order, { id: order.id }, { status: 'cancelled' });
-    order.status = 'cancelled';
-    await this.paymentService.cancelPendingAttempts(order.id, manager);
-  }
-
-  // ============================================
-  // ADMIN METHODS
-  // ============================================
-
-  async findAllAdmin(query: AdminOrderQueryDto) {
-    const { userId, search, status, paymentStatus, needsAction, sort } = query;
-    const { page, limit } = getPaging(query);
-
-    const qb = joinItems(this.orderRepo.createQueryBuilder('o'));
-
-    // Filter by userId
-    if (userId) {
-      qb.andWhere('o.user_id = :userId', { userId });
-    }
-
-    // Filter by status
-    if (status) {
-      qb.andWhere('o.status = :status', { status });
-    }
-
-    // Chỉ đơn cần admin thao tác (cùng điều kiện với con số trên menu admin)
-    if (needsAction) applyOrderNeedsActionFilter(qb);
-
-    // Filter by payment status (unpaid | paid)
-    if (paymentStatus) {
-      qb.andWhere('o.payment_status = :paymentStatus', { paymentStatus });
-    }
-
-    // Search: id, phone, fullName (phone & fullName nằm trong JSONB shipping_address)
-    if (search) {
-      qb.andWhere(
-        "(o.id ILIKE :search OR o.shipping_address->>'phone' ILIKE :search OR o.shipping_address->>'fullName' ILIKE :search OR EXISTS (SELECT 1 FROM payment_attempts pa WHERE pa.order_id = o.id AND pa.transfer_code ILIKE :search))",
-        {
-          search: `%${search}%`,
-        },
-      );
-    }
-
-    // Sort: `field` = ASC, `-field` = DESC
-    const { field, direction } = parseSort(sort, '-createdAt');
-    qb.orderBy(`o.${field}`, direction);
-
-    qb.skip((page - 1) * limit).take(limit);
-
-    const [data, total] = await qb.getManyAndCount();
-
-    return paginated(data.map(presentOrder), total, page, limit);
-  }
-
-  /** Số đơn cần admin thao tác — cùng điều kiện với bộ lọc `needsAction` của `findAllAdmin` */
-  async countNeedsAction(): Promise<number> {
-    return applyOrderNeedsActionFilter(this.orderRepo.createQueryBuilder('o')).getCount();
-  }
-
-  async findOneAdmin(orderId: string) {
-    const order = await this.orderRepo.findOne({
-      where: { id: orderId },
-      relations: ORDER_RELATIONS,
-    });
-    if (!order) throwAppError(EOrderErrorCode.ORDER_NOT_FOUND);
-    return { data: presentOrder(order) };
-  }
-
-  async updateStatus(adminId: string, orderId: string, dto: UpdateOrderStatusDto) {
-    await this.dataSource.transaction(async (manager) => {
-      const order = await findLocked(manager, Order, { id: orderId });
-      if (!order) throwAppError(EOrderErrorCode.ORDER_NOT_FOUND);
-
-      // Validate status transition (trên bản đã khoá: không đua với thanh toán hay huỷ đồng thời)
-      const allowed = ORDER_TRANSITIONS[order.status];
-      if (!allowed.includes(dto.status)) {
-        throwAppError(
-          EOrderErrorCode.ORDER_STATUS_INVALID_TRANSITION,
-          `Cannot change status from '${order.status}' to '${dto.status}'. Allowed transitions: ${allowed.join(', ') || 'none'}`,
-        );
-      }
-
-      if (dto.status === 'cancelled') {
-        // Đơn đã trả mà bị huỷ → tự có yêu cầu hoàn tiền
-        await this.cancelLocked(manager, order, adminId);
-      } else {
-        // `delivered` là mốc bắt đầu hạn đổi trả
-        await manager.update(
-          Order,
-          { id: order.id },
-          { status: dto.status, ...(dto.status === 'delivered' ? { deliveredAt: new Date() } : {}) },
-        );
-      }
-    });
-
-    return this.findOneAdmin(orderId);
   }
 }

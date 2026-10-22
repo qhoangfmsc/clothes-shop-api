@@ -12,3 +12,6 @@ export const ORDER_TRANSITIONS: Record<OrderStatus, readonly OrderStatus[]> = {
   completed: [],
   cancelled: [],
 };
+
+/** Đơn kèm dòng hàng và sản phẩm hiện tại (kèm category/subcategory) của từng dòng — mọi response đơn cùng một hình dạng */
+export const ORDER_RELATIONS = ['items', 'items.product', 'items.product.category', 'items.product.subcategory'];

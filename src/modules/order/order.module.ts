@@ -6,13 +6,15 @@ import { ShippingModule } from '../shipping/shipping.module';
 import { AdminOrderController } from './admin-order.controller';
 import { OrderController } from './order.controller';
 import { Order } from './order.entity';
-import { OrderService } from './order.service';
+import { OrderCheckoutService } from './order-checkout.service';
 import { OrderItem } from './order-item.entity';
+import { OrderQueryService } from './order-query.service';
+import { OrderStatusService } from './order-status.service';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Order, OrderItem]), ShippingModule, PaymentModule, CurrencyModule],
   controllers: [OrderController, AdminOrderController],
-  providers: [OrderService],
-  exports: [OrderService],
+  providers: [OrderQueryService, OrderCheckoutService, OrderStatusService],
+  exports: [OrderQueryService],
 })
 export class OrderModule {}
