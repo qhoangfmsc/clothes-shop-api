@@ -1,4 +1,4 @@
-import { ACTIVE_STATUSES, PRODUCT_BADGES } from '@common/constants/enum-values.constant';
+import { ACTIVE_STATUSES, ActiveStatus, PRODUCT_BADGES } from '@common/constants/enum-values.constant';
 import { MAX_MONEY_VND } from '@common/utils/money.util';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
@@ -109,7 +109,7 @@ export class CreateProductDto {
   @IsOptional()
   @IsIn(ACTIVE_STATUSES)
   @MaxLength(20)
-  status?: string;
+  status?: ActiveStatus;
 }
 
 export class UpdateProductDto {
@@ -210,5 +210,5 @@ export class UpdateProductDto {
   @IsOptional()
   @IsIn(ACTIVE_STATUSES)
   @MaxLength(20)
-  status?: string;
+  status?: ActiveStatus;
 }

@@ -1,3 +1,5 @@
+import type { OrderStatus } from '@common/constants/enum-values.constant';
+
 /**
  * Trạng thái yêu cầu trả hàng (`return_requests.status`)
  * - REQUESTED: khách vừa gửi, chờ cửa hàng duyệt
@@ -23,6 +25,6 @@ export const RETURN_REASONS = ['WRONG_SIZE', 'CHANGED_MIND', 'DEFECTIVE', 'WRONG
 export type ReturnReason = (typeof RETURN_REASONS)[number];
 
 /** Đơn phải đã giao (`delivered`) hoặc hoàn tất (`completed`) mới trả hàng được */
-export const RETURNABLE_ORDER_STATUSES = ['delivered', 'completed'];
+export const RETURNABLE_ORDER_STATUSES: readonly OrderStatus[] = ['delivered', 'completed'];
 
 export const MS_PER_DAY = 24 * 60 * 60 * 1000;

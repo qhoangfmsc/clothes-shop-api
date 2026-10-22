@@ -1,3 +1,4 @@
+import type { OrderPaymentStatus, OrderStatus } from '@common/constants/enum-values.constant';
 import {
   MS_PER_DAY,
   REVIEW_EDIT_WINDOW_DAYS,
@@ -25,7 +26,7 @@ export interface ReviewEligibility {
 
 /** Dòng hàng của đơn có đánh giá được không. Thuần tính toán (không đọc DB); "đã đánh giá chưa" kiểm tra riêng ở service */
 export function computeReviewEligibility(params: {
-  order: { paymentStatus: string; status: string; deliveredAt: Date | null };
+  order: { paymentStatus: OrderPaymentStatus; status: OrderStatus; deliveredAt: Date | null };
   item: { productId: string | null };
   now?: Date;
 }): ReviewEligibility {

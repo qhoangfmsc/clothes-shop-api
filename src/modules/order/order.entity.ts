@@ -1,5 +1,6 @@
 import { BaseEntity } from '@common/base/base.entity';
 import { bigintTransformer, numericTransformer } from '@common/base/column-transformers';
+import type { OrderPaymentStatus, OrderStatus } from '@common/constants/enum-values.constant';
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 import { User } from '../user/user.entity';
 import { OrderItem } from './order-item.entity';
@@ -10,7 +11,7 @@ export class Order extends BaseEntity {
   userId: string | null;
 
   @Column({ type: 'varchar', length: 20, default: 'pending' })
-  status: string; // pending | confirmed | shipping | delivered | completed | cancelled
+  status: OrderStatus;
 
   /** Tiền hàng (VND, số nguyên) */
   @Column({ type: 'bigint', default: 0, transformer: bigintTransformer })
@@ -39,7 +40,7 @@ export class Order extends BaseEntity {
 
   /** Tách khỏi `status` (luồng giao hàng): webhook SePay / admin xác nhận đổi unpaid → paid; admin hoàn tiền xong đổi paid → refunded */
   @Column({ type: 'varchar', length: 10, default: 'unpaid', name: 'payment_status' })
-  paymentStatus: string; // unpaid | paid | refunded
+  paymentStatus: OrderPaymentStatus;
 
   @Column({ type: 'timestamp with time zone', nullable: true, name: 'paid_at' })
   paidAt: Date | null;

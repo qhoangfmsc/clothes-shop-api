@@ -117,6 +117,17 @@ describe('Architecture rules', () => {
     expect(violations).toEqual([]);
   });
 
+  it('declares entity status columns with a type union, not string', () => {
+    const entityFiles = listFiles('src/modules', (file) => file.endsWith('.entity.ts'));
+    const violations: string[] = [];
+    for (const file of entityFiles) {
+      for (const [, name] of stripComments(read(file)).matchAll(/^\s+(\w*[sS]tatus)\??!?:\s*string\b/gm)) {
+        violations.push(`${file}: cột ${name} khai báo string — dùng type union của hằng trạng thái (as const)`);
+      }
+    }
+    expect(violations).toEqual([]);
+  });
+
   it(`keeps services within ${SERVICE_MAX_LINES} lines and ${SERVICE_MAX_DEPENDENCIES} constructor dependencies`, () => {
     const problems: string[] = [];
     for (const file of serviceFiles) {

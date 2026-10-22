@@ -1,3 +1,4 @@
+import type { OrderPaymentStatus, OrderStatus } from '@common/constants/enum-values.constant';
 import { MS_PER_DAY, RETURNABLE_ORDER_STATUSES } from './return.constant';
 
 export type ReturnIneligibleReason = 'ORDER_NOT_PAID' | 'ORDER_NOT_DELIVERED' | 'RETURN_WINDOW_EXPIRED' | 'NOTHING_TO_RETURN';
@@ -25,7 +26,7 @@ export const RETURN_INELIGIBLE_MESSAGES: Record<ReturnIneligibleReason, string> 
  * @param activeQuantities số lượng đã nằm trong các yêu cầu còn hiệu lực, theo `order_items.id`
  */
 export function computeReturnEligibility(params: {
-  order: { paymentStatus: string; status: string; deliveredAt: Date | null };
+  order: { paymentStatus: OrderPaymentStatus; status: OrderStatus; deliveredAt: Date | null };
   items: { id: string; quantity: number }[];
   activeQuantities: Map<string, number>;
   returnWindowDays: number;

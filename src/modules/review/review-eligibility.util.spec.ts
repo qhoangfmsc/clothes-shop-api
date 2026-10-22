@@ -1,9 +1,15 @@
+import type { OrderPaymentStatus, OrderStatus } from '@common/constants/enum-values.constant';
 import { MS_PER_DAY, REVIEW_EDIT_WINDOW_DAYS, REVIEW_WINDOW_DAYS } from './review.constant';
 import { computeReviewEligibility, containsLink, reviewEditBlock } from './review-eligibility.util';
 
 const NOW = new Date('2026-06-30T00:00:00Z');
 const daysAgo = (days: number) => new Date(NOW.getTime() - days * MS_PER_DAY);
-const order = (over: Record<string, any> = {}) => ({ paymentStatus: 'paid', status: 'delivered', deliveredAt: daysAgo(2), ...over });
+const order = (over: Record<string, any> = {}) => ({
+  paymentStatus: 'paid' as OrderPaymentStatus,
+  status: 'delivered' as OrderStatus,
+  deliveredAt: daysAgo(2),
+  ...over,
+});
 const item = (over: Record<string, any> = {}) => ({ productId: 'p1', ...over });
 
 describe('computeReviewEligibility', () => {

@@ -1,4 +1,5 @@
 import { BaseEntity } from '@common/base/base.entity';
+import type { ActiveStatus } from '@common/constants/enum-values.constant';
 import { Column, Entity } from 'typeorm';
 
 @Entity('users')
@@ -28,5 +29,5 @@ export class User extends BaseEntity {
   permissions: number[];
 
   @Column({ type: 'varchar', length: 20, default: 'active' })
-  status: string; // 'active' | 'disabled'
+  status: ActiveStatus;
 }

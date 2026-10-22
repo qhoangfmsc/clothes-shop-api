@@ -18,28 +18,11 @@ import { UpdateOrderStatusDto } from './dtos/admin-order.dto';
 import { AdminOrderQueryDto } from './dtos/admin-order-query.dto';
 import { CreateOrderDto, PickupContactDto, QuoteOrderDto } from './dtos/order.dto';
 import { PublicOrderQueryDto } from './dtos/public-order-query.dto';
+import { ORDER_TRANSITIONS } from './order.constant';
 import { Order } from './order.entity';
 import { presentOrder } from './order.presenter';
 import { OrderItem } from './order-item.entity';
 import { applyOrderNeedsActionFilter } from './order-needs-action.util';
-
-/**
- * Luồng trạng thái hợp lệ
- * pending   → confirmed | cancelled
- * confirmed → shipping  | cancelled
- * shipping  → delivered
- * delivered → completed
- * completed → (terminal)
- * cancelled → (terminal)
- */
-const VALID_TRANSITIONS: Record<string, string[]> = {
-  pending: ['confirmed', 'cancelled'],
-  confirmed: ['shipping', 'cancelled'],
-  shipping: ['delivered'],
-  delivered: ['completed'],
-  completed: [],
-  cancelled: [],
-};
 
 /** Đơn kèm dòng hàng và sản phẩm hiện tại (kèm category/subcategory) của từng dòng — mọi response đơn cùng một hình dạng */
 const ORDER_RELATIONS = ['items', 'items.product', 'items.product.category', 'items.product.subcategory'];
@@ -381,11 +364,11 @@ export class OrderService {
       if (!order) throwAppError(EOrderErrorCode.ORDER_NOT_FOUND);
 
       // Validate status transition (trên bản đã khoá: không đua với thanh toán hay huỷ đồng thời)
-      const allowed = VALID_TRANSITIONS[order.status];
-      if (!allowed || !allowed.includes(dto.status)) {
+      const allowed = ORDER_TRANSITIONS[order.status];
+      if (!allowed.includes(dto.status)) {
         throwAppError(
           EOrderErrorCode.ORDER_STATUS_INVALID_TRANSITION,
-          `Cannot change status from '${order.status}' to '${dto.status}'. Allowed transitions: ${allowed?.join(', ') || 'none'}`,
+          `Cannot change status from '${order.status}' to '${dto.status}'. Allowed transitions: ${allowed.join(', ') || 'none'}`,
         );
       }
 

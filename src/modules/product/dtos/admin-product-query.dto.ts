@@ -1,4 +1,4 @@
-import { ACTIVE_STATUSES, PRODUCT_BADGES } from '@common/constants/enum-values.constant';
+import { ACTIVE_STATUSES, ActiveStatus, PRODUCT_BADGES } from '@common/constants/enum-values.constant';
 import { SearchField } from '@common/decorator/search-field.decorator';
 import { SortField } from '@common/decorator/sort-field.decorator';
 import { PaginationQueryDto } from '@common/dto/pagination-query.dto';
@@ -14,7 +14,7 @@ export class AdminProductQueryDto extends PaginationQueryDto {
   @IsString()
   @IsOptional()
   @IsIn(ACTIVE_STATUSES)
-  status?: string;
+  status?: ActiveStatus;
 
   @ApiPropertyOptional({ description: 'Filter by category slug' })
   @IsString()

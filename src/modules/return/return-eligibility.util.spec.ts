@@ -1,3 +1,4 @@
+import type { OrderPaymentStatus, OrderStatus } from '@common/constants/enum-values.constant';
 import { computeReturnEligibility } from './return-eligibility.util';
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -7,7 +8,11 @@ const items = [
   { id: 'i1', quantity: 2 },
   { id: 'i2', quantity: 1 },
 ];
-const delivered = { paymentStatus: 'paid', status: 'delivered', deliveredAt: daysAgo(5) };
+const delivered: { paymentStatus: OrderPaymentStatus; status: OrderStatus; deliveredAt: Date } = {
+  paymentStatus: 'paid',
+  status: 'delivered',
+  deliveredAt: daysAgo(5),
+};
 const run = (over: Record<string, any> = {}, active = new Map<string, number>(), days = 30) =>
   computeReturnEligibility({ order: { ...delivered, ...over }, items, activeQuantities: active, returnWindowDays: days, now });
 

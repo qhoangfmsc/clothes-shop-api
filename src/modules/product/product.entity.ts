@@ -1,5 +1,6 @@
 import { BaseEntity } from '@common/base/base.entity';
 import { bigintTransformer } from '@common/base/column-transformers';
+import type { ActiveStatus } from '@common/constants/enum-values.constant';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { Category } from '../category/category.entity';
 import { SubCategory } from '../category/sub-category.entity';
@@ -38,7 +39,7 @@ export class Product extends BaseEntity {
   badge: string | null;
 
   @Column({ type: 'varchar', length: 20, default: 'active' })
-  status: string;
+  status: ActiveStatus;
 
   @Column({ type: 'text' })
   description: string;

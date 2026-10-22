@@ -1,4 +1,4 @@
-import { ACTIVE_STATUSES, USER_ROLES } from '@common/constants/enum-values.constant';
+import { ACTIVE_STATUSES, ActiveStatus, USER_ROLES } from '@common/constants/enum-values.constant';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsArray, IsIn, IsInt, IsOptional, IsString, MaxLength } from 'class-validator';
 
@@ -15,7 +15,7 @@ export class UpdateUserDto {
   @IsOptional()
   @IsIn(ACTIVE_STATUSES)
   @MaxLength(20)
-  status?: string;
+  status?: ActiveStatus;
 
   @ApiPropertyOptional({
     example: [1000, 1001, 2000],

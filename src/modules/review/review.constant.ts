@@ -1,3 +1,5 @@
+import type { OrderPaymentStatus, OrderStatus } from '@common/constants/enum-values.constant';
+
 /**
  * Trạng thái đánh giá (`reviews.status`)
  * - PUBLISHED: hiển thị công khai (đăng ngay khi gửi, kiểm duyệt sau)
@@ -11,10 +13,10 @@ export const REVIEW_FITS = ['small', 'true_to_size', 'large'] as const;
 export type ReviewFit = (typeof REVIEW_FITS)[number];
 
 /** Chỉ đơn đã giao hoặc hoàn tất mới được đánh giá */
-export const REVIEWABLE_ORDER_STATUSES: readonly string[] = ['delivered', 'completed'];
+export const REVIEWABLE_ORDER_STATUSES: readonly OrderStatus[] = ['delivered', 'completed'];
 
 /** Đơn đã thu tiền (kể cả đã hoàn): bằng chứng khách thực sự mua hàng */
-export const REVIEWABLE_PAYMENT_STATUSES: readonly string[] = ['paid', 'refunded'];
+export const REVIEWABLE_PAYMENT_STATUSES: readonly OrderPaymentStatus[] = ['paid', 'refunded'];
 
 /** Số ngày kể từ lúc giao (`orders.delivered_at`) khách còn viết được đánh giá */
 export const REVIEW_WINDOW_DAYS = 30;
