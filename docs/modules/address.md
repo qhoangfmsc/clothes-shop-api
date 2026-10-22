@@ -1,6 +1,6 @@
 # address (`src/modules/address`)
 
-> Cập nhật lần cuối: 2026-10-12
+> Cập nhật lần cuối: 2026-10-22
 
 ## 1. Tổng quan
 
@@ -89,7 +89,9 @@ Bảng `addresses` (entity `Address extends BaseEntity`):
 
 ### 4.5 Error code
 
-Không có error code riêng; không tìm thấy địa chỉ ném `NotFoundException('Address not found')` (HTTP 404).
+| Code | Tên | Khi nào |
+|---|---|---|
+| 2101 | `EAddressErrorCode.ADDRESS_NOT_FOUND` | Sửa/xoá địa chỉ không tồn tại hoặc không thuộc user; checkout với địa chỉ như vậy (HTTP 404) |
 
 ### 4.6 Phụ thuộc & cấu hình
 
@@ -97,7 +99,7 @@ Không có error code riêng; không tìm thấy địa chỉ ném `NotFoundExce
 
 ### 4.7 Test
 
-Chưa có test.
+Flow test `test/flows/address/address-errors.flow.ts` (Postgres thật): sửa/xoá địa chỉ lạ hoặc của người khác → 404 / 2101 và địa chỉ của người khác không đổi. Các đường thành công (list/tạo/sửa/xoá, đặt mặc định) chưa có test tự động.
 
 ### 4.8 Lưu ý hiện trạng
 

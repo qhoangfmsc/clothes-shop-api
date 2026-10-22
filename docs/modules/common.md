@@ -162,13 +162,16 @@ Format `[MM][EE]` (4 chữ số). `throwAppError(errorCode, message?, statusCode
 | 10xx | Product | `EProductErrorCode` | 1001–1005, 1009 |
 | 11xx | Category | `ECategoryErrorCode` | 1101–1108 |
 | 12xx | Collection | `ECollectionErrorCode` | 1201–1203 |
-| 13xx | Order | `EOrderErrorCode` | 1301–1307 |
+| 13xx | Order | `EOrderErrorCode` | 1301–1312 |
 | 14xx | User | `EUserErrorCode` | 1401–1402 |
 | 15xx | Site config | `ESiteConfigErrorCode` | 1501–1503 |
 | 16xx | Media | `EMediaErrorCode` | 1601–1607 |
 | 17xx | Payment | `EPaymentErrorCode` | 1701–1714 |
 | 18xx | Return | `EReturnErrorCode` | 1801–1805 |
-| 19xx | Review | `EReviewErrorCode` | 1901–1908 |
+| 19xx | Review | `EReviewErrorCode` | 1901–1909 |
+| 20xx | Cart | `ECartErrorCode` | 2001–2003 |
+| 21xx | Address | `EAddressErrorCode` | 2101 |
+| 22xx | Auth | `EAuthErrorCode` | 2201–2202, 2210–2212 |
 | 90xx | Permission | `EPermissionErrorCode` | 9001 `PERMISSION_DENIED`, 9002 `NO_PERMISSION_DEFINED` |
 
 Chi tiết từng mã nằm ở mục Error code của module tương ứng.
@@ -264,7 +267,7 @@ yarn migration:run              # chạy migration
   - `common/`, `core/` không import `modules/`;
   - đồ thị module Nest không vòng, không `forwardRef`, không entry `imports` là `undefined`;
   - không export thừa trong `common/`, `core/`;
-  - `*.service.ts` không ném exception HTTP thô (dùng `throwAppError`);
+  - `*.service.ts` không ném exception HTTP thô, dùng `throwAppError` (không còn ngoại lệ nào);
   - service tối đa 300 dòng và 5 dependency constructor.
   Thêm vi phạm mới hoặc để vi phạm cũ lớn thêm → đỏ; sửa xong mà chưa giảm allowlist → đỏ. `src/common/dto/list-query.dto.spec.ts` là guard chuẩn list cho mọi `*-query.dto.ts` (xem 4.5); `src/common/utils/money.util.spec.ts` cho helper tiền. Test của từng module: xem file module tương ứng.
 - **Flow** (`yarn test:flows`): `test/flows/<module>/*.flow.ts`, đi qua HTTP thật (`MainModule` + `configureApp`) trên Postgres thật. Config riêng `test/jest.flows.config.js` (rootDir repo, chỉ nhận `*.flow.ts`, chạy tuần tự).
@@ -277,7 +280,7 @@ yarn migration:run              # chạy migration
   - `test/flows/access/access-matrix.flow.ts`: ma trận xác thực và phân quyền cho mọi route đã phát hiện (token thiếu/hỏng/hết hạn/refresh/user không tồn tại/disabled → 401; thiếu quyền → 403 mã 9001; đúng một quyền, admin → qua guard; user mặc định trên `/api/admin/**` → 403). Chỉ kiểm guard nên chấp nhận mọi status khác của route được vào (input rỗng).
   - `createTestApp` dọn DB đầu mỗi file flow và `app.listen(0, '127.0.0.1')` một lần; mỗi request có timeout 10s trong ma trận.
   - Độ phủ endpoint: `createTestApp` gắn middleware ghi `{route, status}` của request thật (bỏ qua header `x-test-probe` của ma trận) vào `test/.coverage/` (gitignore); `test/support/coverage-report.ts` chạy sau jest trong `yarn test:flows`, in số route có ca thành công / ca lỗi và áp ratchet với `test/coverage-baseline.json` (route mới thiếu ca → lỗi; mục đã đủ ca còn trong baseline → lỗi; baseline chỉ co lại).
-  - Hiện có: `test/flows/order-payment/` (đặt hàng – thanh toán, huỷ – hoàn tiền), `test/flows/access/` (bảng quyền, hermetic, ma trận auth/quyền). Bảng luồng nào có test nào: `test/README.md`. Thiết kế: `docs/specs/testing/0001-flow-test-infrastructure.md`.
+  - Hiện có: `test/flows/order-payment/` (đặt hàng – thanh toán, huỷ – hoàn tiền, mã lỗi đơn hàng), `test/flows/cart/`, `test/flows/address/` (mã lỗi), `test/flows/access/` (bảng quyền, hermetic, ma trận auth/quyền). Bảng luồng nào có test nào: `test/README.md`. Thiết kế: `docs/specs/testing/0001-flow-test-infrastructure.md`.
 
 ### 4.13 Lưu ý hiện trạng
 
@@ -288,7 +291,7 @@ yarn migration:run              # chạy migration
 - Migration có dữ liệu seed (`categories`, `subcategories`, `collections`, `products`, `reviews`, `site_configs`); flow test xoá hết dữ liệu này sau khi dựng schema nên mỗi test tự dựng dữ liệu bằng builder, và phí ship/tỷ giá trong flow test là giá trị mặc định trong code (`DEFAULT_SHIPPING_CONFIG`, `DEFAULT_VND_PER_USD`) vì không có dòng `site_configs`.
 - `@ApiEndpoint` (`decorator/api-endpoint.decorator.ts`) chưa module nào dùng; skill `.agent/skills/nest-best-practices` quy định dùng nó thay cho `@ApiOperation`.
 - `common/guards/permissions.guard.ts` import entity `User` từ `src/modules/user`; ngoài ra `common/` và `core/` không import `modules/` (được ép bởi `architecture.spec.ts`, ngoại lệ nằm trong allowlist).
-- Một số service vẫn ném exception HTTP thô (`BadRequestException`, `NotFoundException`...) thay vì `throwAppError`: `order` (8), `auth` (4), `google-auth` (7), `cart` (5), `address` (2), `review` (1); số chỗ được ghi trong allowlist của `architecture.spec.ts` và chỉ được giảm. `auth/jwt.strategy.ts` cố ý ném `UnauthorizedException` thô để 401 của guard không có `errorCode`.
+- `auth/jwt.strategy.ts` cố ý ném `UnauthorizedException` thô (401 của guard không có `errorCode`, khác với 401 nghiệp vụ có `errorCode`); mọi `*.service.ts` đều dùng `throwAppError`. `throwAppError` mặc định trả HTTP 400, nên một số chỗ admin dùng `ORDER_NOT_FOUND` mà không truyền 404 sẽ trả 400 (khác khách hàng: 404).
 - Service vượt 300 dòng: `review` (558), `payment` (549), `return` (449), `order` (408), `category` (382), `refund` (362), `product` (340), `media` (333); `OrderService` và `PaymentService` có 6 dependency constructor. Trần hiện tại ghi trong allowlist, không được tăng.
 - Trạng thái đơn: cột `orders.status`/`payment_status` khai báo kiểu `string` trong entity và bảng chuyển trạng thái đơn là `Record<string, string[]>` trong `OrderService`; `return` dùng `assertStatus` với type union `ReturnStatus`, `payment`/`refund` khai báo trạng thái bằng `as const` ở `payment.constant.ts`.
 - Entity `Order` được import và đăng ký `TypeOrmModule.forFeature` trực tiếp ở module `payment`, `return`, `review`; entity `Product` ở `cart`, `wishlist`, `collection` (bên cạnh module `product`). Các module này truy cập bảng của nhau không qua service.

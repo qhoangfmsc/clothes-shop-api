@@ -334,6 +334,7 @@ Trạng thái: **Chưa làm** · Ghi chú: —
 | P0-1b | 2026-10-21 | Cấu hình flow test gom vào `.env.test` (spec 0003) | 0 | — | — | Cổng đổi 55433 thử thành công; 4 cấu hình sai đều báo đúng lỗi |
 | P0-2 | 2026-10-21 | Ma trận auth/quyền cho 98 route | +8 (flow 20 → 28) | chưa đo (P0-3) | chưa đo (P0-3) | Phá thử 7 lần (nhận token refresh, nhận user disabled, any-of thành all-of, bỏ bypass admin, mở public `GET /api/cart`, đổi quyền admin sang quyền mặc định, bỏ kiểm quyền) đều bị bắt đúng ca. Chạy lặp 25 lần liên tiếp không lỗi. **Sự cố khi làm:** (1) chạy cả bộ lúc treo lúc fail ngẫu nhiên: supertest tự `listen`/`close` mỗi request, hàng nghìn request liên tiếp thì đua; sửa bằng `app.listen(0, '127.0.0.1')` một lần trong `createTestApp`; (2) fail chẵn/lẻ vì ma trận để user lại DB, file sau đụng `UQ_users_email`; sửa bằng `truncateAll` ở đầu `createTestApp`. Tắt keep-alive không cần thiết (thử loại trừ). Thêm timeout 10s mỗi request để treo thành lỗi có tên route |
 | P0-3/4 | 2026-10-21 | Đo độ phủ endpoint + ratchet; đóng spec 0002 | 0 (hạ tầng) | 9/98 | 4/96 (miễn 2) | Ratchet thử 6 tình huống đều đúng. Baseline: 95 route thiếu ca (181 mục). Batch 01 (payment) là việc kế tiếp |
+| Phần 7 | 2026-10-22 | Chuẩn hoá lỗi (spec common/0003): flow ca lỗi cho order, cart, address | +11 (flow 28 → 39) | 9/98 | 11/96 (miễn 2) | Baseline 95 → 94 route (7 route có thêm ca lỗi). Log 503 kỳ vọng được tắt thật; bật lại bằng `FLOW_TEST_LOGS=1` |
 
 ## Phát hiện cần người dùng quyết định
 

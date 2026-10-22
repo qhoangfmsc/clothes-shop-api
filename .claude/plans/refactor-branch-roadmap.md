@@ -21,7 +21,7 @@ Báo cáo mỗi phần: đã đổi gì (file), số liệu trước/sau, patter
 | 4 | P0-3: recorder độ phủ + `coverage-report.ts` + `coverage-baseline.json` (ratchet) + nối vào `yarn test:flows`; P0-4: đóng spec 0002 | Xong |
 | 5 | Xoá code chết ở `common/` (`BaseValidate.ts`, `helper.ts`, `transform.ts`, `types/baseType.ts`, phần không dùng của `base.interface.ts`, `IBaseEntity`); giữ `ApiEndpoint` vì skill `.agent` quy định dùng | Xong |
 | 6 | Quy ước được máy ép: test kiến trúc (`common/` không import `modules/`, không exception thô trong service mới, không `forwardRef`, không export thừa, trần kích thước service) với allowlist chỉ co lại | Xong |
-| 7 | Chuẩn hoá lỗi: exception thô → `throwAppError` + error code (order, auth, cart, address, review), theo từng module, có flow/unit bảo vệ | Chưa làm |
+| 7 | Chuẩn hoá lỗi: exception thô → `throwAppError` + error code (order, auth, cart, address, review), theo từng module, có flow/unit bảo vệ | Xong |
 | 8 | Trạng thái: `as const` + type union cho `orders.status`/`payment_status`; bảng chuyển trạng thái dùng chung (State machine) áp dụng cho order, return | Chưa làm |
 | 9 | Helper `withLock` gom khung transaction + khoá dòng (return, review, order, payment, refund) | Chưa làm |
 | 10 | Tách `OrderService` theo use case (checkout, status, query) — có flow test bảo vệ | Chưa làm |

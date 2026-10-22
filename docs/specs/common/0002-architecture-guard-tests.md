@@ -1,6 +1,7 @@
 # 0002 — Test kiến trúc: quy ước được máy ép, allowlist chỉ co lại
 
 > Module: `common` · Trạng thái: Implemented · Ngày: 2026-10-22
+> Allowlist exception thô trong spec này đã về rỗng (xem 0003); phần còn lại vẫn đúng.
 
 ## 1. Bối cảnh & vấn đề
 

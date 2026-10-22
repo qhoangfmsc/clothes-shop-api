@@ -1,6 +1,6 @@
 # review (`src/modules/review`)
 
-> Cập nhật lần cuối: 2026-10-19
+> Cập nhật lần cuối: 2026-10-22
 
 ## 1. Tổng quan
 
@@ -196,8 +196,7 @@ Bảng `review_votes` (entity `ReviewVote extends BaseEntity`): `review_id` (NOT
 | 1906 | `REVIEW_INVALID_STATE` | Ẩn đánh giá đã ẩn, hiện đánh giá đang hiển thị |
 | 1907 | `REVIEW_VOTE_OWN` | Vote đánh giá của chính mình |
 | 1908 | `REVIEW_IMAGE_INVALID` | `images` chứa URL không phải ảnh đánh giá do chính user upload |
-
-Ngoài ra, `PATCH` với body rỗng trả `400` thô (`BadRequestException('Nothing to update')`).
+| 1909 | `REVIEW_NOTHING_TO_UPDATE` | `PATCH` với body không có field nào (HTTP 400) |
 
 ### 4.6 Phụ thuộc & cấu hình
 
@@ -214,6 +213,7 @@ Ngoài ra, `PATCH` với body rỗng trả `400` thô (`BadRequestException('Not
 - `review.service.spec.ts` (tiếp) — ảnh (lưu URL đã xác nhận, mặc định `[]`, ảnh không phải của user → 1908 và không lưu, sửa thay/xoá ảnh, ảnh sai không tiêu hao lần sửa, `uploadImage` uỷ quyền cho media với `REVIEW` (kiểm tra kích thước ở service chỉ là lớp phòng thủ thứ hai sau `FileInterceptor`), filter `hasImages` ở list công khai/admin, `withImages` của tổng hợp), đồng bộ `products.rating_*` (create khoá sản phẩm trước khi chèn, trung bình tính trên mọi đánh giá `PUBLISHED`, sửa sao mới tính lại, ẩn/hiện, ẩn đánh giá cuối về `null`, vote/phản hồi không đụng sản phẩm, làm tròn half-up khớp Postgres), `countAwaitingReply` cùng điều kiện với list admin, và DTO `images`.
 - `list-query.dto.spec.ts` tự kiểm tra `PublicReviewQueryDto`, `MyReviewQueryDto`, `MyPendingReviewQueryDto`, `AdminReviewQueryDto`; `MyReviewVotesQueryDto` nằm trong `NOT_LIST_DTO_FILES` (không phân trang).
 - Các QueryBuilder của `findMine`, `findPending`, `findAllAdmin`, `findMyVotes` và việc tính lại điểm sản phẩm khi có thao tác đồng thời không được kiểm chứng bằng unit test (bộ test dùng DB giả); chúng đã được chạy thủ công trên PostgreSQL thật (xem 4.8).
+- `review.service.spec.ts` (`ReviewService.update`): body rỗng → 400 / 1909; nội dung chứa liên kết → 400 / 1905.
 
 ### 4.8 Lưu ý hiện trạng
 

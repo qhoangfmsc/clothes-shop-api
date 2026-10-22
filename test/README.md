@@ -75,6 +75,9 @@ Trạng thái: **Có** = đã có test cover luồng · **Unit** = chỉ có uni
 |---|---|---|---|---|
 | auth / guard (mọi route) | Ma trận cho cả 98 route: không/rỗng/sai scheme credential → 401; token sai secret, hết hạn, loại refresh, user không tồn tại, user disabled → 401; không quyền / đủ mọi quyền trừ quyền cần → 403 (9001); đúng một trong các quyền cần → qua guard; admin không cần quyền → qua guard; user mặc định trên `/api/admin/**` → 403; route public vào được không token và với token rác | Flow | `flows/access/access-matrix.flow.ts` | Có |
 | auth / guard | Không token → 401; thiếu quyền → 403 trên `GET /api/orders` | Flow | `flows/order-payment/checkout-and-pay.flow.ts` | Có |
+| order (lỗi) | Đơn lạ → 404/1301; địa chỉ người khác → 2101; giỏ rỗng 1309; mục giỏ lạ 1308; sản phẩm disabled 1310; huỷ không còn pending 1311; đã bị huỷ 1312 | Flow | `flows/order-payment/order-errors.flow.ts` | Có |
+| cart (lỗi) | Chưa có giỏ 2001; dòng lạ/của giỏ khác 2002; thêm sản phẩm disabled 2003 | Flow | `flows/cart/cart-errors.flow.ts` | Có (chỉ ca lỗi) |
+| address (lỗi) | Sửa/xoá địa chỉ lạ hoặc của người khác → 404/2101 | Flow | `flows/address/address-errors.flow.ts` | Có (chỉ ca lỗi) |
 | mọi module (bảng quyền) | Tự phát hiện 98 route; snapshot route–quyền; mọi route cần đăng nhập có quyền; route public không có quyền; route `/api/admin` không public và không dùng quyền mặc định; mã quyền hợp lệ; không trùng method+path | Flow | `flows/access/route-table.flow.ts` | Có |
 | hạ tầng test | Hermetic: env dịch vụ ngoài rỗng, `fetch` bị chặn, media chưa cấu hình → 503/1601 | Flow | `flows/access/route-table.flow.ts` | Có |
 | order + cart + address + payment | Giỏ → báo giá → checkout → mã QR → webhook SePay → đơn `paid`/`confirmed` | Flow | `flows/order-payment/checkout-and-pay.flow.ts` | Có |
@@ -86,11 +89,11 @@ Trạng thái: **Có** = đã có test cover luồng · **Unit** = chỉ có uni
 | review | Viết đánh giá sau khi nhận hàng, cập nhật điểm sản phẩm | Flow | — | Unit |
 | order (admin) | Đổi trạng thái đơn theo state machine (pending → … → completed) | Flow | — | Unit |
 | auth | Đăng nhập Google, refresh token, `GET /auth/me` | Flow | — | Unit |
-| cart | Thêm / sửa / xoá dòng giỏ | Flow | — | Unit |
+| cart | Thêm / sửa / xoá dòng giỏ (ca thành công) | Flow | — | Unit |
 | product / collection | List public (filter, sort, phân trang) và CRUD admin | Flow | — | Unit |
 | category | List public và CRUD admin, thứ hạng `priority` | Flow | — | Chưa có |
 | wishlist | Thêm / xoá / kiểm tra sản phẩm yêu thích | Flow | — | Unit |
-| address | CRUD sổ địa chỉ của khách | Flow | — | Chưa có |
+| address | CRUD sổ địa chỉ của khách (ca thành công) | Flow | — | Chưa có |
 | media | Upload / xoá ảnh admin | Flow | — | Unit |
 | site-config / shipping / currency | Admin sửa cấu hình, ảnh hưởng báo giá | Flow | — | Unit |
 
@@ -99,7 +102,7 @@ Trạng thái: **Có** = đã có test cover luồng · **Unit** = chỉ có uni
 | Module | File spec |
 |---|---|
 | common | `common/dto/list-query.dto.spec.ts` (ép chuẩn list cho mọi `*-query.dto.ts`), `common/utils/money.util.spec.ts`, `common/architecture/architecture.spec.ts` (luật kiến trúc: hướng phụ thuộc, vòng module, export thừa, exception thô, kích thước service) |
-| auth | `modules/auth/auth.service.spec.ts` |
+| auth | `modules/auth/auth.service.spec.ts`, `modules/auth/google-auth.service.spec.ts` |
 | cart | `modules/cart/cart.service.spec.ts` |
 | collection | `modules/collection/collection.service.spec.ts` |
 | currency | `modules/currency/currency.service.spec.ts` |

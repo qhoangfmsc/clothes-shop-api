@@ -1,6 +1,6 @@
 # cart (`src/modules/cart`)
 
-> Cập nhật lần cuối: 2026-10-19
+> Cập nhật lần cuối: 2026-10-22
 
 ## 1. Tổng quan
 
@@ -112,8 +112,11 @@ UNIQUE `UQ_cart_items_unique` trên `(cart_id, product_id, size, color)`.
 |---|---|---|
 | 1303 | `EOrderErrorCode.ORDER_PRODUCT_NOT_ORDERABLE` | Thêm sản phẩm có badge `sold_out` / `custom_order` (mã thuộc nhóm order, dùng chung với checkout) |
 | 1001 | `EProductErrorCode.PRODUCT_NOT_FOUND` | `productId` không tồn tại khi thêm vào giỏ (HTTP 404) |
+| 2001 | `ECartErrorCode.CART_NOT_FOUND` | Sửa/xoá dòng khi user chưa có giỏ (HTTP 404) |
+| 2002 | `ECartErrorCode.CART_ITEM_NOT_FOUND` | Dòng không tồn tại hoặc thuộc giỏ khác (HTTP 404) |
+| 2003 | `ECartErrorCode.CART_PRODUCT_UNAVAILABLE` | Thêm sản phẩm không `active` (HTTP 400) |
 
-Các lỗi khác là HTTP thô: `NotFoundException` (`Cart not found`, `Cart item not found`), `BadRequestException` (`Product is not available`).
+Mọi lỗi nghiệp vụ đều qua `throwAppError`.
 
 ### 4.6 Phụ thuộc & cấu hình
 
@@ -124,6 +127,8 @@ Các lỗi khác là HTTP thô: `NotFoundException` (`Cart not found`, `Cart ite
 ### 4.7 Test
 
 `cart.service.spec.ts` — `CartService.addItem` (service dựng với stub `CurrencyService`): sản phẩm badge `sold_out` / `custom_order` bị từ chối với `errorCode 1303` (HTTP 400, message chứa tên sản phẩm) và không lưu gì; sản phẩm không badge hoặc badge `new`/`sale`/`bestseller`/`limited` vẫn được thêm. `CartService.getCart` nạp kèm `items.product.category` và `items.product.subcategory`.
+
+Flow test `test/flows/cart/cart-errors.flow.ts` (Postgres thật): chưa có giỏ → 404 / 2001 (sửa và xoá); dòng lạ hoặc của giỏ khác → 404 / 2002 (giỏ khác không bị đụng); thêm sản phẩm `disabled` → 400 / 2003 và không thêm gì.
 
 ### 4.8 Lưu ý hiện trạng
 

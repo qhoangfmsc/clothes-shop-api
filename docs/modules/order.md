@@ -1,6 +1,6 @@
 # order (`src/modules/order`)
 
-> Cập nhật lần cuối: 2026-10-21
+> Cập nhật lần cuối: 2026-10-22
 
 ## 1. Tổng quan
 
@@ -50,7 +50,7 @@ Thanh toán (VietQR/SePay) và hoàn tiền của đơn do module [payment](paym
 
 **GET `/api/orders`** — `PublicOrderQueryDto` (extends `PaginationQueryDto`): `status` (`IsIn(ORDER_STATUSES)`), `sort` (whitelist `createdAt`; mặc định `-createdAt`). Response `paginated(...)`, mỗi đơn kèm `items`.
 
-**GET `/api/orders/:orderId`** → `{ data: Order(+items) + paymentAttempts + refunds }`; đơn không thuộc user hoặc không có → `404 Order not found` (khi đó không truy vấn phiên thanh toán).
+**GET `/api/orders/:orderId`** → `{ data: Order(+items) + paymentAttempts + refunds }`; đơn không thuộc user hoặc không có → `404` / `1301` `Order not found` (khi đó không truy vấn phiên thanh toán).
 
 `data.paymentAttempts` là mọi nội dung chuyển khoản đã cấp cho đơn, **mới nhất trước**, kể cả mã đã hết hạn (`[]` nếu đơn chưa từng tạo QR). Do [payment](payment.md) (`PaymentService.listAttemptsForCustomer`) cung cấp:
 
@@ -224,15 +224,20 @@ Không hợp lệ → `ORDER_STATUS_INVALID_TRANSITION (1302)` với message nê
 
 | Code | Tên | Khi nào |
 |---|---|---|
-| 1301 | `ORDER_NOT_FOUND` | Admin xem/đổi trạng thái đơn không tồn tại |
+| 1301 | `ORDER_NOT_FOUND` | Đơn không tồn tại: khách xem chi tiết/huỷ đơn không có hoặc không phải của mình (HTTP 404); admin xem/đổi trạng thái đơn không tồn tại |
 | 1302 | `ORDER_STATUS_INVALID_TRANSITION` | Chuyển trạng thái sai luồng |
 | 1303 | `ORDER_PRODUCT_NOT_ORDERABLE` | Checkout, quote (và thêm giỏ) với sản phẩm `sold_out`/`custom_order` |
 | 1304 | `ORDER_ADDRESS_REQUIRED` | Checkout `standard`/`express` thiếu `addressId` |
 | 1305 | `ORDER_PICKUP_CONTACT_REQUIRED` | Checkout `store-pickup` không có cả `addressId` lẫn `pickupContact` |
 | 1306 | `ORDER_PICKUP_CONTACT_NOT_ALLOWED` | `pickupContact` gửi kèm `standard`/`express`, hoặc gửi cùng `addressId` cho `store-pickup` (HTTP 400) |
 | 1307 | `ORDER_CANCEL_PAID_NOT_ALLOWED` | Khách huỷ đơn đã thanh toán (HTTP 400) |
+| 1308 | `ORDER_CART_ITEMS_INVALID` | `cartItemIds` chứa dòng không có trong giỏ của user (HTTP 400) |
+| 1309 | `ORDER_CART_EMPTY` | Giỏ không có dòng nào để đặt (HTTP 400) |
+| 1310 | `ORDER_PRODUCT_UNAVAILABLE` | Sản phẩm trong các dòng được chọn đã xoá hoặc `disabled` (HTTP 400, message nêu tên sản phẩm) |
+| 1311 | `ORDER_CANCEL_NOT_ALLOWED` | Khách huỷ đơn chưa trả nhưng không còn `pending` (HTTP 400) |
+| 1312 | `ORDER_ALREADY_CANCELLED` | Khách huỷ đơn đã trả mà cửa hàng đã huỷ (HTTP 400) |
 
-Phía khách các lỗi còn lại là HTTP thô: `NotFoundException` (`Order not found`, `Address not found`), `BadRequestException` (`Cart is empty`, `Some selected cart items do not exist in your cart`, `Some products are no longer available: …`, `Only pending orders can be cancelled`, `Order has already been cancelled`). Lỗi hoàn tiền khi huỷ đơn đã trả dùng mã 1711–1714 của module [payment](payment.md).
+Địa chỉ giao không tồn tại hoặc không thuộc user → `2101 ADDRESS_NOT_FOUND` (HTTP 404, module [address](address.md)). Mọi lỗi nghiệp vụ đều qua `throwAppError`. Lỗi hoàn tiền khi huỷ đơn đã trả dùng mã 1711–1714 của module [payment](payment.md).
 
 ### 4.6 Phụ thuộc & cấu hình
 
@@ -251,6 +256,8 @@ Phía khách các lỗi còn lại là HTTP thô: `NotFoundException` (`Order no
 - `order.service.spec.ts` (tiếp) — luật huỷ với hoàn tiền (dùng `RefundService` thật trên manager giả): khách huỷ đơn chưa trả (không có hoàn tiền, mã chờ → `CANCELLED`), khách không huỷ được đơn đã trả ở bất kỳ trạng thái nào (1307, không tạo hoàn), đơn đã huỷ không tạo hoàn lần hai, đơn của người khác → 404, admin huỷ đơn đã trả không có phiên `PAID` → 1712 và trạng thái giữ nguyên, admin huỷ đơn đã trả (`ADMIN_CANCELLED`, `requested_by` admin), admin huỷ đơn chưa trả, chuyển trạng thái khác không đụng thanh toán, bước chuyển sai (huỷ từ `shipping`) → 1302 không tạo hoàn, đơn lạ → 1301.
 - `dtos/order.dto.spec.ts` — `CreateOrderDto` và `QuoteOrderDto`: `cartItemIds` hợp lệ/không hợp lệ, từng `shippingMethod`, phương thức lạ → 400, `pickupContact` hợp lệ/trim/thiếu/rỗng/quá dài/key lạ.
 - Flow test trên Postgres thật (`test/flows/order-payment/`, xem `test/README.md`): `checkout-and-pay.flow.ts` — báo giá (2 × 350.000 + phí ship tiêu chuẩn 30.000 = 730.000), checkout tạo đơn `pending`/`unpaid` và dọn giỏ, đơn sang `confirmed`/`paid` sau webhook SePay; `cancel-and-refund.flow.ts` — khách huỷ đơn chưa trả, khách huỷ đơn đã trả → 1307, admin huỷ đơn đã trả → yêu cầu hoàn đủ tiền → đơn `refunded`. Chưa có flow test cho đổi trạng thái đơn theo chuỗi `pending → … → completed` và cho checkout với `store-pickup`.
+- Flow test `test/flows/order-payment/order-errors.flow.ts` (Postgres thật): đơn lạ khi xem/huỷ → 404 / 1301; checkout với địa chỉ của người khác → 404 / 2101; giỏ rỗng → 1309; `cartItemIds` không thuộc giỏ → 1308 (giỏ và đơn không đổi); sản phẩm `disabled` → 1310 kèm tên; huỷ đơn không còn `pending` → 1311; huỷ đơn đã trả mà cửa hàng đã huỷ → 1312.
+- `order.service.spec.ts`: các ca từ chối checkout/quote kiểm `errorCode` 1308/1309/1310.
 
 ### 4.8 Lưu ý hiện trạng
 
