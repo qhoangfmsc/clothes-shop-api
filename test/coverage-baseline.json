@@ -8,18 +8,6 @@
     }
   },
   "missing": {
-    "GET /api/orders": [
-      "error"
-    ],
-    "POST /api/orders/quote": [
-      "error"
-    ],
-    "GET /api/admin/orders": [
-      "error"
-    ],
-    "GET /api/admin/orders/:orderId": [
-      "error"
-    ],
     "GET /api/returns": [
       "success",
       "error"
