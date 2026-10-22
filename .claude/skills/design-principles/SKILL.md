@@ -121,7 +121,7 @@ Cách đếm nhanh SRP: **số dependency của constructor** và **số mock c�
 - [ ] Không magic number/string; không code chết; comment ít và ngắn (rule `comments.md`).
 - [ ] Tên file/class/hàm đúng vai trò (`x.service.ts`, `presentX`, `assertX`, `applyX`).
 - [ ] Tiền theo cặp `Vnd/Usd`, qua `money()`; không trả entity thô.
-- [ ] `yarn lint` không thêm cảnh báo; quy ước quan trọng có test/lint ép.
+- [ ] `yarn lint` không thêm cảnh báo; quy ước quan trọng có test/lint ép; `yarn test` (gồm `architecture.spec.ts`) xanh, không thêm vào allowlist để qua.
 
 ## 6. Cách giải thích cho người học (trong spec, comment, báo cáo)
 

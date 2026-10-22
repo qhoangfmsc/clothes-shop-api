@@ -98,7 +98,7 @@ Trạng thái: **Có** = đã có test cover luồng · **Unit** = chỉ có uni
 
 | Module | File spec |
 |---|---|
-| common | `common/dto/list-query.dto.spec.ts` (ép chuẩn list cho mọi `*-query.dto.ts`), `common/utils/money.util.spec.ts` |
+| common | `common/dto/list-query.dto.spec.ts` (ép chuẩn list cho mọi `*-query.dto.ts`), `common/utils/money.util.spec.ts`, `common/architecture/architecture.spec.ts` (luật kiến trúc: hướng phụ thuộc, vòng module, export thừa, exception thô, kích thước service) |
 | auth | `modules/auth/auth.service.spec.ts` |
 | cart | `modules/cart/cart.service.spec.ts` |
 | collection | `modules/collection/collection.service.spec.ts` |

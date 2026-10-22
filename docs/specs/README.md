@@ -11,6 +11,7 @@ Cấu trúc: `docs/specs/<module>/NNNN-slug.md` (số tăng dần theo từng mo
 | Module | Spec | Trạng thái | Nội dung |
 |---|---|---|---|
 | common | [0001 — Xoá code chết ở `common/`](common/0001-remove-dead-code.md) | Implemented | Bỏ BaseValidate, helper, transform, baseType, base.interface; giữ ApiEndpoint |
+| common | [0002 — Test kiến trúc, allowlist chỉ co lại](common/0002-architecture-guard-tests.md) | Implemented | Hướng phụ thuộc, vòng module, export thừa, exception thô, kích thước service |
 | testing | [0001 — Khung flow test chạy trên Postgres thật](testing/0001-flow-test-infrastructure.md) | Implemented | Postgres docker, schema từ migration, boot app thật, builder, webhook ký sẵn, test matrix |
 | testing | [0002 — Ma trận auth/quyền tự phát hiện và đo độ phủ endpoint](testing/0002-access-matrix-and-endpoint-coverage.md) | Implemented | Tự phát hiện route, snapshot quyền, ma trận 401/403, đo độ phủ có ratchet |
 | testing | [0003 — Cấu hình flow test ở `.env.test`](testing/0003-flow-test-config-file.md) | Implemented | Một file ở root cho cả docker-compose và jest; cấu hình sai báo lỗi sớm |

@@ -1,6 +1,6 @@
 # common & core (`src/common`, `src/core`, `src/main*.ts`, `src/migrations`)
 
-> Cập nhật lần cuối: 2026-10-21
+> Cập nhật lần cuối: 2026-10-22
 
 ## 1. Tổng quan
 
@@ -260,7 +260,13 @@ yarn migration:run              # chạy migration
 
 ### 4.12 Test
 
-- **Unit** (`yarn test`): `src/**/*.spec.ts` cạnh code, dùng mock. `src/common/dto/list-query.dto.spec.ts` là guard chuẩn list cho mọi `*-query.dto.ts` (xem 4.5); `src/common/utils/money.util.spec.ts` cho helper tiền. Test của từng module: xem file module tương ứng.
+- **Unit** (`yarn test`): `src/**/*.spec.ts` cạnh code, dùng mock. `src/common/architecture/architecture.spec.ts` ép các luật kiến trúc (xem 4.13) với allowlist ở `architecture-allowlist.test-utils.ts` chỉ được co lại:
+  - `common/`, `core/` không import `modules/`;
+  - đồ thị module Nest không vòng, không `forwardRef`, không entry `imports` là `undefined`;
+  - không export thừa trong `common/`, `core/`;
+  - `*.service.ts` không ném exception HTTP thô (dùng `throwAppError`);
+  - service tối đa 300 dòng và 5 dependency constructor.
+  Thêm vi phạm mới hoặc để vi phạm cũ lớn thêm → đỏ; sửa xong mà chưa giảm allowlist → đỏ. `src/common/dto/list-query.dto.spec.ts` là guard chuẩn list cho mọi `*-query.dto.ts` (xem 4.5); `src/common/utils/money.util.spec.ts` cho helper tiền. Test của từng module: xem file module tương ứng.
 - **Flow** (`yarn test:flows`): `test/flows/<module>/*.flow.ts`, đi qua HTTP thật (`MainModule` + `configureApp`) trên Postgres thật. Config riêng `test/jest.flows.config.js` (rootDir repo, chỉ nhận `*.flow.ts`, chạy tuần tự).
   - Mỗi lần chạy: lấy khoá advisory (`pg_try_advisory_lock`; lần chạy thứ hai cùng DB bị chặn), `DROP SCHEMA public` → chạy toàn bộ migration → `TRUNCATE` dữ liệu seed; sau mỗi test `truncateAll`.
   - Cấu hình: file `.env.test` ở root chỉ chứa kết nối Postgres test (`POSTGRES_*`; thiếu khoá thì dùng mặc định trong `test/support/test-env.ts`); `docker-compose.test.yml` và jest cùng đọc. Secret giả của JWT/SePay là hằng số trong `test-env.ts`, `SUPABASE_*`/`GOOGLE_*` luôn rỗng. Giá trị gán thẳng vào `process.env`, thắng `.env` của app. Khoá lạ trong file làm global-setup dừng với thông báo lỗi.
@@ -281,7 +287,8 @@ yarn migration:run              # chạy migration
 - Danh sách quyền của một user được lưu trong cột `users.permissions`; `DEFAULT_USER_PERMISSIONS` chỉ được áp khi tạo user mới, không tự cập nhật cho user đã tồn tại.
 - Migration có dữ liệu seed (`categories`, `subcategories`, `collections`, `products`, `reviews`, `site_configs`); flow test xoá hết dữ liệu này sau khi dựng schema nên mỗi test tự dựng dữ liệu bằng builder, và phí ship/tỷ giá trong flow test là giá trị mặc định trong code (`DEFAULT_SHIPPING_CONFIG`, `DEFAULT_VND_PER_USD`) vì không có dòng `site_configs`.
 - `@ApiEndpoint` (`decorator/api-endpoint.decorator.ts`) chưa module nào dùng; skill `.agent/skills/nest-best-practices` quy định dùng nó thay cho `@ApiOperation`.
-- `common/guards/permissions.guard.ts` import entity `User` từ `src/modules/user`; ngoài ra `common/` và `core/` không import `modules/`.
-- Một số service vẫn ném exception HTTP thô (`BadRequestException`, `NotFoundException`...) thay vì `throwAppError`: `order`, `auth` (`auth.service`, `google-auth.service`), `cart`, `address`, `review`.
+- `common/guards/permissions.guard.ts` import entity `User` từ `src/modules/user`; ngoài ra `common/` và `core/` không import `modules/` (được ép bởi `architecture.spec.ts`, ngoại lệ nằm trong allowlist).
+- Một số service vẫn ném exception HTTP thô (`BadRequestException`, `NotFoundException`...) thay vì `throwAppError`: `order` (8), `auth` (4), `google-auth` (7), `cart` (5), `address` (2), `review` (1); số chỗ được ghi trong allowlist của `architecture.spec.ts` và chỉ được giảm. `auth/jwt.strategy.ts` cố ý ném `UnauthorizedException` thô để 401 của guard không có `errorCode`.
+- Service vượt 300 dòng: `review` (558), `payment` (549), `return` (449), `order` (408), `category` (382), `refund` (362), `product` (340), `media` (333); `OrderService` và `PaymentService` có 6 dependency constructor. Trần hiện tại ghi trong allowlist, không được tăng.
 - Trạng thái đơn: cột `orders.status`/`payment_status` khai báo kiểu `string` trong entity và bảng chuyển trạng thái đơn là `Record<string, string[]>` trong `OrderService`; `return` dùng `assertStatus` với type union `ReturnStatus`, `payment`/`refund` khai báo trạng thái bằng `as const` ở `payment.constant.ts`.
 - Entity `Order` được import và đăng ký `TypeOrmModule.forFeature` trực tiếp ở module `payment`, `return`, `review`; entity `Product` ở `cart`, `wishlist`, `collection` (bên cạnh module `product`). Các module này truy cập bảng của nhau không qua service.

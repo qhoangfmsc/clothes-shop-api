@@ -65,7 +65,7 @@ Chuẩn đã có ở `CLAUDE.md` (validation 3 tầng, list API, tiền, error c
 - **Comment:** ít và ngắn, đúng luật `.claude/rules/comments.md` (mặc định không comment; một dòng cho lý do/bất biến/thứ tự khoá).
 - **Import:** alias `@common/*`, `@core/*`, `@/*` cho thứ ở ngoài module; đường dẫn tương đối trong cùng module.
 - **Không để code chết:** xoá thay vì để lại "phòng khi cần".
-- **Máy kiểm tra, không phải trí nhớ:** Biome là nguồn sự thật format/lint (`yarn lint` không được thêm cảnh báo mới). Quy ước quan trọng phải được ép bằng test hoặc lint (mẫu: `list-query.dto.spec.ts`).
+- **Máy kiểm tra, không phải trí nhớ:** Biome là nguồn sự thật format/lint (`yarn lint` không được thêm cảnh báo mới). Quy ước quan trọng phải được ép bằng test hoặc lint (mẫu: `list-query.dto.spec.ts`). Các luật kiến trúc ở mục 1 và 4 (hướng phụ thuộc, không vòng module, không export thừa, `throwAppError`, service ≤ 300 dòng / ≤ 5 dependency) đã được ép bởi `src/common/architecture/architecture.spec.ts`; vi phạm cũ nằm trong allowlist chỉ được co lại, không thêm mục để "qua" test.
 
 ## 5. Giải thích cho người đọc / người học
 
