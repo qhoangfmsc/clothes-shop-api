@@ -89,6 +89,7 @@ Trạng thái: **Có** = đã có test cover luồng · **Unit** = chỉ có uni
 | payment | Admin xác nhận thanh toán thủ công; mã QR admin; QR hết hạn | Flow | — | Unit |
 | return | Yêu cầu trả hàng → duyệt → nhận hàng → hoàn tiền | Flow | — | Unit |
 | review | Viết đánh giá sau khi nhận hàng, cập nhật điểm sản phẩm | Flow | — | Unit |
+| order (đọc) | Danh sách khách (chỉ đơn của mình, lọc, sắp xếp, phân trang), chi tiết kèm phiên thanh toán, danh sách admin (lọc, tìm theo SĐT và mã chuyển khoản, needsAction), chi tiết admin, số đơn cần thao tác | Flow | `flows/order-payment/order-queries.flow.ts` | Có |
 | order (admin) | Đổi trạng thái đơn theo bảng chuyển (pending → … → completed), chuyển sai → 1302, trạng thái cuối, trạng thái không tồn tại | Flow | `flows/order-payment/order-status.flow.ts` | Có |
 | auth | Đăng nhập Google, refresh token, `GET /auth/me` | Flow | — | Unit |
 | cart | Thêm / sửa / xoá dòng giỏ (ca thành công) | Flow | — | Unit |
@@ -109,7 +110,7 @@ Trạng thái: **Có** = đã có test cover luồng · **Unit** = chỉ có uni
 | collection | `modules/collection/collection.service.spec.ts` |
 | currency | `modules/currency/currency.service.spec.ts` |
 | media | `modules/media/media.service.spec.ts` |
-| order | `modules/order/order.service.spec.ts`, `order.presenter.spec.ts`, `order.constant.spec.ts` (bảng chuyển trạng thái), `dtos/order.dto.spec.ts` |
+| order | `modules/order/order-checkout.service.spec.ts`, `order-query.service.spec.ts`, `order-status.service.spec.ts`, `order.presenter.spec.ts`, `order.constant.spec.ts` (bảng chuyển trạng thái), `dtos/order.dto.spec.ts` |
 | payment | `modules/payment/payment.service.spec.ts`, `payment-confirm.spec.ts`, `payment-expiry.spec.ts`, `payment-attempts-admin.spec.ts`, `refund.service.spec.ts`, `sepay-webhook.service.spec.ts`, `sepay-payload.util.spec.ts`, `sepay-signature.util.spec.ts` |
 | pending-count | `modules/pending-count/pending-count.spec.ts` |
 | product | `modules/product/product.service.spec.ts`, `product.presenter.spec.ts` |

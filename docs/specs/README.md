@@ -12,6 +12,7 @@ Cấu trúc: `docs/specs/<module>/NNNN-slug.md` (số tăng dần theo từng mo
 |---|---|---|---|
 | common | [0001 — Xoá code chết ở `common/`](common/0001-remove-dead-code.md) | Implemented | Bỏ BaseValidate, helper, transform, baseType, base.interface; giữ ApiEndpoint |
 | common | [0002 — Test kiến trúc, allowlist chỉ co lại](common/0002-architecture-guard-tests.md) | Implemented | Hướng phụ thuộc, vòng module, export thừa, exception thô, kích thước service |
+| order | [0002 — Tách `OrderService` theo use case](order/0002-split-order-service.md) | Implemented | OrderQueryService, OrderCheckoutService, OrderStatusService; di chuyển nguyên văn, có flow đặc tả truy vấn |
 | order | [0001 — Trạng thái có kiểu và bảng chuyển trạng thái của đơn](order/0001-typed-statuses-and-order-transitions.md) | Implemented | Type union cho Order/Product/User status, ORDER_TRANSITIONS có kiểu chặt, luật kiến trúc cho cột status |
 | common | [0004 — Một chỗ duy nhất cho khoá dòng (`findLocked`)](common/0004-locked-row-helper.md) | Implemented | Thay 25 literal khoá, luật kiến trúc, hợp đồng khoá và flow song song |
 | common | [0003 — Chuẩn hoá lỗi: exception thô → throwAppError](common/0003-standardize-error-handling.md) | Implemented | 27 chỗ ở 6 service, 15 mã lỗi mới (order, review, cart, address, auth) |

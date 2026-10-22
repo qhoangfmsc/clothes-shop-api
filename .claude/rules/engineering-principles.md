@@ -36,7 +36,7 @@ Kiến thức, ví dụ và checklist chi tiết: skill `design-principles` (`.c
 | Thay thuật toán / nhà cung cấp lúc chạy (cổng thanh toán, tính phí) | **Strategy** qua interface + provider token, chỉ khi có ≥ 2 implementation thật hoặc spec nêu rõ | chưa dùng (SePay là cổng duy nhất) |
 | Bọc dịch vụ ngoài | **Adapter** + hàm thuần parse/verify có unit test | `sepay-payload.util.ts`, `sepay-signature.util.ts` |
 | Retry/webhook trùng | **Idempotency**: UNIQUE ở DB + bắt lỗi `23505` | `payment_transactions.provider_transaction_id` |
-| Nhiều thao tác ghi phải cùng thành công | **Unit of Work** (`dataSource.transaction`) | `OrderService.checkout`, `cancelLocked` |
+| Nhiều thao tác ghi phải cùng thành công | **Unit of Work** (`dataSource.transaction`) | `OrderCheckoutService.checkout`, `OrderStatusService.cancelLocked` |
 | Hiệu ứng phụ dùng chung nhiều luồng | Hàm thuần có tên, một chỗ duy nhất | `applyOrderPaid` |
 | Dữ liệu test | **Test Data Builder** | `test/support/builders.ts` |
 

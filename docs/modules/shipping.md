@@ -108,7 +108,7 @@ Không có bảng riêng. Cấu hình nằm ở `site_configs` (key `SHIPPING_CO
 
 ### 4.8 Lưu ý hiện trạng
 
-- Giá và ngưỡng ship chỉ còn một nguồn (`SHIPPING_CONFIG`); không còn hằng số trùng trong `order.service.ts`. Danh sách phương thức hợp lệ khi checkout dùng chung `SHIPPING_METHOD_IDS` với config (`CreateOrderDto` import từ `shipping-config.ts`), nên admin chỉnh nội dung/phí chứ không thêm/bớt được phương thức.
+- Giá và ngưỡng ship chỉ còn một nguồn (`SHIPPING_CONFIG`); không còn hằng số trùng trong `order-checkout.service.ts`. Danh sách phương thức hợp lệ khi checkout dùng chung `SHIPPING_METHOD_IDS` với config (`CreateOrderDto` import từ `shipping-config.ts`), nên admin chỉnh nội dung/phí chứ không thêm/bớt được phương thức.
 - Ngưỡng miễn phí áp cho mọi phương thức khi checkout; response chỉ có `freeShippingThresholdVnd/Usd`. Response không còn `notes` (các câu ghi chú cố định về gói quà và giao quốc tế trước đây không phải tính năng có thật).
 - Báo giá phí ship cho một giỏ cụ thể lấy từ `POST /api/orders/quote` của module [order](order.md), không phải từ API này.
 - `priceVnd`/`freeShippingThresholdVnd` là VND nguyên; `...Usd` chỉ để hiển thị ([currency](currency.md)). API này không trả ký hiệu tiền tệ; tổng tiền của một giỏ cụ thể nằm ở `POST /api/orders/quote` ([order](order.md)).

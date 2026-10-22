@@ -24,7 +24,7 @@ Luật bắt buộc: `.claude/rules/engineering-principles.md`. Skill này là *
 | Module A có với tay vào bảng của module B? | Đổi cột của B làm vỡ A (coupling qua dữ liệu) | Lệch: `Order` được import ở payment, return, review và các module đó tự `forFeature([Order])` — ghi ở `common.md` 4.13 |
 | Có vòng phụ thuộc giữa module? | Vòng buộc hai module sống chết cùng nhau, khó test | Tốt: không có `forwardRef` |
 | `common/` có import `modules/`? | Hạ tầng phụ thuộc nghiệp vụ làm đảo chiều phụ thuộc | Gần sạch: chỉ `permissions.guard.ts` import `User` |
-| Service > ~300 dòng hoặc > ~5 dependency? | Dấu hiệu nhiều lý do để đổi (SRP) | `OrderService` 407 dòng / 6 dependency; `ReviewService` 557 |
+| Service > ~300 dòng hoặc > ~5 dependency? | Dấu hiệu nhiều lý do để đổi (SRP) | `ReviewService` 559 dòng; `PaymentService` 6 dependency (`OrderService` 391 dòng / 6 dependency đã được tách thành 3 service, spec `order/0002`) |
 | Logic thuần có tách khỏi I/O? | Hàm thuần test nhanh, không mock | Tốt: `sepay-*.util`, `payment-paid.util`, `*-eligibility.util`, `money.util` |
 | Ranh giới transaction ở đâu? | Ghi tiền/trạng thái rải nhiều transaction thì có trạng thái nửa vời | Tốt: `cancelLocked` gom huỷ đơn + hoàn tiền + huỷ QR trong một transaction |
 
@@ -102,11 +102,11 @@ Singleton tự viết (DI đã quản lý vòng đời), Abstract Factory/Factor
 
 | | Câu hỏi | Tốt trong repo | Cần cải thiện |
 |---|---|---|---|
-| **S** | "Class này có mấy lý do để đổi?" | Presenter, scheduler, config, `sepay-*.util` mỗi cái một việc | `OrderService`: checkout + báo giá + huỷ + state machine + lọc admin |
+| **S** | "Class này có mấy lý do để đổi?" | Presenter, scheduler, config, `sepay-*.util` mỗi cái một việc | `ReviewService` / `PaymentService` còn gộp nhiều use case; `OrderService` cũ (checkout + báo giá + huỷ + trạng thái + lọc admin) đã tách thành Query / Checkout / Status |
 | **O** | "Thêm giá trị mới có phải sửa logic cũ?" | `@SortField([...])`, `ORDER_STATUSES`, `sortValues` | Thêm phương thức giao/cổng thanh toán phải sửa service |
 | **L** | "Lớp con thay lớp cha có vỡ không?" | `BaseEntity`; `PaginationQueryDto` (có test ép) | — |
 | **I** | "Có bị ép nhận thứ không dùng?" | `presentOrder` nhận `OrderLike` (4 field), không nhận cả `Order` | Hàm nhận entity đầy đủ chỉ để đọc 1–2 field |
-| **D** | "Logic nghiệp vụ biết tên chi tiết cụ thể nào?" | Nest DI tiêm service | `PaymentService`/`SepayWebhookService` biết thẳng SePay; `OrderService` gọi trực tiếp `PaymentService` + `RefundService` (có chủ đích vì cần cùng transaction) |
+| **D** | "Logic nghiệp vụ biết tên chi tiết cụ thể nào?" | Nest DI tiêm service | `PaymentService`/`SepayWebhookService` biết thẳng SePay; `OrderStatusService` / `OrderQueryService` gọi trực tiếp `PaymentService` + `RefundService` (có chủ đích vì cần cùng transaction) |
 
 Cách đếm nhanh SRP: **số dependency của constructor** và **số mock cần cho một unit test**.
 

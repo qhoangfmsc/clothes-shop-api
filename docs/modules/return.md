@@ -177,7 +177,7 @@ Sau đó admin chuyển khoản và ghi khoản hoàn ở `/api/admin/refunds` (
 - `return-eligibility.util.spec.ts` — điều kiện trả hàng (đã giao/đã trả, biên hạn, trừ số lượng đang trả, không âm).
 - `return.service.spec.ts` — tra cứu điều kiện (hạn theo chính sách, đơn người khác), tạo yêu cầu (snapshot sản phẩm, khoá đơn, từng lý do bị từ chối, vượt số lượng, trùng dòng, số lượng được trả lại khi `REJECTED`/`CANCELLED`), khách xem/list/huỷ, admin duyệt/từ chối/list, nhận hàng (số tiền theo tỷ lệ, số lượng chấp nhận từng dòng, phí ship một lần mỗi đơn, trần theo phần còn lại, dữ liệu sai, sai trạng thái, đơn không còn `paid`, khoản hoàn đang chờ, thiếu phiên `PAID`) và các DTO.
 - Nhiều lần trả hàng của một đơn cộng lại đúng số đã nhận (ba lần trả một món chia không tròn) nằm trong `return.service.spec.ts`.
-- Khoản hoàn từ yêu cầu trả hàng (hoàn xong → `REFUNDED`, từ chối → về `APPROVED`, `prorateRefundAmount`) nằm trong `payment/refund.service.spec.ts`; `delivered_at` khi admin chuyển `delivered` nằm trong `order/order.service.spec.ts`.
+- Khoản hoàn từ yêu cầu trả hàng (hoàn xong → `REFUNDED`, từ chối → về `APPROVED`, `prorateRefundAmount`) nằm trong `payment/refund.service.spec.ts`; `delivered_at` khi admin chuyển `delivered` nằm trong `order/order-status.service.spec.ts`.
 - Các test dùng manager giả; hành vi với Postgres thật (migration, CHECK/UNIQUE, khoá dòng, các thao tác đồng thời) không có test tự động trong repo.
 
 ### 4.8 Lưu ý hiện trạng
