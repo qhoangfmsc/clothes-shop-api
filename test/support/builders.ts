@@ -75,7 +75,7 @@ export function createBuilders(dataSource: DataSource) {
   }
 
   async function cart(owner: User, lines: { product: Product; quantity?: number; size?: string; color?: string }[]) {
-    const saved = await carts.save(carts.create({ userId: owner.id }));
+    const saved = (await carts.findOneBy({ userId: owner.id })) ?? (await carts.save(carts.create({ userId: owner.id })));
     const items: CartItem[] = [];
     for (const line of lines) {
       items.push(

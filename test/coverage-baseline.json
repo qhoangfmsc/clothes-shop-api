@@ -43,21 +43,15 @@
       "error"
     ],
     "GET /api/orders": [
-      "success",
       "error"
-    ],
-    "GET /api/orders/:orderId": [
-      "success"
     ],
     "POST /api/orders/quote": [
       "error"
     ],
     "GET /api/admin/orders": [
-      "success",
       "error"
     ],
     "GET /api/admin/orders/:orderId": [
-      "success",
       "error"
     ],
     "GET /api/returns": [
@@ -355,7 +349,6 @@
       "success"
     ],
     "GET /api/admin/pending-counts": [
-      "success",
       "error"
     ],
     "GET /": [
