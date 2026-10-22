@@ -8,46 +8,6 @@
     }
   },
   "missing": {
-    "GET /api/returns": [
-      "success",
-      "error"
-    ],
-    "POST /api/returns": [
-      "success",
-      "error"
-    ],
-    "GET /api/returns/:returnId": [
-      "success",
-      "error"
-    ],
-    "PATCH /api/returns/:returnId/cancel": [
-      "success",
-      "error"
-    ],
-    "GET /api/returns/eligibility/:orderId": [
-      "success",
-      "error"
-    ],
-    "GET /api/admin/returns": [
-      "success",
-      "error"
-    ],
-    "GET /api/admin/returns/:returnId": [
-      "success",
-      "error"
-    ],
-    "POST /api/admin/returns/:returnId/approve": [
-      "success",
-      "error"
-    ],
-    "POST /api/admin/returns/:returnId/receive": [
-      "success",
-      "error"
-    ],
-    "POST /api/admin/returns/:returnId/reject": [
-      "success",
-      "error"
-    ],
     "GET /api/cart": [
       "success",
       "error"
