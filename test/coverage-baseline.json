@@ -8,27 +8,7 @@
     }
   },
   "missing": {
-    "POST /api/admin/payments/orders/:orderId/confirm": [
-      "success",
-      "error"
-    ],
-    "POST /api/admin/payments/orders/:orderId/qr": [
-      "success",
-      "error"
-    ],
-    "GET /api/admin/payments/transactions": [
-      "success",
-      "error"
-    ],
-    "GET /api/admin/refunds": [
-      "error"
-    ],
-    "POST /api/admin/refunds": [
-      "success",
-      "error"
-    ],
     "POST /api/admin/refunds/:refundId/reject": [
-      "success",
       "error"
     ],
     "GET /api/orders": [
