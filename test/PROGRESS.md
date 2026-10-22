@@ -97,7 +97,7 @@ Trạng thái: **Xong** · Ghi chú: 2026-10-22; 12 flow mới (`flows/order/ord
 | 4 | PATCH | `/api/returns/:returnId/cancel` | JWT | 15000 |
 | 5 | GET | `/api/returns/eligibility/:orderId` | JWT | 15001 |
 
-Trạng thái: **Chưa làm** · Ghi chú: —
+Trạng thái: **Xong** · Ghi chú: 2026-10-22; 24 flow mới (`flows/return/return-customer.flow.ts`)
 
 
 ### Batch 07 — return (5 route)
@@ -110,7 +110,7 @@ Trạng thái: **Chưa làm** · Ghi chú: —
 | 4 | POST | `/api/admin/returns/:returnId/receive` | JWT | 16001 |
 | 5 | POST | `/api/admin/returns/:returnId/reject` | JWT | 16001 |
 
-Trạng thái: **Chưa làm** · Ghi chú: —
+Trạng thái: **Xong** · Ghi chú: 2026-10-22; 43 flow mới (`flows/return/return-admin.flow.ts`). Module return hoàn tất (10/10 route)
 
 
 ### Batch 08 — cart (5 route)
@@ -343,6 +343,7 @@ Trạng thái: **Chưa làm** · Ghi chú: —
 | Batch 03 | 2026-10-22 | payment: refund complete, refund reject | +19 flow (125 → 144) | 21/98 (không đổi: cả hai route đã có ca thành công) | 21 → 22/96 | Baseline 83 → 82. Phá thử 6 điểm đều bị bắt (bỏ kiểm trạng thái, không đánh dấu `refunded`, bỏ trần số đã trả, bỏ ánh xạ UNIQUE → 1714, reject bỏ kiểm trạng thái, bỏ trim). Có test song song: hai admin cùng bấm, hai khoản cùng mã tham chiếu. Module payment xong |
 | Batch 04 | 2026-10-22 | order: danh sách, báo giá, đặt hàng, chi tiết, huỷ | +24 flow (144 → 168) | 21/98 | 22 → 25/96 | Phá thử 5 điểm tiền/snapshot đều bị bắt (ngưỡng miễn ship `>=`, giá không chốt, tỷ giá không chốt, dọn cả giỏ, snapshot pickup). Thêm ca biên đúng ngưỡng và thiếu 1 đồng |
 | Batch 05 | 2026-10-22 | order (admin): danh sách, chi tiết, đổi trạng thái | +12 flow (168 → 180) | 21/98 | 25 → 26/96 | Baseline 82 → 78 sau hai batch. Phá thử sắp xếp và tìm kiếm đều bị bắt. Module order xong (8/8 route) |
+| Batch 06–07 | 2026-10-22 | return: khách (điều kiện, tạo, danh sách, chi tiết, huỷ) và admin (danh sách, chi tiết, duyệt, từ chối, nhận hàng) | +67 flow (180 → 247) | 21 → 31/98 | 26 → 36/96 | Baseline 78 → 68. Phá thử 7 điểm (trần số lượng, sở hữu khi huỷ/xem, trạng thái nhận hàng, khoá đơn, hoàn lại khi từ chối khoản hoàn, hoàn xong → REFUNDED, số lượng chấp nhận mặc định) đều bị bắt; 2 điểm sống sót lúc đầu rồi đã bịt: cộng dồn `previousValueVnd` chỉ khác khi làm tròn (thêm ca số tiền nhận 300.000đ → 143.836 + 143.835) và kiểm phí ship một lần (thêm assert message vì nhánh 'vượt tổng đơn' cũng ra 1805). Module return xong (10/10) |
 
 ## Phát hiện cần người dùng quyết định
 

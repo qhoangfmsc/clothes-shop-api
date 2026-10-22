@@ -1,6 +1,6 @@
 # return (`src/modules/return`)
 
-> Cập nhật lần cuối: 2026-10-16
+> Cập nhật lần cuối: 2026-10-22
 
 ## 1. Tổng quan
 
@@ -178,7 +178,9 @@ Sau đó admin chuyển khoản và ghi khoản hoàn ở `/api/admin/refunds` (
 - `return.service.spec.ts` — tra cứu điều kiện (hạn theo chính sách, đơn người khác), tạo yêu cầu (snapshot sản phẩm, khoá đơn, từng lý do bị từ chối, vượt số lượng, trùng dòng, số lượng được trả lại khi `REJECTED`/`CANCELLED`), khách xem/list/huỷ, admin duyệt/từ chối/list, nhận hàng (số tiền theo tỷ lệ, số lượng chấp nhận từng dòng, phí ship một lần mỗi đơn, trần theo phần còn lại, dữ liệu sai, sai trạng thái, đơn không còn `paid`, khoản hoàn đang chờ, thiếu phiên `PAID`) và các DTO.
 - Nhiều lần trả hàng của một đơn cộng lại đúng số đã nhận (ba lần trả một món chia không tròn) nằm trong `return.service.spec.ts`.
 - Khoản hoàn từ yêu cầu trả hàng (hoàn xong → `REFUNDED`, từ chối → về `APPROVED`, `prorateRefundAmount`) nằm trong `payment/refund.service.spec.ts`; `delivered_at` khi admin chuyển `delivered` nằm trong `order/order-status.service.spec.ts`.
-- Các test dùng manager giả; hành vi với Postgres thật (migration, CHECK/UNIQUE, khoá dòng, các thao tác đồng thời) không có test tự động trong repo.
+- Flow test trên Postgres thật (`test/flows/return/`, dùng `steps.ts`: đơn đã trả và đã giao):
+  - `return-customer.flow.ts` — điều kiện trả hàng (`ORDER_NOT_PAID`, `ORDER_NOT_DELIVERED`, `RETURN_WINDOW_EXPIRED`, `NOTHING_TO_RETURN`, hạn 30 ngày), tạo yêu cầu (snapshot sản phẩm, trả phần còn lại bằng yêu cầu thứ hai, 1802/1803, đơn của người khác → 1301, validation từng field), danh sách (chỉ yêu cầu của mình, lọc `status`/`orderId`, `sort`, phân trang, tham số sai), chi tiết (1801), huỷ ở `REQUESTED`/`APPROVED` và từ chối ở các trạng thái còn lại (1804).
+  - `return-admin.flow.ts` — danh sách admin (shape có `order`/`requestedBy`, lọc, tìm theo mã yêu cầu, mã đơn, SĐT, tên; `sort`; tham số sai), chi tiết, duyệt/từ chối (ghi chú khách thấy, 1804, 1801, validation), nhận hàng (mặc định nhận đủ, nhận một phần, hoàn phí ship, cộng dồn nhiều lần trả, làm tròn luỹ kế khi tiền nhận khác tổng đơn, phí ship chỉ một lần mỗi đơn, khoản hoàn đang chờ → 1712 và rollback, 1805 từng dạng), hợp đồng khoá đơn (chờ khoá rồi quyết định trên dữ liệu mới), hai thao tác cùng lúc, khoản hoàn xong → `REFUNDED` và bị từ chối → quay về `APPROVED` rồi nhận lại.
 
 ### 4.8 Lưu ý hiện trạng
 
