@@ -5,26 +5,15 @@
     },
     "GET /health": {
       "error": "Không có input nên không có ca lỗi nghiệp vụ"
+    },
+    "GET /api/cart": {
+      "error": "Không có input; chưa có giỏ thì trả giỏ rỗng nên không có ca lỗi nghiệp vụ"
+    },
+    "DELETE /api/cart/clear": {
+      "error": "Không có input; xoá sạch idempotent (giỏ rỗng hoặc chưa có vẫn trả giỏ rỗng) nên không có ca lỗi nghiệp vụ"
     }
   },
   "missing": {
-    "GET /api/cart": [
-      "success",
-      "error"
-    ],
-    "DELETE /api/cart/clear": [
-      "success",
-      "error"
-    ],
-    "POST /api/cart/items": [
-      "success"
-    ],
-    "DELETE /api/cart/items/:itemId": [
-      "success"
-    ],
-    "PATCH /api/cart/items/:itemId": [
-      "success"
-    ],
     "POST /api/reviews": [
       "success",
       "error"
