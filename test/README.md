@@ -84,6 +84,8 @@ Trạng thái: **Có** = đã có test cover luồng · **Unit** = chỉ có uni
 | payment (webhook) | Webhook trùng idempotent; sai chữ ký (1704); sai số tiền (`AMOUNT_MISMATCH`); tiền đến lần 2 (`DUPLICATE_PAYMENT`) | Flow | `flows/order-payment/checkout-and-pay.flow.ts` | Có |
 | order | Khách huỷ đơn chưa trả (huỷ QR); khách không huỷ được đơn đã trả (1307) | Flow | `flows/order-payment/cancel-and-refund.flow.ts` | Có |
 | order + payment (refund) | Admin huỷ đơn đã trả → tự sinh hoàn tiền đủ → hoàn xong → `refunded`; hoàn lần hai (1713); trùng mã tham chiếu (1714) | Flow | `flows/order-payment/cancel-and-refund.flow.ts` | Có |
+| order + payment (song song) | 6 QR cùng lúc → 1 phiên PENDING; webhook trùng id song song; hai chuyển khoản khác id; huỷ vs thanh toán đua nhau | Flow | `flows/order-payment/concurrency.flow.ts` | Có |
+| order + payment (khoá dòng) | Hợp đồng khoá `orders`: huỷ, đổi trạng thái, tạo QR, webhook đều chờ khoá rồi quyết định trên dữ liệu mới | Flow | `flows/order-payment/lock-contract.flow.ts` | Có |
 | payment | Admin xác nhận thanh toán thủ công; mã QR admin; QR hết hạn | Flow | — | Unit |
 | return | Yêu cầu trả hàng → duyệt → nhận hàng → hoàn tiền | Flow | — | Unit |
 | review | Viết đánh giá sau khi nhận hàng, cập nhật điểm sản phẩm | Flow | — | Unit |
@@ -101,7 +103,7 @@ Trạng thái: **Có** = đã có test cover luồng · **Unit** = chỉ có uni
 
 | Module | File spec |
 |---|---|
-| common | `common/dto/list-query.dto.spec.ts` (ép chuẩn list cho mọi `*-query.dto.ts`), `common/utils/money.util.spec.ts`, `common/architecture/architecture.spec.ts` (luật kiến trúc: hướng phụ thuộc, vòng module, export thừa, exception thô, kích thước service) |
+| common | `common/dto/list-query.dto.spec.ts` (ép chuẩn list cho mọi `*-query.dto.ts`), `common/utils/money.util.spec.ts`, `common/base/lock.util.spec.ts`, `common/architecture/architecture.spec.ts` (luật kiến trúc: hướng phụ thuộc, vòng module, export thừa, exception thô, kích thước service) |
 | auth | `modules/auth/auth.service.spec.ts`, `modules/auth/google-auth.service.spec.ts` |
 | cart | `modules/cart/cart.service.spec.ts` |
 | collection | `modules/collection/collection.service.spec.ts` |

@@ -336,6 +336,7 @@ Trạng thái: **Chưa làm** · Ghi chú: —
 | P0-3/4 | 2026-10-21 | Đo độ phủ endpoint + ratchet; đóng spec 0002 | 0 (hạ tầng) | 9/98 | 4/96 (miễn 2) | Ratchet thử 6 tình huống đều đúng. Baseline: 95 route thiếu ca (181 mục). Batch 01 (payment) là việc kế tiếp |
 | Phần 7 | 2026-10-22 | Chuẩn hoá lỗi (spec common/0003): flow ca lỗi cho order, cart, address | +11 (flow 28 → 39) | 9/98 | 11/96 (miễn 2) | Baseline 95 → 94 route (7 route có thêm ca lỗi). Log 503 kỳ vọng được tắt thật; bật lại bằng `FLOW_TEST_LOGS=1` |
 | Phần 8 | 2026-10-22 | Chuỗi trạng thái đơn của admin (spec order/0001) | +5 flow (39 → 44), +5 unit (`order.constant.spec.ts`) | 9/98 | 12/96 (miễn 2) | Baseline 94 → 93 route: `PATCH /api/admin/orders/:orderId/status` đã có ca thành công từ trước, nay thêm ca lỗi nên ra khỏi baseline |
+| Phần 9 | 2026-10-22 | Gom khoá dòng (spec common/0004): flow song song + hợp đồng khoá | +8 flow (44 → 52), +2 unit (`lock.util.spec.ts`), +1 luật kiến trúc | 9/98 | 13/96 (miễn 2) | Baseline 93 → 92 (`POST /api/payments/qr` có ca lỗi). Test đua ngẫu nhiên bỏ sót việc thiếu khoá ở huỷ đơn; test giữ khoá từ ngoài bắt được cả 4 điểm |
 
 ## Phát hiện cần người dùng quyết định
 

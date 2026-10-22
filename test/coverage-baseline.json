@@ -11,9 +11,6 @@
     "GET /api/payments/:orderId/status": [
       "error"
     ],
-    "POST /api/payments/qr": [
-      "error"
-    ],
     "GET /api/admin/payments/attempts": [
       "success",
       "error"
