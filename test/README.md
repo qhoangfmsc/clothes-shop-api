@@ -94,6 +94,8 @@ Trạng thái: **Có** = đã có test cover luồng · **Unit** = chỉ có uni
 | return | Yêu cầu trả hàng → duyệt → nhận hàng → hoàn tiền | Flow | — | Unit |
 | review | Viết đánh giá sau khi nhận hàng, cập nhật điểm sản phẩm | Flow | — | Unit |
 | order (đọc) | Danh sách khách (chỉ đơn của mình, lọc, sắp xếp, phân trang), chi tiết kèm phiên thanh toán, danh sách admin (lọc, tìm theo SĐT và mã chuyển khoản, needsAction), chi tiết admin, số đơn cần thao tác | Flow | `flows/order-payment/order-queries.flow.ts` | Có |
+| order (báo giá, đặt hàng) | Báo giá (phí, ngưỡng miễn ship, tỷ giá, không tác dụng phụ), checkout (express, một phần giỏ, store-pickup, chốt giá/tên/tỷ giá, tổ hợp địa chỉ 1304-1306, 1303), validation | Flow | `flows/order/order-checkout.flow.ts` | Có (batch 04) |
+| order (admin) | Danh sách (sắp xếp, tìm, trang vượt cuối, validation), chi tiết, status body sai | Flow | `flows/order/order-admin.flow.ts` | Có (batch 05) |
 | order (admin) | Đổi trạng thái đơn theo bảng chuyển (pending → … → completed), chuyển sai → 1302, trạng thái cuối, trạng thái không tồn tại | Flow | `flows/order-payment/order-status.flow.ts` | Có |
 | auth | Đăng nhập Google, refresh token, `GET /auth/me` | Flow | — | Unit |
 | cart | Thêm / sửa / xoá dòng giỏ (ca thành công) | Flow | — | Unit |

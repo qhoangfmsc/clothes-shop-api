@@ -73,7 +73,7 @@ Trạng thái: **Xong** · Ghi chú: 2026-10-22; 19 flow mới (`flows/payment/p
 | 4 | PATCH | `/api/orders/:orderId/cancel` | JWT | 3003 |
 | 5 | POST | `/api/orders/quote` | JWT | 3002 |
 
-Trạng thái: **Chưa làm** · Ghi chú: —
+Trạng thái: **Xong** · Ghi chú: 2026-10-22; 24 flow mới (`flows/order/order-checkout.flow.ts`)
 
 
 ### Batch 05 — order (3 route)
@@ -84,7 +84,7 @@ Trạng thái: **Chưa làm** · Ghi chú: —
 | 2 | GET | `/api/admin/orders/:orderId` | JWT | 9000 |
 | 3 | PATCH | `/api/admin/orders/:orderId/status` | JWT | 9001 |
 
-Trạng thái: **Chưa làm** · Ghi chú: —
+Trạng thái: **Xong** · Ghi chú: 2026-10-22; 12 flow mới (`flows/order/order-admin.flow.ts`)
 
 
 ### Batch 06 — return (5 route)
@@ -341,6 +341,8 @@ Trạng thái: **Chưa làm** · Ghi chú: —
 | Batch 01 | 2026-10-22 | payment: status, qr, webhook, admin attempts, admin orders/:orderId | +32 flow (56 → 88) | 14 → 16/98 | 13 → 16/96 (miễn 2) | Baseline 91 → 88 route. Phá thử 5 điểm: 3 bị bắt ngay; 2 không: (a) SQL `CASE` trạng thái hiệu lực ở danh sách admin là đột biến tương đương (DB đã được đánh dấu `EXPIRED` trước khi liệt kê), (b) kiểm tài khoản nhận của webhook có hai lớp → thêm ca "phiên cấp cho tài khoản không còn là tài khoản cấu hình", phá thử lại thì bị bắt |
 | Batch 02 | 2026-10-22 | payment: admin confirm, admin QR, transactions, refunds list, refund create | +37 flow (88 → 125) | 16 → 21/98 | 16 → 21/96 (miễn 2) | Baseline 88 → 83. Phá thử 5 điểm đều bị bắt (mark paid, chấp nhận sai tiền, đơn đã huỷ, tạo hoàn cho đơn bất kỳ, needsReview). Sửa mong đợi của chính tôi: webhook kiểm số tiền trước hạn nên thiếu tiền + mã hết hạn = AMOUNT_MISMATCH. 1 phát hiện (rawPayload) |
 | Batch 03 | 2026-10-22 | payment: refund complete, refund reject | +19 flow (125 → 144) | 21/98 (không đổi: cả hai route đã có ca thành công) | 21 → 22/96 | Baseline 83 → 82. Phá thử 6 điểm đều bị bắt (bỏ kiểm trạng thái, không đánh dấu `refunded`, bỏ trần số đã trả, bỏ ánh xạ UNIQUE → 1714, reject bỏ kiểm trạng thái, bỏ trim). Có test song song: hai admin cùng bấm, hai khoản cùng mã tham chiếu. Module payment xong |
+| Batch 04 | 2026-10-22 | order: danh sách, báo giá, đặt hàng, chi tiết, huỷ | +24 flow (144 → 168) | 21/98 | 22 → 25/96 | Phá thử 5 điểm tiền/snapshot đều bị bắt (ngưỡng miễn ship `>=`, giá không chốt, tỷ giá không chốt, dọn cả giỏ, snapshot pickup). Thêm ca biên đúng ngưỡng và thiếu 1 đồng |
+| Batch 05 | 2026-10-22 | order (admin): danh sách, chi tiết, đổi trạng thái | +12 flow (168 → 180) | 21/98 | 25 → 26/96 | Baseline 82 → 78 sau hai batch. Phá thử sắp xếp và tìm kiếm đều bị bắt. Module order xong (8/8 route) |
 
 ## Phát hiện cần người dùng quyết định
 
