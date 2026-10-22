@@ -1,5 +1,5 @@
 import { configureApp } from '@core/app.setup';
-import { type INestApplication, Logger } from '@nestjs/common';
+import type { INestApplication } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
 import type { NextFunction, Request, Response } from 'express';
@@ -20,11 +20,10 @@ export interface TestApp {
 
 /** Boot `MainModule` thật với cấu hình như production. */
 export async function createTestApp(): Promise<TestApp> {
-  // 5xx kỳ vọng (vd storage chưa cấu hình) sẽ lặp lại hàng chục lần ở ma trận, nên chỉ in cảnh báo
-  Logger.overrideLogger(['warn']);
-
   const moduleRef = await Test.createTestingModule({ imports: [MainModule] }).compile();
   const app = moduleRef.createNestApplication();
+  // 5xx kỳ vọng (vd storage chưa cấu hình) lặp lại hàng chục lần ở ma trận; đặt FLOW_TEST_LOGS=1 để xem log khi debug
+  if (!process.env.FLOW_TEST_LOGS) app.useLogger(false);
   configureApp(app);
   // ghi lại request thật (bỏ qua request thăm dò của ma trận) để đo độ phủ endpoint
   app.use((req: Request, res: Response, next: NextFunction) => {
