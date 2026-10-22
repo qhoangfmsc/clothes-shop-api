@@ -8,9 +8,6 @@
     }
   },
   "missing": {
-    "POST /api/admin/refunds/:refundId/reject": [
-      "error"
-    ],
     "GET /api/orders": [
       "error"
     ],
