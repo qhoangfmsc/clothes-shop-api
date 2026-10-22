@@ -50,7 +50,7 @@ Trạng thái: **Xong** · Ghi chú: 2026-10-22; 31 flow mới (`flows/payment/p
 | 4 | GET | `/api/admin/refunds` | JWT | 14000 |
 | 5 | POST | `/api/admin/refunds` | JWT | 14002 |
 
-Trạng thái: **Chưa làm** · Ghi chú: —
+Trạng thái: **Xong** · Ghi chú: 2026-10-22; 37 flow mới (`flows/payment/payment-admin-actions.flow.ts`, `payment-transactions-refunds.flow.ts`); 5/5 route đủ ca. Có 1 phát hiện chờ quyết định (xem bảng cuối)
 
 
 ### Batch 03 — payment (2 route)
@@ -339,6 +339,7 @@ Trạng thái: **Chưa làm** · Ghi chú: —
 | Phần 9 | 2026-10-22 | Gom khoá dòng (spec common/0004): flow song song + hợp đồng khoá | +8 flow (44 → 52), +2 unit (`lock.util.spec.ts`), +1 luật kiến trúc | 9/98 | 13/96 (miễn 2) | Baseline 93 → 92 (`POST /api/payments/qr` có ca lỗi). Test đua ngẫu nhiên bỏ sót việc thiếu khoá ở huỷ đơn; test giữ khoá từ ngoài bắt được cả 4 điểm |
 | Phần 10 | 2026-10-22 | Tách OrderService (spec order/0002): flow đặc tả truy vấn đơn | +4 flow (52 → 56); unit giữ 755 (spec được chia) | 14/98 | 13/96 (miễn 2) | Baseline 92 → 91 route: `GET /api/orders`, `GET /api/orders/:orderId`, `GET /api/admin/orders`, `GET /api/admin/orders/:orderId`, `GET /api/admin/pending-counts` có ca thành công |
 | Batch 01 | 2026-10-22 | payment: status, qr, webhook, admin attempts, admin orders/:orderId | +32 flow (56 → 88) | 14 → 16/98 | 13 → 16/96 (miễn 2) | Baseline 91 → 88 route. Phá thử 5 điểm: 3 bị bắt ngay; 2 không: (a) SQL `CASE` trạng thái hiệu lực ở danh sách admin là đột biến tương đương (DB đã được đánh dấu `EXPIRED` trước khi liệt kê), (b) kiểm tài khoản nhận của webhook có hai lớp → thêm ca "phiên cấp cho tài khoản không còn là tài khoản cấu hình", phá thử lại thì bị bắt |
+| Batch 02 | 2026-10-22 | payment: admin confirm, admin QR, transactions, refunds list, refund create | +37 flow (88 → 125) | 16 → 21/98 | 16 → 21/96 (miễn 2) | Baseline 88 → 83. Phá thử 5 điểm đều bị bắt (mark paid, chấp nhận sai tiền, đơn đã huỷ, tạo hoàn cho đơn bất kỳ, needsReview). Sửa mong đợi của chính tôi: webhook kiểm số tiền trước hạn nên thiếu tiền + mã hết hạn = AMOUNT_MISMATCH. 1 phát hiện (rawPayload) |
 
 ## Phát hiện cần người dùng quyết định
 
@@ -346,4 +347,4 @@ Test lộ ra hành vi nghi là lỗi trong code thì ghi ở đây (route, hành
 
 | Batch | Route | Quan sát | Mong đợi (nguồn) | Trạng thái |
 |---|---|---|---|---|
-| — | — | — | — | — |
+| 02 | `GET /api/admin/payments/transactions` | Response chứa `rawPayload` (body SePay nguyên văn, có `accountNumber` tài khoản nhận) và `paymentAttempt.bankAccount` | `GET /api/admin/payments/attempts` được docs ghi là "không trả raw_payload, số tài khoản nhận"; docs của endpoint giao dịch không nói gì. Không rõ chủ đích (đối soát) hay sót | Chờ người dùng quyết định (test không khẳng định theo hướng nào) |
