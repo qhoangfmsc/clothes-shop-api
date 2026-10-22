@@ -1,3 +1,4 @@
+import type { ActiveStatus } from '@common/constants/enum-values.constant';
 import { EPermissionErrorCode } from '@common/exceptions/error-codes';
 import { DEFAULT_USER_PERMISSIONS, Permission } from '@common/permissions/permissions.constant';
 import { type Builders, bearer, createBuilders, createTestApp, type TestApp } from '../../support';
@@ -30,7 +31,7 @@ describe('Access matrix: authentication and permissions on every route', () => {
   let routes: RouteInfo[];
   const users = new Map<string, Awaited<ReturnType<Builders['user']>>>();
 
-  const userWith = async (permissions: number[], status = 'active') => {
+  const userWith = async (permissions: number[], status: ActiveStatus = 'active') => {
     const key = `${status}:${[...permissions].sort((x, y) => x - y).join(',')}`;
     if (!users.has(key)) users.set(key, await b.user({ permissions, status }));
     return users.get(key)!;
