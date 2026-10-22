@@ -123,7 +123,7 @@ Trạng thái: **Xong** · Ghi chú: 2026-10-22; 43 flow mới (`flows/return/re
 | 4 | DELETE | `/api/cart/items/:itemId` | JWT | 2003 |
 | 5 | PATCH | `/api/cart/items/:itemId` | JWT | 2002 |
 
-Trạng thái: **Chưa làm** · Ghi chú: —
+Trạng thái: **Xong** · Ghi chú: 2026-10-22; 32 flow mới (`flows/cart/cart.flow.ts`). `GET /api/cart` và `DELETE /api/cart/clear` không có ca lỗi nghiệp vụ → `exempt` trong baseline. 2 phát hiện (500 khi cộng dồn > 99; 500 khi thêm đồng thời). Module cart xong
 
 
 ### Batch 09 — review (5 route)
@@ -344,6 +344,7 @@ Trạng thái: **Chưa làm** · Ghi chú: —
 | Batch 04 | 2026-10-22 | order: danh sách, báo giá, đặt hàng, chi tiết, huỷ | +24 flow (144 → 168) | 21/98 | 22 → 25/96 | Phá thử 5 điểm tiền/snapshot đều bị bắt (ngưỡng miễn ship `>=`, giá không chốt, tỷ giá không chốt, dọn cả giỏ, snapshot pickup). Thêm ca biên đúng ngưỡng và thiếu 1 đồng |
 | Batch 05 | 2026-10-22 | order (admin): danh sách, chi tiết, đổi trạng thái | +12 flow (168 → 180) | 21/98 | 25 → 26/96 | Baseline 82 → 78 sau hai batch. Phá thử sắp xếp và tìm kiếm đều bị bắt. Module order xong (8/8 route) |
 | Batch 06–07 | 2026-10-22 | return: khách (điều kiện, tạo, danh sách, chi tiết, huỷ) và admin (danh sách, chi tiết, duyệt, từ chối, nhận hàng) | +67 flow (180 → 247) | 21 → 31/98 | 26 → 36/96 | Baseline 78 → 68. Phá thử 7 điểm (trần số lượng, sở hữu khi huỷ/xem, trạng thái nhận hàng, khoá đơn, hoàn lại khi từ chối khoản hoàn, hoàn xong → REFUNDED, số lượng chấp nhận mặc định) đều bị bắt; 2 điểm sống sót lúc đầu rồi đã bịt: cộng dồn `previousValueVnd` chỉ khác khi làm tròn (thêm ca số tiền nhận 300.000đ → 143.836 + 143.835) và kiểm phí ship một lần (thêm assert message vì nhánh 'vượt tổng đơn' cũng ra 1805). Module return xong (10/10) |
+| Batch 08 | 2026-10-22 | cart: xem, thêm, đổi số lượng, xoá dòng, xoá sạch | +32 flow (247 → 279) | 31 → 36/98 | 36/94 (miễn thêm 2: `GET /api/cart`, `DELETE /api/cart/clear`) | Baseline 68 → 63. Phá thử 6 điểm (cộng dồn, khớp theo size, sở hữu dòng khi sửa, xoá sạch theo giỏ, USD tính từ tổng VND, kiểm badge) đều bị bắt. 2 phát hiện 500 (xem bảng bên dưới). Lưu ý: chạy hai lần `test:flows` chồng nhau trên một DB làm test đỏ ngẫu nhiên và chậm hàng chục phút — chỉ chạy một tiến trình tại một thời điểm |
 
 ## Phát hiện cần người dùng quyết định
 
@@ -352,3 +353,5 @@ Test lộ ra hành vi nghi là lỗi trong code thì ghi ở đây (route, hành
 | Batch | Route | Quan sát | Mong đợi (nguồn) | Trạng thái |
 |---|---|---|---|---|
 | 02 | `GET /api/admin/payments/transactions` | Response chứa `rawPayload` (body SePay nguyên văn, có `accountNumber` tài khoản nhận) và `paymentAttempt.bankAccount` | `GET /api/admin/payments/attempts` được docs ghi là "không trả raw_payload, số tài khoản nhận"; docs của endpoint giao dịch không nói gì. Không rõ chủ đích (đối soát) hay sót | Chờ người dùng quyết định (test không khẳng định theo hướng nào) |
+| 08 | `POST /api/cart/items` | Thêm cùng sản phẩm/size/màu khi dòng đã có 99 cái (cộng dồn > 99) trả **500** `Internal server error` (vi phạm `CK_cart_items_quantity_max` ở DB) | Lỗi nghiệp vụ có errorCode 4xx; CLAUDE.md: bọc try/catch lỗi DB ra mã lỗi đẹp. DTO chỉ chặn `quantity` 1–99 của một lần gọi, không chặn tổng | Chờ người dùng quyết định (test không khẳng định) |
+| 08 | `POST /api/cart/items` | Nhiều lần thêm đồng thời khi user chưa có giỏ/dòng: 3 request song song cho `[201, 500, 500]` (đua tạo `carts`/`cart_items` vi phạm UNIQUE `UQ_carts_user` / `UQ_cart_items_unique`) | Request thua nên được xử lý như thêm vào dòng đã có (hoặc trả lỗi 4xx), không 500; docs/CLAUDE.md yêu cầu UNIQUE ở DB cộng bắt lỗi ra mã đẹp | Chờ người dùng quyết định (test không khẳng định) |

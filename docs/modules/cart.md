@@ -128,11 +128,15 @@ Mọi lỗi nghiệp vụ đều qua `throwAppError`.
 
 `cart.service.spec.ts` — `CartService.addItem` (service dựng với stub `CurrencyService`): sản phẩm badge `sold_out` / `custom_order` bị từ chối với `errorCode 1303` (HTTP 400, message chứa tên sản phẩm) và không lưu gì; sản phẩm không badge hoặc badge `new`/`sale`/`bestseller`/`limited` vẫn được thêm. `CartService.getCart` nạp kèm `items.product.category` và `items.product.subcategory`.
 
-Flow test `test/flows/cart/cart-errors.flow.ts` (Postgres thật): chưa có giỏ → 404 / 2001 (sửa và xoá); dòng lạ hoặc của giỏ khác → 404 / 2002 (giỏ khác không bị đụng); thêm sản phẩm `disabled` → 400 / 2003 và không thêm gì.
+Flow test (Postgres thật):
+
+- `test/flows/cart/cart-errors.flow.ts` — chưa có giỏ → 404 / 2001 (sửa và xoá); dòng lạ hoặc của giỏ khác → 404 / 2002 (giỏ khác không bị đụng); thêm sản phẩm `disabled` → 400 / 2003 và không thêm gì.
+- `test/flows/cart/cart.flow.ts` — xem giỏ (rỗng, dòng kèm sản phẩm/category/subcategory, cặp `Vnd`/`Usd`, USD của tổng suy ra từ tổng VND, giá theo giá hiện tại, chỉ giỏ của mình); thêm (mặc định, cộng dồn cùng sản phẩm/size/màu, size hoặc màu khác là dòng khác, biên 1/99/50/100 ký tự, 1001/2003/1303, validation từng field); đổi số lượng (đặt chứ không cộng, biên 1/99, dòng của người khác, validation); xoá dòng; xoá sạch (giữ giỏ, không đụng giỏ người khác, lặp lại được).
 
 ### 4.8 Lưu ý hiện trạng
 
 - `size` và `color` là chuỗi tự do, không đối chiếu với `sizes`/`colors` của sản phẩm.
 - Khi cộng dồn vào dòng đã có, service không kiểm tra trần 99; tổng vượt 99 sẽ bị CHECK `CK_cart_items_quantity_max` của DB từ chối (lỗi DB, chưa map sang error code).
+- Hai request thêm đồng thời cho user chưa có giỏ (hoặc chưa có dòng đó) có thể đua nhau tạo `carts`/`cart_items`; request thua vi phạm UNIQUE `UQ_carts_user` / `UQ_cart_items_unique` và trả 500 (chưa map sang error code).
 - `updateItem` và `getCart` không kiểm tra lại `status`/badge của sản phẩm; việc đó chỉ thực hiện khi thêm và khi checkout.
 - Giá trong giỏ lấy theo giá hiện tại của sản phẩm (không lưu snapshot); snapshot chỉ được tạo khi tạo đơn hàng.

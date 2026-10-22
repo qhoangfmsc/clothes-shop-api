@@ -76,7 +76,7 @@ Trạng thái: **Có** = đã có test cover luồng · **Unit** = chỉ có uni
 | auth / guard (mọi route) | Ma trận cho cả 98 route: không/rỗng/sai scheme credential → 401; token sai secret, hết hạn, loại refresh, user không tồn tại, user disabled → 401; không quyền / đủ mọi quyền trừ quyền cần → 403 (9001); đúng một trong các quyền cần → qua guard; admin không cần quyền → qua guard; user mặc định trên `/api/admin/**` → 403; route public vào được không token và với token rác | Flow | `flows/access/access-matrix.flow.ts` | Có |
 | auth / guard | Không token → 401; thiếu quyền → 403 trên `GET /api/orders` | Flow | `flows/order-payment/checkout-and-pay.flow.ts` | Có |
 | order (lỗi) | Đơn lạ → 404/1301; địa chỉ người khác → 2101; giỏ rỗng 1309; mục giỏ lạ 1308; sản phẩm disabled 1310; huỷ không còn pending 1311; đã bị huỷ 1312 | Flow | `flows/order-payment/order-errors.flow.ts` | Có |
-| cart (lỗi) | Chưa có giỏ 2001; dòng lạ/của giỏ khác 2002; thêm sản phẩm disabled 2003 | Flow | `flows/cart/cart-errors.flow.ts` | Có (chỉ ca lỗi) |
+| cart (lỗi) | Chưa có giỏ 2001; dòng lạ/của giỏ khác 2002; thêm sản phẩm disabled 2003 | Flow | `flows/cart/cart-errors.flow.ts` | Có |
 | address (lỗi) | Sửa/xoá địa chỉ lạ hoặc của người khác → 404/2101 | Flow | `flows/address/address-errors.flow.ts` | Có (chỉ ca lỗi) |
 | mọi module (bảng quyền) | Tự phát hiện 98 route; snapshot route–quyền; mọi route cần đăng nhập có quyền; route public không có quyền; route `/api/admin` không public và không dùng quyền mặc định; mã quyền hợp lệ; không trùng method+path | Flow | `flows/access/route-table.flow.ts` | Có |
 | hạ tầng test | Hermetic: env dịch vụ ngoài rỗng, `fetch` bị chặn, media chưa cấu hình → 503/1601 | Flow | `flows/access/route-table.flow.ts` | Có |
@@ -99,7 +99,7 @@ Trạng thái: **Có** = đã có test cover luồng · **Unit** = chỉ có uni
 | order (admin) | Danh sách (sắp xếp, tìm, trang vượt cuối, validation), chi tiết, status body sai | Flow | `flows/order/order-admin.flow.ts` | Có (batch 05) |
 | order (admin) | Đổi trạng thái đơn theo bảng chuyển (pending → … → completed), chuyển sai → 1302, trạng thái cuối, trạng thái không tồn tại | Flow | `flows/order-payment/order-status.flow.ts` | Có |
 | auth | Đăng nhập Google, refresh token, `GET /auth/me` | Flow | — | Unit |
-| cart | Thêm / sửa / xoá dòng giỏ (ca thành công) | Flow | — | Unit |
+| cart | Xem giỏ (Vnd/Usd, giá hiện tại), thêm (cộng dồn, size/màu, 1001/2003/1303), đổi số lượng, xoá dòng, xoá sạch, validation từng field | Flow | `flows/cart/cart.flow.ts` | Có (batch 08) |
 | product / collection | List public (filter, sort, phân trang) và CRUD admin | Flow | — | Unit |
 | category | List public và CRUD admin, thứ hạng `priority` | Flow | — | Chưa có |
 | wishlist | Thêm / xoá / kiểm tra sản phẩm yêu thích | Flow | — | Unit |
