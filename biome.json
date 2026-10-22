@@ -48,7 +48,7 @@
     }
   },
   "files": {
-    "includes": ["src/**", "test/**", "!src/migrations"]
+    "includes": ["src/**", "test/**", "!src/migrations", "!test/coverage-baseline.json"]
   },
   "vcs": {
     "enabled": true,

@@ -1,3 +1,4 @@
+import { findLocked } from '@common/base/lock.util';
 import { getPaging, paginated } from '@common/base/pagination.util';
 import { parseSort } from '@common/base/sort.util';
 import { NON_ORDERABLE_BADGES } from '@common/constants/enum-values.constant';
@@ -267,7 +268,7 @@ export class OrderService {
   async cancel(userId: string, orderId: string) {
     await this.dataSource.transaction(async (manager) => {
       // Khoá dòng đơn: không đua với webhook đang ghi nhận thanh toán cho đúng đơn này (thứ tự khoá order → attempt như payment)
-      const order = await manager.findOne(Order, { where: { id: orderId, userId }, lock: { mode: 'pessimistic_write' } });
+      const order = await findLocked(manager, Order, { id: orderId, userId });
       if (!order) throwAppError(EOrderErrorCode.ORDER_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
 
       if (order.paymentStatus === 'unpaid') {
@@ -360,7 +361,7 @@ export class OrderService {
 
   async updateStatus(adminId: string, orderId: string, dto: UpdateOrderStatusDto) {
     await this.dataSource.transaction(async (manager) => {
-      const order = await manager.findOne(Order, { where: { id: orderId }, lock: { mode: 'pessimistic_write' } });
+      const order = await findLocked(manager, Order, { id: orderId });
       if (!order) throwAppError(EOrderErrorCode.ORDER_NOT_FOUND);
 
       // Validate status transition (trên bản đã khoá: không đua với thanh toán hay huỷ đồng thời)

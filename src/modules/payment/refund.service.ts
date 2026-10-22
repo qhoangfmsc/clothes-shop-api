@@ -1,3 +1,4 @@
+import { findLocked } from '@common/base/lock.util';
 import { getPaging, paginated } from '@common/base/pagination.util';
 import { parseSort } from '@common/base/sort.util';
 import { throwAppError } from '@common/exceptions/app.exception';
@@ -187,7 +188,7 @@ export class RefundService {
   /** [Admin] Tạo yêu cầu hoàn cho đơn ĐÃ HUỶ mà đã thu tiền (đơn huỷ trước khi có luồng hoàn tiền, hoặc yêu cầu cũ đã bị từ chối) */
   async createAdmin(adminId: string, dto: CreateRefundDto) {
     const refund = await this.dataSource.transaction(async (manager) => {
-      const order = await manager.findOne(Order, { where: { id: dto.orderId }, lock: { mode: 'pessimistic_write' } });
+      const order = await findLocked(manager, Order, { id: dto.orderId });
       if (!order) throwAppError(EOrderErrorCode.ORDER_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
       if (order.status !== 'cancelled' || order.paymentStatus !== 'paid') {
         throwAppError(
@@ -210,8 +211,8 @@ export class RefundService {
 
     try {
       await this.dataSource.transaction(async (manager) => {
-        const order = await manager.findOne(Order, { where: { id: found.orderId }, lock: { mode: 'pessimistic_write' } });
-        const refund = await manager.findOne(Refund, { where: { id: refundId }, lock: { mode: 'pessimistic_write' } });
+        const order = await findLocked(manager, Order, { id: found.orderId });
+        const refund = await findLocked(manager, Refund, { id: refundId });
         if (!order || !refund) throwAppError(EPaymentErrorCode.REFUND_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
         if (refund.status !== 'REQUESTED') {
           throwAppError(EPaymentErrorCode.REFUND_NOT_PENDING, `This refund is already ${refund.status}`);
@@ -253,8 +254,8 @@ export class RefundService {
     if (!found) throwAppError(EPaymentErrorCode.REFUND_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
 
     await this.dataSource.transaction(async (manager) => {
-      await manager.findOne(Order, { where: { id: found.orderId }, lock: { mode: 'pessimistic_write' } });
-      const refund = await manager.findOne(Refund, { where: { id: refundId }, lock: { mode: 'pessimistic_write' } });
+      await findLocked(manager, Order, { id: found.orderId });
+      const refund = await findLocked(manager, Refund, { id: refundId });
       if (!refund) throwAppError(EPaymentErrorCode.REFUND_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
       if (refund.status !== 'REQUESTED') {
         throwAppError(EPaymentErrorCode.REFUND_NOT_PENDING, `This refund is already ${refund.status}`);

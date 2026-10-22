@@ -1,3 +1,4 @@
+import { findLocked } from '@common/base/lock.util';
 import { getPaging, paginated } from '@common/base/pagination.util';
 import { parseSort } from '@common/base/sort.util';
 import { throwAppError } from '@common/exceptions/app.exception';
@@ -275,7 +276,7 @@ export class ReviewService {
     const images = dto.images === undefined ? undefined : await this.resolveImages(userId, dto.images);
 
     await this.dataSource.transaction(async (manager) => {
-      const review = await manager.findOne(Review, { where: { id: reviewId, userId }, lock: { mode: 'pessimistic_write' } });
+      const review = await findLocked(manager, Review, { id: reviewId, userId });
       if (!review) throwAppError(EReviewErrorCode.REVIEW_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
 
       const block = reviewEditBlock(review);
@@ -396,7 +397,7 @@ export class ReviewService {
   private setVote(userId: string, reviewId: string, voted: boolean) {
     return this.dataSource.transaction(async (manager) => {
       // Khoá dòng đánh giá: các vote đồng thời cho cùng đánh giá phải tuần tự để số đếm luôn đúng
-      const review = await manager.findOne(Review, { where: { id: reviewId }, lock: { mode: 'pessimistic_write' } });
+      const review = await findLocked(manager, Review, { id: reviewId });
       if (review?.status !== 'PUBLISHED') throwAppError(EReviewErrorCode.REVIEW_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
 
       if (voted) {
@@ -522,7 +523,7 @@ export class ReviewService {
 
   /** Khoá dòng sản phẩm; mọi thay đổi đánh giá chạy tuần tự theo sản phẩm nên số liệu tổng hợp luôn tính trên dữ liệu đã commit */
   private async lockProduct(manager: EntityManager, productId: string) {
-    await manager.findOne(Product, { where: { id: productId }, select: { id: true }, lock: { mode: 'pessimistic_write' } });
+    await findLocked(manager, Product, { id: productId }, { select: { id: true } });
   }
 
   /** Tính lại `products.rating_average`/`rating_count` từ các đánh giá `PUBLISHED` (gọi sau `lockProduct`, trong cùng transaction) */
@@ -549,7 +550,7 @@ export class ReviewService {
 
   private withLockedReview(reviewId: string, fn: (manager: EntityManager, review: Review) => Promise<void>) {
     return this.dataSource.transaction(async (manager) => {
-      const review = await manager.findOne(Review, { where: { id: reviewId }, lock: { mode: 'pessimistic_write' } });
+      const review = await findLocked(manager, Review, { id: reviewId });
       if (!review) throwAppError(EReviewErrorCode.REVIEW_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
       await fn(manager, review);
     });

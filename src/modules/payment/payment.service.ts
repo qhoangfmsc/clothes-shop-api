@@ -1,3 +1,4 @@
+import { findLocked } from '@common/base/lock.util';
 import { getPaging, paginated } from '@common/base/pagination.util';
 import { parseSort } from '@common/base/sort.util';
 import { throwAppError } from '@common/exceptions/app.exception';
@@ -72,7 +73,7 @@ export class PaymentService {
 
     return this.dataSource.transaction(async (manager) => {
       // Khoá dòng đơn: hai request đồng thời cho cùng đơn phải tuần tự → luôn chỉ có 1 phiên PENDING
-      const order = await manager.findOne(Order, { where: { id: dto.orderId, userId }, lock: { mode: 'pessimistic_write' } });
+      const order = await findLocked(manager, Order, { id: dto.orderId, userId });
       if (!order) throwAppError(EOrderErrorCode.ORDER_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
       this.assertPayable(order);
 
@@ -98,7 +99,7 @@ export class PaymentService {
     const config = this.paymentConfig.getQrConfig();
 
     return this.dataSource.transaction(async (manager) => {
-      const order = await manager.findOne(Order, { where: { id: orderId }, lock: { mode: 'pessimistic_write' } });
+      const order = await findLocked(manager, Order, { id: orderId });
       if (!order) throwAppError(EOrderErrorCode.ORDER_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
       this.assertPayable(order);
 
@@ -386,7 +387,7 @@ export class PaymentService {
     }
 
     return this.dataSource.transaction(async (manager) => {
-      const order = await manager.findOne(Order, { where: { id: orderId }, lock: { mode: 'pessimistic_write' } });
+      const order = await findLocked(manager, Order, { id: orderId });
       if (!order) throwAppError(EOrderErrorCode.ORDER_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
       if (order.paymentStatus !== 'unpaid') throwAppError(EPaymentErrorCode.PAYMENT_ORDER_NOT_PAYABLE, 'Order has already been paid');
       if (order.status === 'cancelled') throwAppError(EPaymentErrorCode.PAYMENT_ORDER_NOT_PAYABLE, 'Order has been cancelled');
@@ -394,7 +395,7 @@ export class PaymentService {
       // Giao dịch làm bằng chứng
       let transaction: PaymentTransaction | null = null;
       if (useExisting) {
-        transaction = await manager.findOne(PaymentTransaction, { where: { id: dto.transactionId }, lock: { mode: 'pessimistic_write' } });
+        transaction = await findLocked(manager, PaymentTransaction, { id: dto.transactionId });
         if (!transaction) throwAppError(EPaymentErrorCode.PAYMENT_TRANSACTION_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
         if (!CONFIRMABLE_VERIFICATION_STATUSES.includes(transaction.verificationStatus)) {
           throwAppError(
@@ -416,10 +417,7 @@ export class PaymentService {
       // không thì phiên mới nhất của đơn. Phiên luôn phải thuộc đúng đơn này.
       let attempt: PaymentAttempt | null = null;
       if (transaction?.paymentAttemptId) {
-        attempt = await manager.findOne(PaymentAttempt, {
-          where: { id: transaction.paymentAttemptId },
-          lock: { mode: 'pessimistic_write' },
-        });
+        attempt = await findLocked(manager, PaymentAttempt, { id: transaction.paymentAttemptId });
         if (attempt && attempt.orderId !== order.id) {
           throwAppError(
             EPaymentErrorCode.PAYMENT_TRANSACTION_NOT_CONFIRMABLE,
@@ -433,16 +431,9 @@ export class PaymentService {
           );
         }
       } else if (transferCode !== undefined) {
-        attempt = await manager.findOne(PaymentAttempt, {
-          where: { orderId: order.id, transferCode },
-          lock: { mode: 'pessimistic_write' },
-        });
+        attempt = await findLocked(manager, PaymentAttempt, { orderId: order.id, transferCode });
       } else {
-        attempt = await manager.findOne(PaymentAttempt, {
-          where: { orderId: order.id },
-          order: { createdAt: 'DESC' },
-          lock: { mode: 'pessimistic_write' },
-        });
+        attempt = await findLocked(manager, PaymentAttempt, { orderId: order.id }, { order: { createdAt: 'DESC' } });
       }
       if (!attempt) {
         throwAppError(

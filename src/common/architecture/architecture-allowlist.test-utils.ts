@@ -17,10 +17,10 @@ export const OVERSIZED_SERVICES: Record<string, number> = {
   'src/modules/media/media.service.ts': 333,
   'src/modules/order/order.service.ts': 408,
   'src/modules/payment/payment.service.ts': 549,
-  'src/modules/payment/refund.service.ts': 362,
+  'src/modules/payment/refund.service.ts': 363,
   'src/modules/product/product.service.ts': 340,
-  'src/modules/return/return.service.ts': 449,
-  'src/modules/review/review.service.ts': 558,
+  'src/modules/return/return.service.ts': 450,
+  'src/modules/review/review.service.ts': 559,
 };
 
 // Service đang có quá nhiều dependency: số hiện tại là trần

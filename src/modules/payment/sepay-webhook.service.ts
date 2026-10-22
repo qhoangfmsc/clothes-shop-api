@@ -1,3 +1,4 @@
+import { findLocked } from '@common/base/lock.util';
 import { throwAppError } from '@common/exceptions/app.exception';
 import { EPaymentErrorCode } from '@common/exceptions/error-codes';
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
@@ -122,8 +123,8 @@ export class SepayWebhookService {
     if (!found) return { status: 'UNMATCHED', attemptId: null };
 
     // Thứ tự khoá: order → attempt (giống createQr) để không deadlock
-    const order = await manager.findOne(Order, { where: { id: found.orderId }, lock: { mode: 'pessimistic_write' } });
-    const attempt = await manager.findOne(PaymentAttempt, { where: { id: found.id }, lock: { mode: 'pessimistic_write' } });
+    const order = await findLocked(manager, Order, { id: found.orderId });
+    const attempt = await findLocked(manager, PaymentAttempt, { id: found.id });
     if (!order || !attempt) return { status: 'UNMATCHED', attemptId: null };
 
     const result = (status: PaymentVerificationStatus) => ({ status, attemptId: attempt.id });

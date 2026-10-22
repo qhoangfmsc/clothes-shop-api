@@ -117,6 +117,13 @@ describe('Architecture rules', () => {
     expect(violations).toEqual([]);
   });
 
+  it('takes row locks only through findLocked', () => {
+    const offenders = listFiles('src', isSource)
+      .filter((file) => file !== 'src/common/base/lock.util.ts' && /lock:\s*\{\s*mode:/.test(stripComments(read(file))))
+      .map((file) => `${file}: khoá dòng trực tiếp — dùng findLocked (@common/base/lock.util)`);
+    expect(offenders).toEqual([]);
+  });
+
   it('declares entity status columns with a type union, not string', () => {
     const entityFiles = listFiles('src/modules', (file) => file.endsWith('.entity.ts'));
     const violations: string[] = [];

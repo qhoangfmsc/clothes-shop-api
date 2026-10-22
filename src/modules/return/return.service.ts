@@ -1,3 +1,4 @@
+import { findLocked } from '@common/base/lock.util';
 import { getPaging, paginated } from '@common/base/pagination.util';
 import { parseSort } from '@common/base/sort.util';
 import { throwAppError } from '@common/exceptions/app.exception';
@@ -67,7 +68,7 @@ export class ReturnService {
 
     const created = await this.dataSource.transaction(async (manager) => {
       // Khoá đơn: hai yêu cầu đồng thời cho cùng một dòng hàng phải tuần tự, nên không thể trả quá số lượng đã mua
-      const order = await manager.findOne(Order, { where: { id: dto.orderId, userId }, lock: { mode: 'pessimistic_write' } });
+      const order = await findLocked(manager, Order, { id: dto.orderId, userId });
       if (!order) throwAppError(EOrderErrorCode.ORDER_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
 
       const items = await manager.find(OrderItem, { where: { orderId: order.id } });
@@ -156,9 +157,9 @@ export class ReturnService {
   async cancel(userId: string, returnId: string) {
     await this.dataSource.transaction(async (manager) => {
       const found = await manager.findOne(ReturnRequest, { where: { id: returnId } });
-      const order = found && (await manager.findOne(Order, { where: { id: found.orderId, userId }, lock: { mode: 'pessimistic_write' } }));
+      const order = found && (await findLocked(manager, Order, { id: found.orderId, userId }));
       if (!found || !order) throwAppError(EReturnErrorCode.RETURN_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
-      const request = await manager.findOne(ReturnRequest, { where: { id: returnId }, lock: { mode: 'pessimistic_write' } });
+      const request = await findLocked(manager, ReturnRequest, { id: returnId });
       this.assertStatus(request, CUSTOMER_CANCELLABLE_RETURN_STATUSES);
       request.status = 'CANCELLED';
       await manager.save(request);
@@ -306,8 +307,8 @@ export class ReturnService {
     await this.dataSource.transaction(async (manager) => {
       const found = await manager.findOne(ReturnRequest, { where: { id: returnId } });
       if (!found) throwAppError(EReturnErrorCode.RETURN_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
-      const order = await manager.findOne(Order, { where: { id: found.orderId }, lock: { mode: 'pessimistic_write' } });
-      const request = await manager.findOne(ReturnRequest, { where: { id: returnId }, lock: { mode: 'pessimistic_write' } });
+      const order = await findLocked(manager, Order, { id: found.orderId });
+      const request = await findLocked(manager, ReturnRequest, { id: returnId });
       if (!order || !request) throwAppError(EReturnErrorCode.RETURN_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
       await work(manager, request, order);
     });
