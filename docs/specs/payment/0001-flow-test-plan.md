@@ -1,6 +1,6 @@
 # 0001 — Kế hoạch flow test cho module payment
 
-> Module: `payment` · Trạng thái: Approved (đang thực hiện: batch 01–02 xong, còn 03) · Ngày: 2026-10-22 · Cỡ: rút gọn
+> Module: `payment` · Trạng thái: Implemented · Ngày: 2026-10-22 · Cỡ: rút gọn
 
 ## 1. Bối cảnh & vấn đề
 
@@ -17,7 +17,7 @@ Chiến dịch test toàn diện (`test/PROGRESS.md`, skill `test-campaign`) ph�
 |---|---|---|
 | 01 (xong) | `GET /api/payments/:orderId/status`, `POST /api/payments/qr`, `POST /api/webhooks/sepay`, `GET /api/admin/payments/attempts`, `GET /api/admin/payments/orders/:orderId` | `test/flows/payment/payment-session.flow.ts`, `payment-admin-queries.flow.ts` |
 | 02 (xong) | `POST /api/admin/payments/orders/:orderId/confirm`, `POST /api/admin/payments/orders/:orderId/qr`, `GET /api/admin/payments/transactions`, `GET /api/admin/refunds`, `POST /api/admin/refunds` | `test/flows/payment/payment-admin-actions.flow.ts`, `payment-transactions-refunds.flow.ts` |
-| 03 | `POST /api/admin/refunds/:refundId/complete`, `POST /api/admin/refunds/:refundId/reject` | theo batch |
+| 03 (xong) | `POST /api/admin/refunds/:refundId/complete`, `POST /api/admin/refunds/:refundId/reject` | `test/flows/payment/payment-refund-actions.flow.ts` |
 
 3.3/3.4: không thêm pattern; flow dùng builder, steps và helper ký webhook sẵn có.
 
@@ -33,4 +33,6 @@ Test phát hiện hành vi nghi là lỗi: ghi vào "Phát hiện" của PROGRES
 
 - **Batch 01:** 31 flow test, 5/5 route đủ ca thành công và ca lỗi; độ phủ toàn cục 14 → 16/98 thành công, 13 → 16/96 lỗi. Hai đột biến không bị bắt ngay đã được phân tích: một đột biến tương đương (nhánh SQL dự phòng), một lỗ hổng test đã bịt (kiểm tài khoản nhận hai lớp).
 - **Batch 02:** 37 flow test, 5/5 route đủ ca; độ phủ toàn cục 16 → 21/98 thành công, 16 → 21/96 lỗi. Phá thử 5 điểm đều bị bắt. Phát hiện 1 điểm cần quyết định (`rawPayload` trong danh sách giao dịch), ghi ở PROGRESS và `payment.md` 4.8.
-- Batch 03: chưa làm.
+- **Batch 03:** 19 flow test, 2/2 route đủ ca; lỗi toàn cục 21 → 22/96. Phá thử 6 điểm đều bị bắt; có test song song (hai admin cùng bấm; hai khoản cùng mã tham chiếu).
+- **Tổng module:** 12/12 route payment có ca thành công và ca lỗi trên Postgres thật; 87 flow test mới (31 + 37 + 19). Phát hiện cần quyết định: `rawPayload` trong danh sách giao dịch (PROGRESS, `payment.md` 4.8). Ngoài phạm vi chưa phủ: nhánh `RETURN` của khoản hoàn (phủ cùng module return).
+- **Docs:** `payment.md` (4.7, 4.8), `test/README.md`, `test/PROGRESS.md`.

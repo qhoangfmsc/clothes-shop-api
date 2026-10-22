@@ -89,6 +89,7 @@ Trạng thái: **Có** = đã có test cover luồng · **Unit** = chỉ có uni
 | order + payment (song song) | 6 QR cùng lúc → 1 phiên PENDING; webhook trùng id song song; hai chuyển khoản khác id; huỷ vs thanh toán đua nhau | Flow | `flows/order-payment/concurrency.flow.ts` | Có |
 | order + payment (khoá dòng) | Hợp đồng khoá `orders`: huỷ, đổi trạng thái, tạo QR, webhook đều chờ khoá rồi quyết định trên dữ liệu mới | Flow | `flows/order-payment/lock-contract.flow.ts` | Có |
 | payment (admin) | Xác nhận thủ công (giao dịch mới, theo mã, gắn giao dịch có sẵn, các lỗi 1702/1707/1708/1709/1710/1703); QR do admin tạo (thay mã cũ, LATE) | Flow | `flows/payment/payment-admin-actions.flow.ts` | Có (batch 02) |
+| payment (hoàn xong / từ chối) | Hoàn đủ và hoàn từng phần, 1711/1712/1713/1714, validation, hai admin bấm cùng lúc, hai khoản cùng mã tham chiếu | Flow | `flows/payment/payment-refund-actions.flow.ts` | Có (batch 03) |
 | payment (giao dịch, hoàn tiền) | Danh sách giao dịch (lọc, needsReview, sắp xếp), danh sách hoàn tiền (lọc, tìm, nguồn tiền), tạo yêu cầu hoàn thủ công và các từ chối 1712 | Flow | `flows/payment/payment-transactions-refunds.flow.ts` | Có (batch 02) |
 | return | Yêu cầu trả hàng → duyệt → nhận hàng → hoàn tiền | Flow | — | Unit |
 | review | Viết đánh giá sau khi nhận hàng, cập nhật điểm sản phẩm | Flow | — | Unit |
