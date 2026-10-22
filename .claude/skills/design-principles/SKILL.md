@@ -54,19 +54,15 @@ export function assertTransition(from: OrderStatus, to: OrderStatus): void {
 ```
 `Record<OrderStatus, …>` buộc compiler báo lỗi khi thêm trạng thái mà quên khai báo chuyển tiếp (Open/Closed bằng dữ liệu). *Cái giá:* thêm một file; chỉ đáng khi ≥ 3 trạng thái. *Trong repo:* `VALID_TRANSITIONS` (order, kiểu `Record<string, string[]>` lỏng), `assertStatus` (return).
 
-### Template Method / higher-order helper — khung lặp lại
-*Dấu hiệu:* cùng khung "transaction → khoá → kiểm tra tồn tại → làm việc" copy ở nhiều nơi.
+### Gom phần lặp thật, không gom cả khung — Template Method / hàm tiện ích
+*Dấu hiệu:* cùng một đoạn lặp ở nhiều nơi (rule of three). *Bài học trong repo:* khung "transaction → khoá → kiểm tra tồn tại → làm việc" lặp 22 lần nhưng **khác nhau thật** (lỗi 404 hay 400, điều kiện sở hữu, tra bản ghi con trước khi khoá cha), nên một wrapper nhiều tham số sẽ khó đọc. Phần giống hệt là literal khoá, và đó mới là thứ được gom:
 ```ts
-/** Khung dùng chung: khoá dòng rồi chạy `work` trong cùng transaction */
-protected withLock<T extends { id: string }>(entity: EntityTarget<T>, id: string, notFoundCode: number, work: (m: EntityManager, row: T) => Promise<void>) {
-  return this.dataSource.transaction(async (manager) => {
-    const row = await manager.findOne(entity, { where: { id } as any, lock: { mode: 'pessimistic_write' } });
-    if (!row) throwAppError(notFoundCode, undefined, HttpStatus.NOT_FOUND);
-    await work(manager, row);
-  });
+// common/base/lock.util.ts: một chỗ chọn chiến lược khoá
+export function findLocked<T extends ObjectLiteral>(manager: EntityManager, entity: EntityTarget<T>, where: FindOptionsWhere<T>, extra = {}) {
+  return manager.findOne(entity, { ...extra, where, lock: { mode: 'pessimistic_write' } });
 }
 ```
-*Cái giá:* khung quá khái quát thì khó đọc — chỉ gom đúng phần giống nhau. *Trong repo:* `withLockedRequest` (return), `withLockedReview` (review).
+Khung transaction giữ trong từng service. *Cái giá của phương án này:* mỗi service vẫn tự viết "không thấy thì báo lỗi gì" (đúng là phần khác nhau). Chỉ khi ≥ 3 khung *giống hệt* mới đáng gom thành wrapper (spec `common/0004`).
 
 ### Strategy — thay thuật toán/nhà cung cấp lúc chạy
 *Dấu hiệu:* `switch (provider)` ở nhiều nơi; thêm nhà cung cấp phải sửa service.
@@ -88,7 +84,7 @@ Parse/verify là hàm thuần tách khỏi service để test không cần mạn
 Không bao giờ trả entity thô. Dùng generic kiểu hẹp (`OrderLike`) để dùng lại cho nhiều hình dạng (`presentOrder<O extends OrderLike>`). Kiểu trả về `MoneyFields<'price'>` ép cặp `Vnd`/`Usd` ngay lúc compile.
 
 ### Unit of Work + khoá bi quan — nhiều ghi phải cùng thành công
-`dataSource.transaction` + `lock: { mode: 'pessimistic_write' }` theo **thứ tự cố định** (order → attempt) để tránh deadlock; ghi thứ tự trong comment. Race giữa webhook và huỷ đơn là lý do tồn tại của nó.
+`dataSource.transaction` + `findLocked` theo **thứ tự cố định** (`Order` trước, rồi bản ghi con) để tránh deadlock; thứ tự ghi ở `docs/modules/common.md`, hợp đồng khoá được kiểm bằng `test/flows/order-payment/lock-contract.flow.ts` (giữ khoá từ ngoài, đổi đơn, nhả khoá: thao tác bỏ khoá sẽ lộ ra). Race giữa webhook và huỷ đơn là lý do tồn tại của nó.
 
 ### Idempotency — chịu được gửi lặp
 UNIQUE ở DB làm chốt chặn cuối + bắt lỗi `23505` thành kết quả "đã xử lý" (`SepayWebhookService`). Không tin vào kiểm tra "đã tồn tại chưa" ở tầng ứng dụng một mình (race).

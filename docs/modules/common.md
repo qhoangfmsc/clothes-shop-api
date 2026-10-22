@@ -194,6 +194,7 @@ Entity **không** extends `BaseEntity` (tự khai báo id nanoid16): `Wishlist` 
 | File | Nội dung | Dùng ở |
 |---|---|---|
 | `utils/money.util.ts` | Tiền tệ gốc VND: `MAX_MONEY_VND` (1 tỷ), `vndToUsd(vnd, vndPerUsd)` (làm tròn 2 chữ số), `money(tên, vnd, tỷ giá)` → `{ <tên>Vnd, <tên>Usd }`, `moneyOrNull(...)` (`null` ở cả hai field khi vắng giá trị) | mọi module trả tiền (xem [currency](currency.md)) |
+| `base/lock.util.ts` | `findLocked(manager, Entity, where, { select?, order? })`: `SELECT … FOR UPDATE` (`pessimistic_write`) một dòng; nơi duy nhất chọn chiến lược khoá (luật kiến trúc cấm viết `lock: { mode:` ở chỗ khác). Thứ tự khoá toàn dự án: `Order` trước, rồi bản ghi con (`PaymentTransaction` → `PaymentAttempt` / `Refund` / `ReturnRequest`); `Review` và `Product` (tính lại điểm sao) khoá riêng, không cùng `Order` trong một transaction. `category` dùng khoá cố vấn `pg_advisory_xact_lock` riêng | order, payment (3 service), return, review |
 | `base/column-transformers.ts` | `bigintTransformer` (bigint → number, dùng cho mọi cột tiền VND), `numericTransformer` (numeric → number, dùng cho `orders.exchange_rate`) | entity product, order, order_item, payment_attempt, payment_transaction, refund |
 
 ### 4.9 Migration
@@ -270,6 +271,7 @@ yarn migration:run              # chạy migration
   - không export thừa trong `common/`, `core/`;
   - `*.service.ts` không ném exception HTTP thô, dùng `throwAppError` (không còn ngoại lệ nào);
   - cột entity tên `status`/`paymentStatus` không khai báo `string` (dùng type union);
+  - khoá dòng chỉ qua `findLocked` (không có `lock: { mode:` ngoài `lock.util.ts`);
   - service tối đa 300 dòng và 5 dependency constructor.
   Thêm vi phạm mới hoặc để vi phạm cũ lớn thêm → đỏ; sửa xong mà chưa giảm allowlist → đỏ. `src/common/dto/list-query.dto.spec.ts` là guard chuẩn list cho mọi `*-query.dto.ts` (xem 4.5); `src/common/utils/money.util.spec.ts` cho helper tiền. Test của từng module: xem file module tương ứng.
 - **Flow** (`yarn test:flows`): `test/flows/<module>/*.flow.ts`, đi qua HTTP thật (`MainModule` + `configureApp`) trên Postgres thật. Config riêng `test/jest.flows.config.js` (rootDir repo, chỉ nhận `*.flow.ts`, chạy tuần tự).
@@ -282,7 +284,7 @@ yarn migration:run              # chạy migration
   - `test/flows/access/access-matrix.flow.ts`: ma trận xác thực và phân quyền cho mọi route đã phát hiện (token thiếu/hỏng/hết hạn/refresh/user không tồn tại/disabled → 401; thiếu quyền → 403 mã 9001; đúng một quyền, admin → qua guard; user mặc định trên `/api/admin/**` → 403). Chỉ kiểm guard nên chấp nhận mọi status khác của route được vào (input rỗng).
   - `createTestApp` dọn DB đầu mỗi file flow và `app.listen(0, '127.0.0.1')` một lần; mỗi request có timeout 10s trong ma trận.
   - Độ phủ endpoint: `createTestApp` gắn middleware ghi `{route, status}` của request thật (bỏ qua header `x-test-probe` của ma trận) vào `test/.coverage/` (gitignore); `test/support/coverage-report.ts` chạy sau jest trong `yarn test:flows`, in số route có ca thành công / ca lỗi và áp ratchet với `test/coverage-baseline.json` (route mới thiếu ca → lỗi; mục đã đủ ca còn trong baseline → lỗi; baseline chỉ co lại).
-  - Hiện có: `test/flows/order-payment/` (đặt hàng – thanh toán, huỷ – hoàn tiền, mã lỗi đơn hàng), `test/flows/cart/`, `test/flows/address/` (mã lỗi), `test/flows/access/` (bảng quyền, hermetic, ma trận auth/quyền). Bảng luồng nào có test nào: `test/README.md`. Thiết kế: `docs/specs/testing/0001-flow-test-infrastructure.md`.
+  - Hiện có: `test/flows/order-payment/` (đặt hàng – thanh toán, huỷ – hoàn tiền, mã lỗi và trạng thái đơn hàng, request song song, hợp đồng khoá dòng), `test/flows/cart/`, `test/flows/address/` (mã lỗi), `test/flows/access/` (bảng quyền, hermetic, ma trận auth/quyền). Bảng luồng nào có test nào: `test/README.md`. Thiết kế: `docs/specs/testing/0001-flow-test-infrastructure.md`.
 
 ### 4.13 Lưu ý hiện trạng
 

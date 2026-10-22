@@ -32,7 +32,7 @@ Kiến thức, ví dụ và checklist chi tiết: skill `design-principles` (`.c
 | Hành vi ngang (auth, quyền, lỗi, validate) | **Guard / Decorator / Filter / Pipe** của Nest | `@Public()`, `@Permissions()`, `AllExceptionFilter` |
 | Gộp nhiều decorator thành một | **Decorator composition** (`applyDecorators`) | `@SortField`, `@SearchField` |
 | Vòng đời trạng thái (order, return, refund, payment attempt) | **State machine**: bảng chuyển `Record<Status, readonly Status[]>` kiểu chặt + một hàm kiểm tra | `VALID_TRANSITIONS` (order), `assertStatus` (return) |
-| Khung "mở transaction → khoá → kiểm tra tồn tại → làm việc" lặp lại | **Template Method / higher-order helper** (`withLock(...)`) — khi lặp lần thứ 3 | `withLockedRequest`, `withLockedReview` |
+| Đoạn lặp giống hệt giữa các khung transaction (vd literal khoá dòng) | **Hàm tiện ích một điểm đổi** (`findLocked`) — gom phần giống thật khi lặp lần thứ 3; không gom cả khung khi chúng khác nhau (lỗi, sở hữu, thứ tự) | `findLocked` (`common/base/lock.util.ts`) |
 | Thay thuật toán / nhà cung cấp lúc chạy (cổng thanh toán, tính phí) | **Strategy** qua interface + provider token, chỉ khi có ≥ 2 implementation thật hoặc spec nêu rõ | chưa dùng (SePay là cổng duy nhất) |
 | Bọc dịch vụ ngoài | **Adapter** + hàm thuần parse/verify có unit test | `sepay-payload.util.ts`, `sepay-signature.util.ts` |
 | Retry/webhook trùng | **Idempotency**: UNIQUE ở DB + bắt lỗi `23505` | `payment_transactions.provider_transaction_id` |

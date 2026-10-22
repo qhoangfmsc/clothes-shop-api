@@ -1,6 +1,6 @@
 # payment (`src/modules/payment`)
 
-> Cập nhật lần cuối: 2026-10-21
+> Cập nhật lần cuối: 2026-10-22
 
 ## 1. Tổng quan
 
@@ -331,7 +331,9 @@ Dùng mã giao dịch SePay làm `reference` (provider `sepay`) thì khi SePay g
 - Các spec trên dùng manager giả. Flow test trên Postgres thật (`test/flows/order-payment/`, xem `test/README.md`):
   - `checkout-and-pay.flow.ts` — giỏ → báo giá → checkout → QR → webhook SePay ký HMAC → đơn `paid`/`confirmed` và giao dịch `MATCHED`; webhook trùng id tuần tự chỉ ghi một giao dịch; sai chữ ký → 401 + 1704, không ghi gì; sai số tiền → `AMOUNT_MISMATCH`, đơn vẫn `unpaid`; tiền đến lần hai → `DUPLICATE_PAYMENT`; không token → 401, thiếu quyền → 403.
   - `cancel-and-refund.flow.ts` — khách huỷ đơn chưa trả (phiên QR → `CANCELLED`); khách huỷ đơn đã trả → 1307; admin huỷ đơn đã trả → khoản hoàn `REQUESTED` đúng số đã nhận → hoàn xong → đơn `refunded`; hoàn lần hai → 1713, mã tham chiếu trùng → 1714.
-  - Chưa có test tự động cho các tình huống đồng thời (hai webhook cùng id chạy song song, huỷ và thanh toán cùng lúc) và cho xác nhận thủ công (`confirmPaymentAdmin`), mã QR admin, QR hết hạn trên Postgres thật.
+  - `concurrency.flow.ts` — 6 request `POST /api/payments/qr` cùng lúc cho một đơn → đúng một phiên `PENDING`; hai webhook cùng id song song → một giao dịch `MATCHED`, đơn `paid` một lần; hai chuyển khoản khác id cho một đơn → một `MATCHED` và một `DUPLICATE_PAYMENT`; huỷ đơn và thanh toán đua nhau (lặp 8 lần) luôn cho trạng thái nhất quán (`confirmed`+`paid` hoặc `cancelled`+`unpaid`).
+  - `lock-contract.flow.ts` — giữ khoá `FOR UPDATE` trên dòng đơn từ kết nối riêng, đổi đơn rồi nhả khoá: huỷ đơn (khách) thấy đơn đã trả → 1307; đổi trạng thái (admin) thấy đơn đã huỷ → 1302; tạo QR thấy đơn đã huỷ → 1702; chuyển khoản vào đơn đã huỷ → `NOT_PAYABLE`. Thao tác nào bỏ khoá sẽ quyết định trên dữ liệu cũ và bị test bắt.
+  - Chưa có test tự động cho xác nhận thủ công (`confirmPaymentAdmin`), mã QR admin, QR hết hạn trên Postgres thật.
 
 ### 4.8 Lưu ý hiện trạng
 

@@ -23,7 +23,7 @@ Báo cáo mỗi phần: đã đổi gì (file), số liệu trước/sau, patter
 | 6 | Quy ước được máy ép: test kiến trúc (`common/` không import `modules/`, không exception thô trong service mới, không `forwardRef`, không export thừa, trần kích thước service) với allowlist chỉ co lại | Xong |
 | 7 | Chuẩn hoá lỗi: exception thô → `throwAppError` + error code (order, auth, cart, address, review), theo từng module, có flow/unit bảo vệ | Xong |
 | 8 | Trạng thái: `as const` + type union cho `orders.status`/`payment_status`/`products.status`/`users.status`; bảng chuyển trạng thái của đơn có kiểu chặt (không có helper chung: return kiểm theo hành động, xem spec order/0001) | Xong |
-| 9 | Helper `withLock` gom khung transaction + khoá dòng (return, review, order, payment, refund) | Chưa làm |
+| 9 | Gom khoá dòng: `findLocked` thay 25 literal (không có wrapper `withLock` chung vì các khung khác nhau, xem spec common/0004), hợp đồng khoá + flow song song | Xong |
 | 10 | Tách `OrderService` theo use case (checkout, status, query) — có flow test bảo vệ | Chưa làm |
 | 11 | Ranh giới module: bỏ việc module khác với tay vào bảng `orders`/`products` (qua service export) — thiết kế trong spec, quyết định cùng người dùng | Chưa làm |
 | 12+ | Chiến dịch test toàn diện: 25 batch theo `test/PROGRESS.md` (nhóm theo module, mỗi lần một batch) | Chưa làm |
