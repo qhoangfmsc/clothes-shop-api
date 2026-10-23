@@ -149,7 +149,7 @@ Trạng thái: **Xong** · Ghi chú: 2026-10-23; 56 flow mới (`flows/review/re
 | 4 | GET | `/api/my-reviews/pending` | JWT | 17001 |
 | 5 | GET | `/api/my-reviews/votes` | JWT | 17001 |
 
-Trạng thái: **Chưa làm** · Ghi chú: —
+Trạng thái: **Đang làm** · Ghi chú: —
 
 
 ### Batch 11 — review (5 route)
