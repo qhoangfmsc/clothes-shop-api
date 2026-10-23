@@ -96,6 +96,7 @@ Giá trị `EXCHANGE_RATE` (cột `site_configs.value`, chuỗi JSON):
 - `src/common/utils/money.util.spec.ts` — `vndToUsd` (làm tròn 2 chữ số, nhận chuỗi số), `money`, `moneyOrNull`.
 - `product/product.presenter.spec.ts`, `order/order.presenter.spec.ts` — đổi field tiền, tỷ giá chốt trên đơn.
 - `site-config/site-config.service.spec.ts` — lưu và từ chối `EXCHANGE_RATE`.
+- Flow test trên Postgres thật (module không có route riêng nên được phủ qua các luồng dùng nó): `test/flows/site-config/site-config.flow.ts` (đặt `EXCHANGE_RATE` hợp lệ/sai → 1503, tỷ giá mới có hiệu lực ngay ở mọi số USD của sản phẩm, xoá dòng thì về 25.000), `test/flows/shipping/shipping.flow.ts` (USD của phí ship và ngưỡng theo tỷ giá hiện tại), `test/flows/order/order-checkout.flow.ts` và `order-payment/*` (tỷ giá chốt trên đơn, USD của đơn/thanh toán/hoàn tiền không đổi khi admin đổi tỷ giá).
 
 ### 4.8 Lưu ý hiện trạng
 

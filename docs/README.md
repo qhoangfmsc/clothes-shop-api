@@ -4,7 +4,7 @@ Thư mục này là tài liệu thực tế của backend: mỗi module một fi
 
 Quy tắc viết: `.claude/rules/module-docs.md` · Quy trình: skill `module-docs` · Template: `.claude/skills/module-docs/TEMPLATE.md`.
 
-Cập nhật lần cuối: 2026-10-21
+Cập nhật lần cuối: 2026-10-23
 
 ## Ba loại tài liệu
 
