@@ -17,26 +17,6 @@
     }
   },
   "missing": {
-    "GET /api/collections": [
-      "success",
-      "error"
-    ],
-    "GET /api/admin/collections": [
-      "success",
-      "error"
-    ],
-    "POST /api/admin/collections": [
-      "success",
-      "error"
-    ],
-    "DELETE /api/admin/collections/:id": [
-      "success",
-      "error"
-    ],
-    "PATCH /api/admin/collections/:id": [
-      "success",
-      "error"
-    ],
     "GET /api/addresses": [
       "success",
       "error"
