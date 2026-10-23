@@ -135,6 +135,11 @@ export enum Permission {
  * Permissions mặc định cho role 'user' (customer thông thường).
  * Admin (role='admin') tự động có tất cả permissions, không cần khai báo ở đây.
  */
+/** Mọi mã permission có thật (giá trị số của enum) */
+export const PERMISSION_CODES: readonly number[] = Object.values(Permission).filter(
+  (value): value is Permission => typeof value === 'number',
+);
+
 export const DEFAULT_USER_PERMISSIONS: Permission[] = [
   Permission.AUTH_ME,
   Permission.AUTH_REFRESH,

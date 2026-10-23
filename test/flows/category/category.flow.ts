@@ -266,6 +266,7 @@ describe('Flow: categories', () => {
       const results = await Promise.all([1, 2, 3].map((n) => create(admin, { slug: 'dup', title: `T${String(n)}` })));
 
       expect(results.map((res) => res.status).sort()).toEqual([201, 400, 400]);
+      expect(results.filter((res) => res.status === 400).map((res) => res.body.errorCode)).toEqual([1102, 1102]);
       expect(await priorities()).toEqual([['dup', 1]]);
     });
 

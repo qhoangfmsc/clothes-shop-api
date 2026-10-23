@@ -241,6 +241,16 @@ describe('Flow: collections', () => {
       expect((await publicList({ slug: 'summer' }).expect(200)).body.data.products).toHaveLength(1);
     });
 
+    it('lets exactly one of several simultaneous creations with the same slug through; the others get 400 / 1202 (no 500)', async () => {
+      const admin = await b.admin();
+
+      const results = await Promise.all([1, 2, 3, 4].map(() => create(admin, { slug: 'summer', name: 'Summer', image: 'x' })));
+
+      expect(results.map((res) => res.status).sort()).toEqual([201, 400, 400, 400]);
+      expect(results.filter((res) => res.status === 400).map((res) => res.body.errorCode)).toEqual([1202, 1202, 1202]);
+      expect(await rows('SELECT 1 FROM collections')).toHaveLength(1);
+    });
+
     it('refuses a duplicate slug (400 / 1202) and creates nothing', async () => {
       const admin = await b.admin();
       await make(admin, 'summer');

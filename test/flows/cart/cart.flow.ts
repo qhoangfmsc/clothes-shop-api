@@ -137,6 +137,94 @@ describe('Flow: cart', () => {
       expect((await lines()).map((line) => line.quantity)).toEqual([99, 1]);
     });
 
+    describe('quantity limit of 99 per line', () => {
+      const quantityOf = (userId: string) =>
+        rows<{ quantity: number }>(
+          'SELECT quantity FROM cart_items WHERE cart_id IN (SELECT id FROM carts WHERE user_id = $1) ORDER BY size, color',
+          [userId],
+        ).then((r) => r.map((row) => row.quantity));
+
+      it('allows the total to reach exactly 99', async () => {
+        const [user, product] = [await b.user(), await b.product()];
+        await add(user, { productId: product.id, quantity: 98 }).expect(201);
+
+        const res = await add(user, { productId: product.id }).expect(201);
+
+        expect(res.body.data.items[0].quantity).toBe(99);
+        expect(await quantityOf(user.id)).toEqual([99]);
+      });
+
+      it.each([
+        [99, 1],
+        [98, 2],
+        [50, 50],
+        [1, 99],
+      ])('refuses to go over 99 when a line holds %i and %i more are added (400 / 2004) and leaves the cart unchanged', async (existing, extra) => {
+        const [user, product] = [await b.user(), await b.product()];
+        await add(user, { productId: product.id, quantity: existing }).expect(201);
+
+        const res = await add(user, { productId: product.id, quantity: extra });
+
+        expect(error(res)).toEqual({ status: 400, errorCode: 2004, message: 'Cart item quantity limit (99) reached' });
+        expect(await quantityOf(user.id)).toEqual([existing]);
+      });
+
+      it('counts the limit per line: another size or colour of the same product is a separate line', async () => {
+        const [user, product] = [await b.user(), await b.product()];
+        await add(user, { productId: product.id, quantity: 99, size: 'M' }).expect(201);
+
+        await add(user, { productId: product.id, quantity: 99, size: 'L' }).expect(201);
+        const full = await add(user, { productId: product.id, size: 'M' });
+
+        expect(error(full)).toMatchObject({ status: 400, errorCode: 2004 });
+        expect(await quantityOf(user.id)).toEqual([99, 99]);
+      });
+
+      it('still lets the quantity be set directly to 99 or lowered afterwards', async () => {
+        const [user, product] = [await b.user(), await b.product()];
+        const { items } = await b.cart(user, [{ product, quantity: 99 }]);
+
+        await add(user, { productId: product.id, size: 'M', color: 'Black' }).expect(400);
+        await update(user, items[0].id, { quantity: 10 }).expect(200);
+        await add(user, { productId: product.id, quantity: 89, size: 'M', color: 'Black' }).expect(201);
+
+        expect(await quantityOf(user.id)).toEqual([99]);
+      });
+
+      it('never loses an add when requests arrive at the same time: 6 adds of 1 on an existing line make 7', async () => {
+        const [user, product] = [await b.user(), await b.product()];
+        await add(user, { productId: product.id }).expect(201);
+
+        const results = await Promise.all(Array.from({ length: 6 }, () => add(user, { productId: product.id })));
+
+        expect(results.map((res) => res.status)).toEqual([201, 201, 201, 201, 201, 201]);
+        expect(await quantityOf(user.id)).toEqual([7]);
+      });
+
+      it('creates the cart and the line once when the first adds arrive together (no 500)', async () => {
+        const [user, product] = [await b.user(), await b.product()];
+
+        const results = await Promise.all(Array.from({ length: 4 }, () => add(user, { productId: product.id })));
+
+        expect(results.map((res) => res.status)).toEqual([201, 201, 201, 201]);
+        expect(await quantityOf(user.id)).toEqual([4]);
+        expect(await rows('SELECT 1 FROM carts')).toHaveLength(1);
+      });
+
+      it('lets only one of two simultaneous adds go through when together they would pass 99', async () => {
+        const [user, product] = [await b.user(), await b.product()];
+
+        const results = await Promise.all([
+          add(user, { productId: product.id, quantity: 60 }),
+          add(user, { productId: product.id, quantity: 60 }),
+        ]);
+
+        expect(results.map((res) => res.status).sort()).toEqual([201, 400]);
+        expect(results.find((res) => res.status === 400)?.body.errorCode).toBe(2004);
+        expect(await quantityOf(user.id)).toEqual([60]);
+      });
+    });
+
     it('answers 404 / 1001 for an unknown product, 400 / 2003 for a disabled one and 400 / 1303 for sold-out or custom-order badges', async () => {
       const user = await b.user();
       const [disabled, soldOut, custom, onSale] = [

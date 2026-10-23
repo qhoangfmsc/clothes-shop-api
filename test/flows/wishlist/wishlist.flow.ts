@@ -38,6 +38,17 @@ describe('Flow: wishlist', () => {
       expect(await entries()).toEqual([{ user_id: me.id, product_id: product.id }]);
     });
 
+    it('is idempotent under a double click: simultaneous adds all succeed, one entry exists and only one answer says created: true', async () => {
+      const [me, product] = [await b.user(), await b.product()];
+
+      const results = await Promise.all(Array.from({ length: 4 }, () => add(me, product.id)));
+
+      expect(results.map((res) => res.status)).toEqual([201, 201, 201, 201]);
+      expect(results.filter((res) => res.body.created === true)).toHaveLength(1);
+      expect(new Set(results.map((res) => res.body.data.id)).size).toBe(1);
+      expect(await entries()).toHaveLength(1);
+    });
+
     it('is idempotent: adding again answers created: false with the same entry and adds no row', async () => {
       const [me, product] = [await b.user(), await b.product()];
       const first = await add(me, product.id).expect(201);

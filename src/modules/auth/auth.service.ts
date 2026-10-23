@@ -1,3 +1,4 @@
+import { isUniqueViolation } from '@common/base/db-error.util';
 import { throwAppError } from '@common/exceptions/app.exception';
 import { EAuthErrorCode } from '@common/exceptions/error-codes';
 import { DEFAULT_USER_PERMISSIONS } from '@common/permissions/permissions.constant';
@@ -42,29 +43,7 @@ export class AuthService {
       googleUser = await this.googleAuthService.fetchUserInfo(credential);
     }
 
-    // Upsert user by email
-    let user = await this.userRepo.findOne({ where: { email: googleUser.email } });
-
-    if (!user) {
-      user = this.userRepo.create({
-        email: googleUser.email,
-        name: googleUser.name,
-        image: googleUser.picture,
-        provider: 'google',
-        providerId: googleUser.sub,
-        role: 'user',
-        permissions: DEFAULT_USER_PERMISSIONS,
-        status: 'active',
-      });
-      user = await this.userRepo.save(user);
-    } else {
-      // Update Google info on each login
-      user.name = googleUser.name || user.name;
-      user.image = googleUser.picture || user.image;
-      user.provider = 'google';
-      user.providerId = googleUser.sub;
-      user = await this.userRepo.save(user);
-    }
+    const user = await this.upsertGoogleUser(googleUser);
 
     const tokens = this.generateTokens(user);
 
@@ -103,6 +82,45 @@ export class AuthService {
     } catch {
       return null;
     }
+  }
+
+  /** Tạo user theo email Google, hoặc cập nhật hồ sơ nếu đã có (kể cả khi vừa bị request đồng thời tạo mất) */
+  private async upsertGoogleUser(googleUser: GoogleUserPayload): Promise<User> {
+    const existing = await this.userRepo.findOne({ where: { email: googleUser.email } });
+    if (existing) return this.refreshGoogleProfile(this.assertActive(existing), googleUser);
+
+    try {
+      return await this.userRepo.save(
+        this.userRepo.create({
+          email: googleUser.email,
+          name: googleUser.name,
+          image: googleUser.picture,
+          provider: 'google',
+          providerId: googleUser.sub,
+          role: 'user',
+          permissions: DEFAULT_USER_PERMISSIONS,
+          status: 'active',
+        }),
+      );
+    } catch (err) {
+      const raced = isUniqueViolation(err, 'UQ_users_email') && (await this.userRepo.findOne({ where: { email: googleUser.email } }));
+      if (!raced) throw err;
+      return this.refreshGoogleProfile(this.assertActive(raced), googleUser);
+    }
+  }
+
+  /** Tài khoản bị khoá không nhận token mới (và không bị cập nhật hồ sơ) */
+  private assertActive(user: User): User {
+    if (user.status !== 'active') throwAppError(EAuthErrorCode.AUTH_USER_DISABLED, undefined, HttpStatus.FORBIDDEN);
+    return user;
+  }
+
+  private refreshGoogleProfile(user: User, googleUser: GoogleUserPayload): Promise<User> {
+    user.name = googleUser.name || user.name;
+    user.image = googleUser.picture || user.image;
+    user.provider = 'google';
+    user.providerId = googleUser.sub;
+    return this.userRepo.save(user);
   }
 
   private get jwtSecret(): string {

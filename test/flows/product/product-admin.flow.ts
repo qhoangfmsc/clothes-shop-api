@@ -119,6 +119,33 @@ describe('Flow: products (admin write)', () => {
       await t.api.get(`/api/products/${created.body.data.id}`).expect(200);
     });
 
+    it('lets exactly one of several simultaneous creations with the same slug through; the others get 400 / 1002 (no 500)', async () => {
+      const [admin, category] = [await b.admin(), await b.category()];
+
+      const results = await Promise.all([1, 2, 3].map(() => create(admin, validBody(category))));
+
+      expect(results.map((res) => res.status).sort()).toEqual([201, 400, 400]);
+      expect(results.filter((res) => res.status === 400).map((res) => res.body.errorCode)).toEqual([1002, 1002]);
+      expect(await productRows()).toHaveLength(1);
+    });
+
+    it('answers 400 / 1003 for simultaneous creations that send the same SKU, and when the generated SKU is already taken', async () => {
+      const [admin, category] = [await b.admin(), await b.category()];
+      const sub = category.subcategories[0];
+      await b.product({ sku: `${category.slug}-${sub.slug}-fresh`, category, subcategory: sub });
+
+      const race = await Promise.all([
+        create(admin, validBody(category, { slug: 'a', sku: 'SAME' })),
+        create(admin, validBody(category, { slug: 'b', sku: 'SAME' })),
+      ]);
+      const generated = await create(admin, validBody(category, { slug: 'fresh' }));
+
+      expect(race.map((res) => res.status).sort()).toEqual([201, 400]);
+      expect(race.find((res) => res.status === 400)?.body.errorCode).toBe(1003);
+      expect(error(generated)).toMatchObject({ status: 400, errorCode: 1003 });
+      expect(await productRows()).toHaveLength(2);
+    });
+
     it('refuses a duplicate slug (400 / 1002) and a duplicate SKU (400 / 1003)', async () => {
       const [admin, category] = [await b.admin(), await b.category()];
       await create(admin, validBody(category, { sku: 'DUP-SKU' })).expect(201);

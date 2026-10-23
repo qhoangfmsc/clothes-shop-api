@@ -1,6 +1,7 @@
 import { ACTIVE_STATUSES, ActiveStatus, USER_ROLES } from '@common/constants/enum-values.constant';
+import { PERMISSION_CODES } from '@common/permissions/permissions.constant';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsArray, IsIn, IsInt, IsOptional, IsString, MaxLength } from 'class-validator';
+import { ArrayUnique, IsArray, IsIn, IsInt, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class UpdateUserDto {
   @ApiPropertyOptional({ enum: USER_ROLES, example: 'admin' })
@@ -23,6 +24,8 @@ export class UpdateUserDto {
   })
   @IsArray()
   @IsInt({ each: true })
+  @IsIn(PERMISSION_CODES, { each: true })
+  @ArrayUnique()
   @IsOptional()
   permissions?: number[];
 }

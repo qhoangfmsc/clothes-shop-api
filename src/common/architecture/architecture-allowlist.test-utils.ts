@@ -13,11 +13,11 @@ export const UNUSED_EXPORTS: Record<string, string[]> = {
 
 // Service đang quá dài: số dòng hiện tại là trần, không được dài thêm
 export const OVERSIZED_SERVICES: Record<string, number> = {
-  'src/modules/category/category.service.ts': 382,
+  'src/modules/category/category.service.ts': 376,
   'src/modules/media/media.service.ts': 333,
   'src/modules/payment/payment.service.ts': 549,
   'src/modules/payment/refund.service.ts': 363,
-  'src/modules/product/product.service.ts': 329,
+  'src/modules/product/product.service.ts': 326,
   'src/modules/return/return.service.ts': 450,
   'src/modules/review/review.service.ts': 559,
 };

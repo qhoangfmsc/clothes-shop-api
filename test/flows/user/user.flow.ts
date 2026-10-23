@@ -188,12 +188,25 @@ describe('Flow: users (admin)', () => {
 
       const role = await patch(admin, admin.id, { role: 'user' });
       const status = await patch(admin, admin.id, { status: 'disabled' });
-      const both = await patch(admin, admin.id, { role: 'admin', permissions: [1] });
+      const both = await patch(admin, admin.id, { role: 'admin', permissions: [Permission.AUTH_ME] });
       const permissions = await patch(admin, admin.id, { permissions: [Permission.AUTH_ME] }).expect(200);
 
       for (const res of [role, status, both]) expect(error(res)).toMatchObject({ status: 400, errorCode: 1402 });
       expect(permissions.body.data).toMatchObject({ role: 'admin', status: 'active', permissions: [Permission.AUTH_ME] });
       expect((await userRow(admin.id)).permissions).toEqual([Permission.AUTH_ME]);
+    });
+
+    it('accepts only permission codes that exist and no repeats; an empty list revokes everything', async () => {
+      const [admin, user] = [await b.admin(), await b.user()];
+
+      const unknown = await patch(admin, user.id, { permissions: [Permission.AUTH_ME, 99_999] });
+      const repeated = await patch(admin, user.id, { permissions: [Permission.AUTH_ME, Permission.AUTH_ME] });
+      const valid = await patch(admin, user.id, { permissions: [Permission.AUTH_ME, Permission.ORDER_VIEW_LIST] }).expect(200);
+      const revoked = await patch(admin, user.id, { permissions: [] }).expect(200);
+
+      for (const res of [unknown, repeated]) expect([res.status, res.body.errorCode]).toEqual([400, undefined]);
+      expect(valid.body.data.permissions).toEqual([Permission.AUTH_ME, Permission.ORDER_VIEW_LIST]);
+      expect(revoked.body.data.permissions).toEqual([]);
     });
 
     it('answers 404 / 1401 for an unknown user', async () => {

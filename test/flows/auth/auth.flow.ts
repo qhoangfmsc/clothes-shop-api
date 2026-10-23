@@ -82,6 +82,37 @@ describe('Flow: auth', () => {
       expect((await me(res.body.accessToken).expect(200)).body.user.email).toBe('new@flow.test');
     });
 
+    it('creates one user when the very first logins of the same email arrive together, and every request gets tokens for it', async () => {
+      idTokenIs(googlePayload());
+
+      const results = await Promise.all(Array.from({ length: 4 }, () => login(ID_TOKEN)));
+
+      expect(results.map((res) => res.status)).toEqual([201, 201, 201, 201]);
+      expect(new Set(results.map((res) => res.body.user.id)).size).toBe(1);
+      expect(await rows('SELECT 1 FROM users')).toHaveLength(1);
+    });
+
+    it('refuses a disabled user before issuing tokens (403 / 2203), leaves the profile untouched, and works again once re-enabled', async () => {
+      const user = await b.user({
+        email: 'blocked@flow.test',
+        name: 'Tên cũ',
+        image: 'old.jpg',
+        providerId: 'old-sub',
+        status: 'disabled',
+      });
+      idTokenIs(googlePayload({ email: 'blocked@flow.test', name: 'Tên mới', picture: 'new.jpg', sub: 'new-sub' }));
+
+      const res = await login(ID_TOKEN);
+
+      expect(error(res)).toEqual({ status: 403, errorCode: 2203, message: 'User account is disabled' });
+      expect(res.body).not.toHaveProperty('accessToken');
+      expect(await rows('SELECT name, image, provider_id, status FROM users')).toEqual([
+        { name: 'Tên cũ', image: 'old.jpg', provider_id: 'old-sub', status: 'disabled' },
+      ]);
+      await rows(`UPDATE users SET status = 'active' WHERE id = $1`, [user.id]);
+      await login(ID_TOKEN).expect(201);
+    });
+
     it('updates name, picture and provider id on a later login but keeps role, permissions and status', async () => {
       const admin = await b.admin({ email: 'boss@flow.test', name: 'Cũ', image: 'old.jpg', providerId: 'old-sub' });
       idTokenIs(googlePayload({ email: 'boss@flow.test', name: 'Tên mới', picture: 'new.jpg', sub: 'new-sub' }));

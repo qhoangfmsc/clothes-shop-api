@@ -1,3 +1,4 @@
+import { isUniqueViolation } from '@common/base/db-error.util';
 import { throwAppError } from '@common/exceptions/app.exception';
 import { EProductErrorCode } from '@common/exceptions/error-codes';
 import { HttpStatus, Injectable } from '@nestjs/common';
@@ -39,9 +40,15 @@ export class WishlistService {
     const existing = await this.wishlistRepo.findOne({ where: { userId, productId } });
     if (existing) return { data: existing, created: false };
 
-    const item = this.wishlistRepo.create({ userId, productId });
-    const saved = await this.wishlistRepo.save(item);
-    return { data: saved, created: true };
+    try {
+      return { data: await this.wishlistRepo.save(this.wishlistRepo.create({ userId, productId })), created: true };
+    } catch (err) {
+      // Bấm đúp: request thua cuộc đua thấy bản ghi của request thắng, như thêm lại
+      const raced =
+        isUniqueViolation(err, 'UQ_wishlists_user_product') && (await this.wishlistRepo.findOne({ where: { userId, productId } }));
+      if (!raced) throw err;
+      return { data: raced, created: false };
+    }
   }
 
   async remove(userId: string, productId: string) {
