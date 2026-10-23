@@ -44,31 +44,10 @@
     },
     "GET /api/size-guides/:category": {
       "error": "Nhóm không có trả 200 với data null (docs 4.1) nên không có ca lỗi nghiệp vụ"
+    },
+    "GET /api/admin/pending-counts": {
+      "error": "Không có input; chỉ có lỗi của guard (401/403, ma trận auth đã kiểm), thiếu quyền một mục thì bỏ key chứ không lỗi"
     }
   },
-  "missing": {
-    "GET /api/admin/media": [
-      "error"
-    ],
-    "POST /api/admin/media": [
-      "success",
-      "error"
-    ],
-    "DELETE /api/admin/media/:fileId": [
-      "success",
-      "error"
-    ],
-    "GET /api/admin/media/ping": [
-      "success"
-    ],
-    "GET /api/admin/pending-counts": [
-      "error"
-    ],
-    "GET /": [
-      "success"
-    ],
-    "GET /health": [
-      "success"
-    ]
-  }
+  "missing": {}
 }
