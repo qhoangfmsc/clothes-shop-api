@@ -136,7 +136,7 @@ Trạng thái: **Xong** · Ghi chú: 2026-10-22; 32 flow mới (`flows/cart/cart
 | 4 | PATCH | `/api/reviews/:reviewId` | JWT | 17000 |
 | 5 | DELETE | `/api/reviews/:reviewId/helpful` | JWT | 17002 |
 
-Trạng thái: **Chưa làm** · Ghi chú: —
+Trạng thái: **Xong** · Ghi chú: 2026-10-23; 56 flow mới (`flows/review/review.flow.ts`), thêm builder `b.review()` và `flows/review/steps.ts`; `deliveredPaidOrder` chuyển sang `order-payment/steps.ts` (dùng chung return + review). `GET /api/reviews/:productId/summary` không có ca lỗi nghiệp vụ → `exempt`
 
 
 ### Batch 10 — review (5 route)
@@ -345,6 +345,7 @@ Trạng thái: **Chưa làm** · Ghi chú: —
 | Batch 05 | 2026-10-22 | order (admin): danh sách, chi tiết, đổi trạng thái | +12 flow (168 → 180) | 21/98 | 25 → 26/96 | Baseline 82 → 78 sau hai batch. Phá thử sắp xếp và tìm kiếm đều bị bắt. Module order xong (8/8 route) |
 | Batch 06–07 | 2026-10-22 | return: khách (điều kiện, tạo, danh sách, chi tiết, huỷ) và admin (danh sách, chi tiết, duyệt, từ chối, nhận hàng) | +67 flow (180 → 247) | 21 → 31/98 | 26 → 36/96 | Baseline 78 → 68. Phá thử 7 điểm (trần số lượng, sở hữu khi huỷ/xem, trạng thái nhận hàng, khoá đơn, hoàn lại khi từ chối khoản hoàn, hoàn xong → REFUNDED, số lượng chấp nhận mặc định) đều bị bắt; 2 điểm sống sót lúc đầu rồi đã bịt: cộng dồn `previousValueVnd` chỉ khác khi làm tròn (thêm ca số tiền nhận 300.000đ → 143.836 + 143.835) và kiểm phí ship một lần (thêm assert message vì nhánh 'vượt tổng đơn' cũng ra 1805). Module return xong (10/10) |
 | Batch 08 | 2026-10-22 | cart: xem, thêm, đổi số lượng, xoá dòng, xoá sạch | +32 flow (247 → 279) | 31 → 36/98 | 36/94 (miễn thêm 2: `GET /api/cart`, `DELETE /api/cart/clear`) | Baseline 68 → 63. Phá thử 6 điểm (cộng dồn, khớp theo size, sở hữu dòng khi sửa, xoá sạch theo giỏ, USD tính từ tổng VND, kiểm badge) đều bị bắt. 2 phát hiện 500 (xem bảng bên dưới). Lưu ý: chạy hai lần `test:flows` chồng nhau trên một DB làm test đỏ ngẫu nhiên và chậm hàng chục phút — chỉ chạy một tiến trình tại một thời điểm |
+| Batch 09 | 2026-10-23 | review: tạo, danh sách công khai, tổng hợp, sửa, bỏ "hữu ích" | +56 flow (279 → 335) | 36 → 42/98 | 36 → 40/93 (miễn thêm: `GET /api/reviews/:productId/summary`) | Baseline 63 → 58. Phá thử 11 điểm (sở hữu khi tạo/sửa, lọc `PUBLISHED` ở danh sách và tổng hợp, tính lại điểm sản phẩm, chặn sửa lần hai, ánh xạ UNIQUE → 409, bỏ phiếu của người khác, làm tròn trung bình, hạn đánh giá, kiểm liên kết) đều bị bắt ngay |
 
 ## Phát hiện cần người dùng quyết định
 
