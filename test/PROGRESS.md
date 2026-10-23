@@ -184,7 +184,7 @@ Trạng thái: **Xong** · Ghi chú: 2026-10-23; làm chung file với batch 11.
 | 4 | GET | `/api/admin/products` | JWT | 6003 |
 | 5 | POST | `/api/admin/products` | JWT | 6000 |
 
-Trạng thái: **Chưa làm** · Ghi chú: —
+Trạng thái: **Xong** · Ghi chú: 2026-10-23; 85 flow mới (`flows/product/product-read.flow.ts`, `product-admin.flow.ts`); thêm 3 phát hiện (xem bảng)
 
 
 ### Batch 14 — product (2 route)
@@ -348,6 +348,7 @@ Trạng thái: **Chưa làm** · Ghi chú: —
 | Batch 09 | 2026-10-23 | review: tạo, danh sách công khai, tổng hợp, sửa, bỏ "hữu ích" | +56 flow (279 → 335) | 36 → 42/98 | 36 → 40/93 (miễn thêm: `GET /api/reviews/:productId/summary`) | Baseline 63 → 58. Phá thử 11 điểm (sở hữu khi tạo/sửa, lọc `PUBLISHED` ở danh sách và tổng hợp, tính lại điểm sản phẩm, chặn sửa lần hai, ánh xạ UNIQUE → 409, bỏ phiếu của người khác, làm tròn trung bình, hạn đánh giá, kiểm liên kết) đều bị bắt ngay |
 | Batch 10 | 2026-10-23 | review (khách): vote, upload ảnh, đánh giá của tôi, chờ đánh giá, phiếu đã bấm | +33 flow (335 → 368) | 42 → 47/98 | 40 → 45/93 | Baseline 58 → 53. Phá thử 14 điểm đều bị bắt; 2 điểm lọt lúc đầu rồi đã bịt: kiểm trạng thái thanh toán ở `pending` (thêm ca đơn đã giao nhưng chưa trả, dựng bằng SQL) và mutation loại ảnh (lỗi biên dịch của chính mutation, làm lại) |
 | Batch 11–12 | 2026-10-23 | review (admin): danh sách, chi tiết, ẩn, hiện lại, đặt và xoá phản hồi | +37 flow (368 → 405) | 47 → 53/98 | 45 → 51/93 | Baseline 53 → 47. Phá thử 10 điểm (tính lại điểm khi ẩn/hiện, chặn ẩn hai lần, xoá lý do khi hiện lại, đảo bộ lọc `replied`, tìm theo tên sản phẩm, lọc theo slug, xoá `repliedBy`, bỏ khoá dòng, ghi lý do) đều bị bắt ngay. Module review xong (16/16) |
+| Batch 13 | 2026-10-23 | product: danh sách, chi tiết, autocomplete (công khai), danh sách admin, tạo | +85 flow (405 → 490) | 53 → 58/98 | 51 → 56/93 | Baseline 47 → 42. Phá thử 18 điểm đều bị bắt; 1 điểm lọt lúc đầu (xếp hạng khớp-đầu của autocomplete, vì tên có dấu "Á" vốn đã xếp sau "P") rồi đã bịt bằng tên ASCII. 3 phát hiện cần quyết định (500 khi tạo đồng thời cùng slug, 500 khi SKU tự sinh trùng, PATCH nhận chuỗi rỗng) |
 
 ## Phát hiện cần người dùng quyết định
 
@@ -358,3 +359,6 @@ Test lộ ra hành vi nghi là lỗi trong code thì ghi ở đây (route, hành
 | 02 | `GET /api/admin/payments/transactions` | Response chứa `rawPayload` (body SePay nguyên văn, có `accountNumber` tài khoản nhận) và `paymentAttempt.bankAccount` | `GET /api/admin/payments/attempts` được docs ghi là "không trả raw_payload, số tài khoản nhận"; docs của endpoint giao dịch không nói gì. Không rõ chủ đích (đối soát) hay sót | Chờ người dùng quyết định (test không khẳng định theo hướng nào) |
 | 08 | `POST /api/cart/items` | Thêm cùng sản phẩm/size/màu khi dòng đã có 99 cái (cộng dồn > 99) trả **500** `Internal server error` (vi phạm `CK_cart_items_quantity_max` ở DB) | Lỗi nghiệp vụ có errorCode 4xx; CLAUDE.md: bọc try/catch lỗi DB ra mã lỗi đẹp. DTO chỉ chặn `quantity` 1–99 của một lần gọi, không chặn tổng | Chờ người dùng quyết định (test không khẳng định) |
 | 08 | `POST /api/cart/items` | Nhiều lần thêm đồng thời khi user chưa có giỏ/dòng: 3 request song song cho `[201, 500, 500]` (đua tạo `carts`/`cart_items` vi phạm UNIQUE `UQ_carts_user` / `UQ_cart_items_unique`) | Request thua nên được xử lý như thêm vào dòng đã có (hoặc trả lỗi 4xx), không 500; docs/CLAUDE.md yêu cầu UNIQUE ở DB cộng bắt lỗi ra mã đẹp | Chờ người dùng quyết định (test không khẳng định) |
+| 13 | `POST /api/admin/products` | Hai request tạo đồng thời cùng `slug` cho `[201, 500, 500]` (kiểm tra trùng chạy trước khi lưu, không bắt UNIQUE `UQ_products_slug` / `UQ_products_sku`) | `PRODUCT_SLUG_DUPLICATE (1002)` / `PRODUCT_SKU_DUPLICATE (1003)`; CLAUDE.md: bắt lỗi DB ra mã đẹp | Chờ người dùng quyết định (test không khẳng định) |
+| 13 | `POST /api/admin/products` | `sku` tự sinh `{category}-{subcategory}-{slug}` không được kiểm tra trùng: nếu trùng `sku` có sẵn (vd sản phẩm khác dùng `sku` tuỳ chỉnh đúng chuỗi đó) thì vi phạm `UQ_products_sku` và trả 500 | `PRODUCT_SKU_DUPLICATE (1003)` như khi gửi `sku` trùng | Chờ người dùng quyết định (test không khẳng định) |
+| 13 | `PATCH /api/admin/products/:id` | `UpdateProductDto` thiếu `@IsNotEmpty` cho `slug`/`name`/`description`/`categoryId`/`subcategoryId`: PATCH `{ "slug": "", "name": "" }` trả 200 và lưu chuỗi rỗng | `docs/modules/product.md` 4.1: mọi field của update "cùng ràng buộc" như create (create yêu cầu not empty) | Chờ người dùng quyết định (test batch 14 không khẳng định) |

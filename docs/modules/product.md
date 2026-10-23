@@ -1,6 +1,6 @@
 # product (`src/modules/product`)
 
-> Cập nhật lần cuối: 2026-10-19
+> Cập nhật lần cuối: 2026-10-23
 
 ## 1. Tổng quan
 
@@ -188,9 +188,18 @@ Sizes/colors/images rỗng không có error code riêng: bị chặn ở DTO (`A
 
 ### 4.7 Test
 
-`product.presenter.spec.ts` — `presentProduct` (thay field giá bằng cặp Vnd/Usd, giá gốc `null`, không đổi entity gốc; `category`/`subcategory` cùng hình dạng dù nạp kiểu nào, vắng mặt khi chưa nạp). `product.service.spec.ts` — lọc `minRating` và sort theo `ratingAverage`/`ratingCount` (public: điều kiện, `NULLS LAST`, thứ tự phụ; admin: `where`/`order`, kết hợp với search). Các phần còn lại của service chưa có spec riêng. `PublicProductQueryDto` và `AdminProductQueryDto` được `list-query.dto.spec.ts` kiểm tra tự động; `ProductAutocompleteQueryDto` và `ProductDetailQueryDto` nằm trong danh sách DTO không phải list. `presentProductSummary`: giữ đúng các key của `ProductSummary`, `null` khi thiếu ảnh/badge/quan hệ; autocomplete trả summary kèm `priceVnd`/`priceUsd` và join `category`, `subcategory`. `presentProduct`: bỏ `category.subcategories` và `subcategory.category`, không đụng entity gốc, không thêm field khi quan hệ chưa nạp. `findById`: `related` dùng `take` mặc định 4 và theo `relatedLimit`; `ProductDetailQueryDto`: mặc định 4, ép kiểu số, từ chối 0, âm, > 20, chữ, số thập phân.
+`product.presenter.spec.ts` — `presentProduct` (thay field giá bằng cặp Vnd/Usd, giá gốc `null`, không đổi entity gốc; `category`/`subcategory` cùng hình dạng dù nạp kiểu nào, vắng mặt khi chưa nạp). `product.service.spec.ts` — lọc `minRating` và sort theo `ratingAverage`/`ratingCount` (public: điều kiện, `NULLS LAST`, thứ tự phụ; admin: `where`/`order`, kết hợp với search). Các phần còn lại của service chưa có unit spec riêng. `PublicProductQueryDto` và `AdminProductQueryDto` được `list-query.dto.spec.ts` kiểm tra tự động; `ProductAutocompleteQueryDto` và `ProductDetailQueryDto` nằm trong danh sách DTO không phải list. `presentProductSummary`: giữ đúng các key của `ProductSummary`, `null` khi thiếu ảnh/badge/quan hệ; autocomplete trả summary kèm `priceVnd`/`priceUsd` và join `category`, `subcategory`. `presentProduct`: bỏ `category.subcategories` và `subcategory.category`, không đụng entity gốc, không thêm field khi quan hệ chưa nạp. `findById`: `related` dùng `take` mặc định 4 và theo `relatedLimit`; `ProductDetailQueryDto`: mặc định 4, ép kiểu số, từ chối 0, âm, > 20, chữ, số thập phân.
+
+Flow test trên Postgres thật (`test/flows/product/`; builder `b.product()` nhận `category`/`subcategory`/`createdAt`/`ratingAverage` để dựng dữ liệu):
+
+- `product-read.flow.ts` (batch 13) — danh sách công khai (chỉ `active`, hình dạng chuẩn với cặp `Vnd`/`Usd`, tìm theo tên/slug/mô tả, lọc category/subcategory/badge, khoảng giá hai đầu gồm cả biên, size/màu khớp một trong các giá trị và bỏ qua mục rỗng, `minRating` loại sản phẩm chưa có đánh giá, sort tăng/giảm với sản phẩm chưa có đánh giá luôn cuối, phân trang, tham số sai); chi tiết (`related` cùng category, chỉ `active`, bỏ chính nó, mới nhất trước, mặc định 4 và `relatedLimit`, 404 / 1001, `relatedLimit` sai); autocomplete (khớp chứa tên/slug, tên bắt đầu bằng `q` lên trước rồi theo tên, `%`/`_` khớp theo nghĩa đen, `limit`, `q`/`limit` sai); danh sách admin (mọi trạng thái, tìm theo tên/slug/SKU/mô tả kết hợp với bộ lọc, lọc category/badge/status/`minRating`, sort, phân trang, tham số sai).
+- `product-admin.flow.ts` (batch 13: tạo) — tạo (SKU tự sinh `{category}-{subcategory}-{slug}`, SKU và giá gốc tuỳ chỉnh, biên giá 1 và 1.000.000.000, `disabled` không hiện ở danh sách công khai, 1002/1003/1009/1004/1005, validation từng field kể cả tên cũ `price`/`originalPrice` và các field không được gửi).
 
 ### 4.8 Lưu ý hiện trạng
+
+- Tạo hai sản phẩm đồng thời cùng `slug` (hoặc cùng `sku`): kiểm tra trùng chạy trước khi lưu và không bắt lỗi UNIQUE của DB, nên request thua trả 500 thay vì `PRODUCT_SLUG_DUPLICATE` / `PRODUCT_SKU_DUPLICATE`.
+- `sku` tự sinh (khi không gửi `sku`) không được kiểm tra trùng; nếu trùng `sku` của sản phẩm khác (vd sản phẩm kia dùng `sku` tuỳ chỉnh đúng bằng chuỗi này) thì vi phạm UNIQUE `UQ_products_sku` và trả 500.
+- `UpdateProductDto` không có `@IsNotEmpty` cho `slug`, `name`, `description`, `categoryId`, `subcategoryId` (create có): `PATCH` với chuỗi rỗng ở các field này được chấp nhận và lưu.
 
 - `GET /api/products/:id` không lọc theo `status`: sản phẩm `disabled` vẫn xem được chi tiết theo id; `related` thì chỉ gồm `active`.
 - `sort=price` và `minPrice`/`maxPrice` luôn theo VND (tiền gốc); không có lọc/sắp xếp theo USD.
