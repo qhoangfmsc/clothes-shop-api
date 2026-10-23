@@ -148,7 +148,7 @@ Luật đầy đủ: `.claude/rules/engineering-principles.md` · Kiến thức,
 - **Flow** (`yarn test:flows`): `test/flows/<module>/*.flow.ts`, HTTP thật + Postgres thật (docker, cổng 55432, DB `*_test`, schema dựng từ migration). Bắt buộc cho luồng chính; chạm luồng tiền/trạng thái đơn/thanh toán/hoàn tiền/trả hàng/auth thì phải mở rộng flow tương ứng. Sửa bug: viết test tái hiện trước.
 - Độ phủ endpoint do máy đo cuối `yarn test:flows` (ca thành công + ca lỗi mỗi route, ratchet `test/coverage-baseline.json`): route mới bắt buộc kèm test, phủ thêm thì `yarn test:coverage:update`.
 - Bảng luồng nào có test nào: `test/README.md` — cập nhật cùng lượt khi thêm/đổi test. Hạ tầng: `docs/specs/testing/0001-flow-test-infrastructure.md`.
-- Test toàn diện cho mọi route (ca đúng, ca lỗi, auth, quyền) làm theo từng lượt 1 batch ≤ 5 route: skill `test-campaign`, tiến độ `test/PROGRESS.md` (đọc trước khi làm việc test lớn).
+- Chiến dịch test toàn diện (ca đúng, ca lỗi, auth, quyền cho mọi route) đã xong 25/25 batch (nhật ký `test/PROGRESS.md`); đợt phủ lớn mới dùng lại skill `test-campaign` theo lượt 1 batch ≤ 5 route.
 
 ## Migration Convention
 

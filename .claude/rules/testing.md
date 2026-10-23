@@ -50,7 +50,7 @@ Hạ tầng flow test (spec): `docs/specs/testing/0001-flow-test-infrastructure.
 
 ## Chiến dịch test toàn diện
 
-Phủ ca đúng + ca lỗi + auth/quyền cho **mọi route** được làm theo từng lượt nhỏ (1 batch ≤ 5 route/lượt), có đong đếm và nối lại được giữa các phiên: skill `test-campaign`, tiến độ ở `test/PROGRESS.md`. Làm việc test lớn thì mở PROGRESS.md trước, không làm ngoài batch đang đến lượt.
+Chiến dịch phủ ca đúng + ca lỗi + auth/quyền cho **mọi route** đã hoàn tất (2026-10-23, 25/25 batch, nhật ký ở `test/PROGRESS.md`); từ nay ratchet giữ mức đó (route mới phải kèm test). Cần một đợt phủ lớn khác (vd module mới nhiều route) thì dùng lại skill `test-campaign`: lượt nhỏ (1 batch ≤ 5 route), có đong đếm, nối lại được giữa các phiên, mở PROGRESS.md trước.
 
 ## Test matrix
 

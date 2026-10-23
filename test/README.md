@@ -1,8 +1,8 @@
 # Test — nơi quản lý toàn bộ test
 
-Cập nhật lần cuối: 2026-10-21 · Luật: `.claude/rules/testing.md` · Thao tác: skill `module-test` · Hạ tầng (spec): `docs/specs/testing/0001-flow-test-infrastructure.md`, `0002-access-matrix-and-endpoint-coverage.md`
+Cập nhật lần cuối: 2026-10-23 · Luật: `.claude/rules/testing.md` · Thao tác: skill `module-test` · Hạ tầng (spec): `docs/specs/testing/0001-flow-test-infrastructure.md`, `0002-access-matrix-and-endpoint-coverage.md`
 
-**Chiến dịch test toàn diện (98 route, từng lượt 1 batch ≤ 5 route):** quy trình ở skill `test-campaign`, kế hoạch + nhật ký + trạng thái ở [`PROGRESS.md`](PROGRESS.md).
+**Chiến dịch test toàn diện (98 route, 25 batch) — đã hoàn tất 2026-10-23:** 98/98 route có ca thành công, 82/82 route còn lại có ca lỗi nghiệp vụ, 16 route miễn ca lỗi kèm lý do; quy trình ở skill `test-campaign`, nhật ký + các phát hiện chờ quyết định ở [`PROGRESS.md`](PROGRESS.md).
 
 ## Hai tầng
 
