@@ -1,6 +1,6 @@
 # shipping (`src/modules/shipping`)
 
-> Cập nhật lần cuối: 2026-10-16
+> Cập nhật lần cuối: 2026-10-23
 
 ## 1. Tổng quan
 
@@ -104,6 +104,7 @@ Không có bảng riêng. Cấu hình nằm ở `site_configs` (key `SHIPPING_CO
 ### 4.7 Test
 
 - `shipping-config.spec.ts` — `parseShippingConfig` (config mặc định, VND nguyên, `null`, chuẩn hoá thứ tự, các trường hợp bị từ chối gồm số lẻ, vượt trần và khoá cũ `price`/`freeShippingThreshold`) và `validateShippingConfigValue` (lỗi 1503).
+- Flow test trên Postgres thật: `test/flows/shipping/shipping.flow.ts` (batch 23) — mặc định khi chưa cấu hình (3 phương thức với cặp `Vnd`/`Usd`, ngưỡng 1.500.000₫, chính sách đổi trả, không có `notes`/`freeAbove`), cấu hình của admin có hiệu lực ngay (giá, ngưỡng, văn bản, chính sách), ngưỡng `null` cho cả hai tiền tệ, USD theo tỷ giá hiện tại, giá trị hỏng/sai cấu trúc/đã xoá → dùng mặc định thay vì lỗi, cùng nguồn với `POST /api/orders/quote` (phí và ngưỡng miễn phí) và với hạn đổi trả của module return.
 - `shipping-config.service.spec.ts` — `ShippingConfigService.get` (đọc config, điền chính sách đổi trả mặc định khi thiếu, fallback khi thiếu dòng/JSON hỏng/sai cấu trúc, trả bản sao) và `ShippingController` (response mặc định có cặp `priceVnd`/`priceUsd` và `freeShippingThresholdVnd/Usd`, không có `freeAbove` và `notes`, phản ánh thay đổi của admin, trả chính sách đổi trả đã cấu hình, ngưỡng `null` ở cả hai tiền tệ). `shipping-config.spec.ts` cũng cover các trường hợp `returnPolicy` hợp lệ/sai.
 
 ### 4.8 Lưu ý hiện trạng

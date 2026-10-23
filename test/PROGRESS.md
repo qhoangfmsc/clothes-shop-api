@@ -289,7 +289,7 @@ Trạng thái: **Xong** · Ghi chú: 2026-10-23; làm chung file `flows/user/use
 | 4 | PUT | `/api/admin/site-config/:key` | JWT | 11001 |
 | 5 | GET | `/api/admin/site-config/keys` | JWT | 11000 |
 
-Trạng thái: **Chưa làm** · Ghi chú: —
+Trạng thái: **Xong** · Ghi chú: 2026-10-23; 32 flow mới (`flows/site-config/site-config.flow.ts`); `GET /api/admin/site-config` và `GET /api/admin/site-config/keys` không có ca lỗi nghiệp vụ → `exempt`
 
 
 ### Batch 23 — site-config+shipping+size-guide (2 route)
@@ -299,7 +299,7 @@ Trạng thái: **Chưa làm** · Ghi chú: —
 | 1 | GET | `/api/shipping` | Public | — |
 | 2 | GET | `/api/size-guides/:category` | Public | — |
 
-Trạng thái: **Chưa làm** · Ghi chú: —
+Trạng thái: **Xong** · Ghi chú: 2026-10-23; 17 flow mới (`flows/shipping/shipping.flow.ts`, `flows/size-guide/size-guide.flow.ts`); `GET /api/shipping` và `GET /api/size-guides/:category` → `exempt` ca lỗi. Module site-config, shipping, size-guide hoàn tất
 
 
 ### Batch 24 — media+pending-count+health (5 route)
@@ -355,6 +355,7 @@ Trạng thái: **Chưa làm** · Ghi chú: —
 | Batch 18 | 2026-10-23 | address: danh sách, tạo, sửa, xoá | +40 flow (649 → 688) | 72 → 76/98 | 69 → 70/92 (miễn thêm: `GET /api/addresses`) | Baseline 29 → 25. Phá thử 8 điểm: 7 bị bắt; 1 mutant tương đương (lấy chủ sở hữu từ body: DTO đã cấm `userId` nên không thể đi qua HTTP, test DTO ghim lớp này). 1 phát hiện (PATCH nhận chuỗi rỗng; response thiếu field không gửi). Module address xong (4/4) |
 | Batch 19 | 2026-10-23 | wishlist: thêm, danh sách, kiểm tra, bỏ | +12 flow (688 → 700) | 76 → 79/98 | 70 → 71/92 (miễn thêm 3 route) | Baseline 25 → 21. Phá thử 8 điểm đều bị bắt. 1 phát hiện: thêm đồng thời cùng sản phẩm (bấm đúp) cho `[201, 500, 500]`. Module wishlist xong (4/4) |
 | Batch 20–21 | 2026-10-23 | auth (đăng nhập Google, refresh, me, permissions) + user (danh sách, chi tiết, sửa) | +49 flow (700 → 749) | 79 → 86/98 | 71 → 76/87 (miễn thêm: `GET /api/auth/me`, `GET /api/auth/permissions`) | Baseline 21 → 14. Phá thử 15 điểm (role/permission mặc định, phân loại credential, loại token, trạng thái user, tự sửa, lọc/tìm) đều bị bắt. 3 phát hiện: đăng nhập lần đầu đồng thời → 500; user bị khoá vẫn đăng nhập được; PATCH nhận mã permission lạ. Module auth, user xong |
+| Batch 22–23 | 2026-10-23 | site-config (đọc, danh sách, key, đặt, xoá), shipping, size-guide | +49 flow (749 → 798) | 86 → 93/98 | 76 → 79/83 (miễn thêm 4 route) | Baseline 14 → 11. Phá thử 13 điểm: 12 bị bắt; 1 mutant tương đương (`findOne` đã trả `null` nên `config ?? null` và `config` như nhau). 1 điểm lọt lúc đầu (type của key được đặt lại khi cập nhật) rồi đã bịt bằng ca dòng có type khác. Module site-config, shipping, size-guide xong |
 
 ## Phát hiện cần người dùng quyết định
 

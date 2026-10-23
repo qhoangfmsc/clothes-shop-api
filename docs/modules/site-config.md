@@ -1,6 +1,6 @@
 # site-config (`src/modules/site-config`)
 
-> Cập nhật lần cuối: 2026-10-16
+> Cập nhật lần cuối: 2026-10-23
 
 ## 1. Tổng quan
 
@@ -103,9 +103,13 @@ Migration `AddSiteConfig` seed 4 key banner với `value = '[]'`; migration `Add
 
 ### 4.7 Test
 
+- Flow test trên Postgres thật: `test/flows/site-config/site-config.flow.ts` (batch 22; bảng `site_configs` trống ở đầu mỗi test nên các giá trị mặc định trong code được dùng) — danh sách key của registry kèm type; tạo/thay giá trị giữ nguyên dòng, type suy ra từ key và được đặt lại nếu dòng có type khác, banner nhận mọi object/mảng JSON, `SHIPPING_CONFIG` được chuẩn hoá thứ tự phương thức, `EXCHANGE_RATE` có hiệu lực ngay ở mọi số USD, 1502/1503 giữ nguyên giá trị đã lưu, validation (`value` thiếu/rỗng/không phải JSON/JSON nguyên thuỷ/không phải chuỗi, field lạ như `type`); đọc công khai (có/không token, `data: null`, `key` sai); danh sách admin (theo `key`, không phân trang); xoá (đọc công khai trả `null`, tỷ giá về mặc định, 1501 kể cả key ngoài registry và xoá lần hai).
 - `site-config.service.spec.ts` — `upsert` (lưu `SHIPPING_CONFIG` với type `SHIPPING` sau khi validate, lưu `EXCHANGE_RATE` với type `CURRENCY`, từ chối cấu hình ship/tỷ giá sai với 1503 và không lưu, cập nhật dòng có sẵn, key banner vẫn nhận JSON bất kỳ, key lạ → 1502) và `findValue`.
 
 ### 4.8 Lưu ý hiện trạng
+
+- `value` được kiểm bằng `IsJSON` của class-validator nên chỉ nhận chuỗi JSON là object hoặc mảng; JSON nguyên thuỷ (`"text"`, `25000`, `null`) bị từ chối ở DTO (400 không có `errorCode`).
+- Lỗi `SITE_CONFIG_KEY_INVALID` và `SITE_CONFIG_NOT_FOUND` trả HTTP 400 (không có status riêng).
 
 - Admin `DELETE` với key ngoài registry cũng trả `SITE_CONFIG_NOT_FOUND` (không phân biệt với key hợp lệ nhưng chưa có dòng).
 - Với key banner, BE chỉ kiểm tra `value` là JSON hợp lệ, không kiểm tra cấu trúc bên trong (ví dụ danh sách `{ image, title, href }`); chỉ `SHIPPING_CONFIG` và `EXCHANGE_RATE` được kiểm cấu trúc.
