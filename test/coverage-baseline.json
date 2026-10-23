@@ -26,37 +26,15 @@
     },
     "GET /api/wishlist/check/:productId": {
       "error": "Chỉ trả có/không; productId lạ trả inWishlist false nên không có ca lỗi nghiệp vụ"
+    },
+    "GET /api/auth/me": {
+      "error": "Chỉ có lỗi của guard (401/403, ma trận auth đã kiểm); 2201 không đến được qua HTTP vì JwtStrategy đã chặn user không tồn tại"
+    },
+    "GET /api/auth/permissions": {
+      "error": "Không có input; chỉ có lỗi của guard (401/403, ma trận auth đã kiểm)"
     }
   },
   "missing": {
-    "POST /api/auth/google": [
-      "success",
-      "error"
-    ],
-    "GET /api/auth/me": [
-      "success",
-      "error"
-    ],
-    "GET /api/auth/permissions": [
-      "success",
-      "error"
-    ],
-    "POST /api/auth/refresh": [
-      "success",
-      "error"
-    ],
-    "GET /api/admin/users": [
-      "success",
-      "error"
-    ],
-    "GET /api/admin/users/:id": [
-      "success",
-      "error"
-    ],
-    "PATCH /api/admin/users/:id": [
-      "success",
-      "error"
-    ],
     "GET /api/site-config": [
       "success",
       "error"
