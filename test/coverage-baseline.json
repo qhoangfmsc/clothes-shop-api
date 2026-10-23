@@ -11,31 +11,13 @@
     },
     "DELETE /api/cart/clear": {
       "error": "Không có input; xoá sạch idempotent (giỏ rỗng hoặc chưa có vẫn trả giỏ rỗng) nên không có ca lỗi nghiệp vụ"
+    },
+    "GET /api/reviews/:productId/summary": {
+      "error": "Chỉ có productId trong đường dẫn; id không tồn tại trả bản tổng hợp rỗng nên không có ca lỗi nghiệp vụ"
     }
   },
   "missing": {
-    "POST /api/reviews": [
-      "success",
-      "error"
-    ],
-    "GET /api/reviews/:productId": [
-      "success",
-      "error"
-    ],
-    "GET /api/reviews/:productId/summary": [
-      "success",
-      "error"
-    ],
-    "PATCH /api/reviews/:reviewId": [
-      "success",
-      "error"
-    ],
-    "DELETE /api/reviews/:reviewId/helpful": [
-      "success",
-      "error"
-    ],
     "POST /api/reviews/:reviewId/helpful": [
-      "success",
       "error"
     ],
     "POST /api/reviews/images": [

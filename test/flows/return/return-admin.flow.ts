@@ -1,6 +1,7 @@
 import { type Builders, bearer, createBuilders, createTestApp, type TestApp, truncateAll } from '../../support';
 import { requestWhileRowLocked } from '../../support/locks';
-import { deliveredPaidOrder, requestReturn } from './steps';
+import { deliveredPaidOrder } from '../order-payment/steps';
+import { requestReturn } from './steps';
 
 /** Batch 07 (return, admin): danh sách, chi tiết, duyệt, từ chối, nhận hàng và liên kết với khoản hoàn. */
 describe('Flow: returns (admin)', () => {

@@ -6,6 +6,7 @@ import { CartItem } from '../../src/modules/cart/cart-item.entity';
 import { Category } from '../../src/modules/category/category.entity';
 import { SubCategory } from '../../src/modules/category/sub-category.entity';
 import { Product } from '../../src/modules/product/product.entity';
+import { Review } from '../../src/modules/review/review.entity';
 import { User } from '../../src/modules/user/user.entity';
 
 let seq = 0;
@@ -19,6 +20,7 @@ export function createBuilders(dataSource: DataSource) {
   const carts = dataSource.getRepository(Cart);
   const cartItems = dataSource.getRepository(CartItem);
   const addresses = dataSource.getRepository(Address);
+  const reviews = dataSource.getRepository(Review);
 
   async function user(overrides: Partial<User> = {}): Promise<User> {
     const n = next();
@@ -107,7 +109,33 @@ export function createBuilders(dataSource: DataSource) {
     );
   }
 
-  return { user, admin, category, product, cart, address };
+  // đánh giá seed kiểu cũ (không gắn dòng hàng); mặc định thoả CHECK của DB
+  async function review(product: Product, overrides: Partial<Review> = {}): Promise<Review> {
+    const n = next();
+    return reviews.save(
+      reviews.create({
+        productId: product.id,
+        userId: null,
+        orderItemId: null,
+        author: `Reviewer ${n}`,
+        avatar: '',
+        rating: 5,
+        date: '2026-10-01',
+        title: `Title ${n}`,
+        content: `Content ${n}`,
+        verified: true,
+        size: 'M',
+        color: 'Black',
+        fit: null,
+        images: [],
+        status: 'PUBLISHED',
+        helpfulCount: 0,
+        ...overrides,
+      }),
+    );
+  }
+
+  return { user, admin, category, product, cart, address, review };
 }
 
 export type Builders = ReturnType<typeof createBuilders>;
