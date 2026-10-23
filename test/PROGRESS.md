@@ -162,7 +162,7 @@ Trạng thái: **Xong** · Ghi chú: 2026-10-23; 33 flow mới (`flows/review/re
 | 4 | POST | `/api/admin/reviews/:reviewId/publish` | JWT | 18001 |
 | 5 | DELETE | `/api/admin/reviews/:reviewId/reply` | JWT | 18002 |
 
-Trạng thái: **Chưa làm** · Ghi chú: —
+Trạng thái: **Xong** · Ghi chú: 2026-10-23; 37 flow mới chung với batch 12 (`flows/review/review-admin.flow.ts`)
 
 
 ### Batch 12 — review (1 route)
@@ -171,7 +171,7 @@ Trạng thái: **Chưa làm** · Ghi chú: —
 |---|---|---|---|---|
 | 1 | PUT | `/api/admin/reviews/:reviewId/reply` | JWT | 18002 |
 
-Trạng thái: **Chưa làm** · Ghi chú: —
+Trạng thái: **Xong** · Ghi chú: 2026-10-23; làm chung file với batch 11. Module review hoàn tất (16/16 route; `GET /api/reviews/:productId/summary` miễn ca lỗi)
 
 
 ### Batch 13 — product (5 route)
@@ -347,6 +347,7 @@ Trạng thái: **Chưa làm** · Ghi chú: —
 | Batch 08 | 2026-10-22 | cart: xem, thêm, đổi số lượng, xoá dòng, xoá sạch | +32 flow (247 → 279) | 31 → 36/98 | 36/94 (miễn thêm 2: `GET /api/cart`, `DELETE /api/cart/clear`) | Baseline 68 → 63. Phá thử 6 điểm (cộng dồn, khớp theo size, sở hữu dòng khi sửa, xoá sạch theo giỏ, USD tính từ tổng VND, kiểm badge) đều bị bắt. 2 phát hiện 500 (xem bảng bên dưới). Lưu ý: chạy hai lần `test:flows` chồng nhau trên một DB làm test đỏ ngẫu nhiên và chậm hàng chục phút — chỉ chạy một tiến trình tại một thời điểm |
 | Batch 09 | 2026-10-23 | review: tạo, danh sách công khai, tổng hợp, sửa, bỏ "hữu ích" | +56 flow (279 → 335) | 36 → 42/98 | 36 → 40/93 (miễn thêm: `GET /api/reviews/:productId/summary`) | Baseline 63 → 58. Phá thử 11 điểm (sở hữu khi tạo/sửa, lọc `PUBLISHED` ở danh sách và tổng hợp, tính lại điểm sản phẩm, chặn sửa lần hai, ánh xạ UNIQUE → 409, bỏ phiếu của người khác, làm tròn trung bình, hạn đánh giá, kiểm liên kết) đều bị bắt ngay |
 | Batch 10 | 2026-10-23 | review (khách): vote, upload ảnh, đánh giá của tôi, chờ đánh giá, phiếu đã bấm | +33 flow (335 → 368) | 42 → 47/98 | 40 → 45/93 | Baseline 58 → 53. Phá thử 14 điểm đều bị bắt; 2 điểm lọt lúc đầu rồi đã bịt: kiểm trạng thái thanh toán ở `pending` (thêm ca đơn đã giao nhưng chưa trả, dựng bằng SQL) và mutation loại ảnh (lỗi biên dịch của chính mutation, làm lại) |
+| Batch 11–12 | 2026-10-23 | review (admin): danh sách, chi tiết, ẩn, hiện lại, đặt và xoá phản hồi | +37 flow (368 → 405) | 47 → 53/98 | 45 → 51/93 | Baseline 53 → 47. Phá thử 10 điểm (tính lại điểm khi ẩn/hiện, chặn ẩn hai lần, xoá lý do khi hiện lại, đảo bộ lọc `replied`, tìm theo tên sản phẩm, lọc theo slug, xoá `repliedBy`, bỏ khoá dòng, ghi lý do) đều bị bắt ngay. Module review xong (16/16) |
 
 ## Phát hiện cần người dùng quyết định
 

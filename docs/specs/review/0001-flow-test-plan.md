@@ -1,6 +1,6 @@
 # 0001 — Kế hoạch flow test cho module review
 
-> Module: `review` · Trạng thái: Approved · Ngày: 2026-10-23 · Cỡ: rút gọn
+> Module: `review` · Trạng thái: Implemented · Ngày: 2026-10-23 · Cỡ: rút gọn
 
 ## 1. Bối cảnh & vấn đề
 
@@ -18,8 +18,8 @@ Mỗi route review có ≥ 1 ca thành công và ≥ 1 ca lỗi nghiệp vụ tr
 |---|---|---|
 | 09 | `POST /api/reviews`, `GET /api/reviews/:productId`, `GET /api/reviews/:productId/summary`, `PATCH /api/reviews/:reviewId`, `DELETE /api/reviews/:reviewId/helpful` | `test/flows/review/review.flow.ts` |
 | 10 | `POST /api/reviews/:reviewId/helpful`, `POST /api/reviews/images`, `GET /api/my-reviews`, `/pending`, `/votes` | `test/flows/review/review-customer.flow.ts` |
-| 11 | `GET /api/admin/reviews`, `GET /api/admin/reviews/:reviewId`, `POST .../hide`, `POST .../publish`, `DELETE .../reply` | _(chưa làm)_ |
-| 12 | `PUT /api/admin/reviews/:reviewId/reply` | _(chưa làm)_ |
+| 11 | `GET /api/admin/reviews`, `GET /api/admin/reviews/:reviewId`, `POST .../hide`, `POST .../publish`, `DELETE .../reply` | `test/flows/review/review-admin.flow.ts` |
+| 12 | `PUT /api/admin/reviews/:reviewId/reply` | `test/flows/review/review-admin.flow.ts` |
 
 ## 4. Kế hoạch test
 
@@ -31,5 +31,8 @@ Theo skill `test-campaign`; phá thử các điểm tính điểm sản phẩm, 
 
 ## 6. Kết quả triển khai
 
+- **Batch 11–12:** 37 flow test dùng chung một file. Phá thử 10 điểm (tính lại điểm sản phẩm khi ẩn/hiện, ẩn hai lần, xoá lý do khi hiện lại, đảo bộ lọc `replied`, tìm theo tên sản phẩm, lọc theo slug, xoá `repliedBy`, bỏ khoá dòng, ghi lý do) đều bị bắt.
+- **Tổng module:** 16/16 route review có ca thành công và ca lỗi nghiệp vụ trên Postgres thật (`GET /api/reviews/:productId/summary` miễn ca lỗi). Độ phủ toàn cục sau batch 12: thành công 53/98, lỗi 51/93, baseline 47 route. Không có phát hiện cần quyết định.
+- **Docs:** `review.md` (4.7), `test/README.md`, `test/PROGRESS.md`.
 - **Batch 10:** 33 flow test; storage giả bằng `jest.spyOn(globalThis, 'fetch')`. Phá thử 14 điểm (vote: tự vote, trùng, khoá dòng, đếm lại; `my-reviews`; `pending`: đã đánh giá, thanh toán, hạn; `votes`: người, sản phẩm; upload: giới hạn, người, cửa sổ 24 giờ, magic bytes) đều bị bắt sau khi bổ sung ca đơn đã giao nhưng chưa trả.
 - **Batch 09:** 56 flow test. Phá thử 11 điểm đều bị bắt. `GET /api/reviews/:productId/summary` không có ca lỗi nghiệp vụ (`exempt`).
