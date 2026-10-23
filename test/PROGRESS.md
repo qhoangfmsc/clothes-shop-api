@@ -3,7 +3,7 @@
 > Quy trình: skill `test-campaign` (`.claude/skills/test-campaign/SKILL.md`) — **đọc skill trước khi làm bất kỳ lượt nào**.
 > Đây là file điều phối: kế hoạch + nhật ký. Sự thật do máy đo (độ phủ endpoint) nằm ở báo cáo cuối `yarn test:flows` và `test/coverage-baseline.json`.
 
-Cập nhật lần cuối: 2026-10-21 · Tổng: **98 route** (15 public, 83 cần đăng nhập), **25 batch** + 4 bước hạ tầng (P0)
+Cập nhật lần cuối: 2026-10-23 · Tổng: **98 route** (15 public, 83 cần đăng nhập), **25 batch** + 4 bước hạ tầng (P0) · **Trạng thái: 25/25 batch xong**; còn các mục ở bảng "Phát hiện cần người dùng quyết định"
 
 Trạng thái: `Chưa làm` · `Đang làm` · `Xong` · `Chặn` (kèm lý do ở cột Ghi chú)
 
@@ -322,7 +322,7 @@ Trạng thái: **Xong** · Ghi chú: 2026-10-23; 25 flow media (`flows/media/med
 | 1 | GET | `/` | Public | — |
 | 2 | GET | `/health` | Public | — |
 
-Trạng thái: **Xong** · Ghi chú: 2026-10-23; 3 flow (`flows/health/health.flow.ts`). Chiến dịch hoàn tất: 98/98 route có ca thành công, 82/83 có ca lỗi (15 route `exempt`, lý do ghi trong `test/coverage-baseline.json`), baseline `missing` rỗng
+Trạng thái: **Xong** · Ghi chú: 2026-10-23; 3 flow (`flows/health/health.flow.ts`). Chiến dịch hoàn tất: 98/98 route có ca thành công, 82/82 route còn lại có ca lỗi (16 route `exempt`, lý do ghi trong `test/coverage-baseline.json`), baseline `missing` rỗng
 
 
 ## Nhật ký (thêm một dòng sau mỗi lượt, mới nhất ở dưới)
@@ -356,7 +356,7 @@ Trạng thái: **Xong** · Ghi chú: 2026-10-23; 3 flow (`flows/health/health.fl
 | Batch 19 | 2026-10-23 | wishlist: thêm, danh sách, kiểm tra, bỏ | +12 flow (688 → 700) | 76 → 79/98 | 70 → 71/92 (miễn thêm 3 route) | Baseline 25 → 21. Phá thử 8 điểm đều bị bắt. 1 phát hiện: thêm đồng thời cùng sản phẩm (bấm đúp) cho `[201, 500, 500]`. Module wishlist xong (4/4) |
 | Batch 20–21 | 2026-10-23 | auth (đăng nhập Google, refresh, me, permissions) + user (danh sách, chi tiết, sửa) | +49 flow (700 → 749) | 79 → 86/98 | 71 → 76/87 (miễn thêm: `GET /api/auth/me`, `GET /api/auth/permissions`) | Baseline 21 → 14. Phá thử 15 điểm (role/permission mặc định, phân loại credential, loại token, trạng thái user, tự sửa, lọc/tìm) đều bị bắt. 3 phát hiện: đăng nhập lần đầu đồng thời → 500; user bị khoá vẫn đăng nhập được; PATCH nhận mã permission lạ. Module auth, user xong |
 | Batch 22–23 | 2026-10-23 | site-config (đọc, danh sách, key, đặt, xoá), shipping, size-guide | +49 flow (749 → 798) | 86 → 93/98 | 76 → 79/83 (miễn thêm 4 route) | Baseline 14 → 11. Phá thử 13 điểm: 12 bị bắt; 1 mutant tương đương (`findOne` đã trả `null` nên `config ?? null` và `config` như nhau). 1 điểm lọt lúc đầu (type của key được đặt lại khi cập nhật) rồi đã bịt bằng ca dòng có type khác. Module site-config, shipping, size-guide xong |
-| Batch 24–25 | 2026-10-23 | media (ping, danh sách, upload, xoá), pending-count, health | +34 flow (798 → 832) | 93 → 98/98 | 79 → 82/83 (miễn thêm: `GET /api/admin/pending-counts`) | Baseline 11 → 0. Phá thử 15 điểm đều bị bắt. Không có phát hiện mới. Chiến dịch xong |
+| Batch 24–25 | 2026-10-23 | media (ping, danh sách, upload, xoá), pending-count, health | +34 flow (798 → 832) | 93 → 98/98 | 79 → 82/82 (miễn thêm: `GET /api/admin/pending-counts`; tổng 16 route miễn) | Baseline 11 → 0. Phá thử 15 điểm đều bị bắt. Không có phát hiện mới. Chiến dịch xong |
 
 ## Phát hiện cần người dùng quyết định
 
