@@ -8,8 +8,8 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, Repository } from 'typeorm';
 import { Order } from '../order/order.entity';
-import { ReturnRequest } from '../return/return-request.entity';
-import { ReturnRequestItem } from '../return/return-request-item.entity';
+import { markOrderRefunded } from '../order/order-payment-state.util';
+import { markReturnRefunded, reopenReturnAfterRefundRejected } from '../return/return-refund-state.util';
 import { AdminRefundQueryDto } from './dtos/admin-refund-query.dto';
 import { CompleteRefundDto } from './dtos/complete-refund.dto';
 import { CreateRefundDto } from './dtos/create-refund.dto';
@@ -235,10 +235,8 @@ export class RefundService {
         refund.bankReference = dto.reference;
         refund.note = dto.note;
         await manager.save(refund);
-        if (refundedAfter === paid) await manager.update(Order, { id: order.id }, { paymentStatus: 'refunded' });
-        // Khoản hoàn của yêu cầu trả hàng: yêu cầu đó xong
-        if (refund.returnRequestId)
-          await manager.update(ReturnRequest, { id: refund.returnRequestId, status: 'RECEIVED' }, { status: 'REFUNDED' });
+        if (refundedAfter === paid) await markOrderRefunded(manager, order.id);
+        if (refund.returnRequestId) await markReturnRefunded(manager, refund.returnRequestId);
       });
     } catch (error) {
       // Hai khoản hoàn (hai đơn khác nhau) cùng được ghi một mã giao dịch ngân hàng cùng lúc: chốt chặn là UNIQUE ở DB
@@ -265,15 +263,7 @@ export class RefundService {
       refund.processedAt = new Date();
       refund.note = dto.note;
       await manager.save(refund);
-      // Không hoàn cho hàng đã trả: yêu cầu trả hàng quay về APPROVED để cửa hàng nhận/chốt lại số lượng và tạo lại khoản hoàn
-      if (refund.returnRequestId) {
-        await manager.update(
-          ReturnRequest,
-          { id: refund.returnRequestId, status: 'RECEIVED' },
-          { status: 'APPROVED', receivedAt: null, shippingRefunded: false },
-        );
-        await manager.update(ReturnRequestItem, { returnRequestId: refund.returnRequestId }, { acceptedQuantity: null });
-      }
+      if (refund.returnRequestId) await reopenReturnAfterRefundRejected(manager, refund.returnRequestId);
     });
     return { data: await this.getAdminView(refundId) };
   }

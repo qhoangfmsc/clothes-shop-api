@@ -1,5 +1,5 @@
 import { EntityManager } from 'typeorm';
-import { Order } from '../order/order.entity';
+import { markOrderPaid } from '../order/order-payment-state.util';
 import { PaymentAttempt } from './payment-attempt.entity';
 
 /**
@@ -10,7 +10,6 @@ import { PaymentAttempt } from './payment-attempt.entity';
  * Gọi SAU khi phiên được thanh toán đã được lưu `PAID` (phiên đó không bị ảnh hưởng bởi bước huỷ).
  */
 export async function applyOrderPaid(manager: EntityManager, orderId: string, paidAt: Date): Promise<void> {
-  await manager.update(Order, { id: orderId }, { paymentStatus: 'paid', paidAt });
-  await manager.update(Order, { id: orderId, status: 'pending' }, { status: 'confirmed' });
+  await markOrderPaid(manager, orderId, paidAt);
   await manager.update(PaymentAttempt, { orderId, status: 'PENDING' }, { status: 'CANCELLED' });
 }

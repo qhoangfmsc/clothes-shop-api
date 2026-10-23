@@ -4,9 +4,10 @@ import { EAddressErrorCode, EOrderErrorCode } from '@common/exceptions/error-cod
 import { money, moneyOrNull } from '@common/utils/money.util';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource, EntityManager, In } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { Address } from '../address/address.entity';
 import { Cart } from '../cart/cart.entity';
+import { removeOrderedCartItems } from '../cart/cart-checkout.util';
 import { CartItem } from '../cart/cart-item.entity';
 import { CurrencyService } from '../currency/currency.service';
 import { ShippingConfigService } from '../shipping/shipping-config.service';
@@ -113,7 +114,11 @@ export class OrderCheckoutService {
       await manager.save(orderItems);
 
       // Remove only the ordered items from the cart (whole cart when cartItemIds is omitted)
-      await manager.delete(CartItem, { cartId: cart.id, id: In(selectedItems.map((item) => item.id)) });
+      await removeOrderedCartItems(
+        manager,
+        cart.id,
+        selectedItems.map((item) => item.id),
+      );
 
       // Return full order (re-read within transaction for consistency)
       const result = await manager.findOne(Order, {

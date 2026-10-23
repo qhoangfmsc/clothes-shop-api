@@ -12,6 +12,7 @@ import { Order } from '../order/order.entity';
 import { OrderItem } from '../order/order-item.entity';
 import { Product } from '../product/product.entity';
 import { presentProductSummary } from '../product/product.presenter';
+import { setProductRating } from '../product/product-rating.util';
 import { User } from '../user/user.entity';
 import { AdminReviewQueryDto } from './dtos/admin-review-query.dto';
 import { CreateReviewDto } from './dtos/create-review.dto';
@@ -119,10 +120,6 @@ export class ReviewService {
     private readonly mediaService: MediaService,
   ) {}
 
-  // ============================================
-  // PUBLIC
-  // ============================================
-
   async findByProductId(productId: string, query: PublicReviewQueryDto = {}) {
     const { rating, fit, hasImages, sort } = query;
     const { page, limit } = getPaging(query);
@@ -196,10 +193,6 @@ export class ReviewService {
       },
     };
   }
-
-  // ============================================
-  // CUSTOMER
-  // ============================================
 
   async create(user: User, dto: CreateReviewDto) {
     if (containsLink(dto.title, dto.content)) throwAppError(EReviewErrorCode.REVIEW_CONTENT_NOT_ALLOWED);
@@ -415,10 +408,6 @@ export class ReviewService {
     });
   }
 
-  // ============================================
-  // ADMIN
-  // ============================================
-
   async findAllAdmin(query: AdminReviewQueryDto) {
     const { search, status, rating, fit, hasImages, product, userId, replied, sort } = query;
     const { page, limit } = getPaging(query);
@@ -536,7 +525,7 @@ export class ReviewService {
       .andWhere('r.status = :status', { status: 'PUBLISHED' })
       .getRawOne<{ count: string; average: string | null }>();
     const ratingCount = Number(row?.count ?? 0);
-    await manager.update(Product, { id: productId }, { ratingCount, ratingAverage: ratingCount > 0 ? Number(row?.average) : null });
+    await setProductRating(manager, productId, { count: ratingCount, average: ratingCount > 0 ? Number(row?.average) : null });
   }
 
   private async getWithProduct(reviewId: string): Promise<Review> {

@@ -2,6 +2,7 @@ import { join } from 'node:path';
 import { MODULE_METADATA } from '@nestjs/common/constants';
 import {
   COMMON_IMPORTS_MODULES,
+  CROSS_MODULE_WRITES,
   MANY_DEPENDENCIES_SERVICES,
   OVERSIZED_SERVICES,
   SERVICE_MAX_DEPENDENCIES,
@@ -122,6 +123,41 @@ describe('Architecture rules', () => {
       .filter((file) => file !== 'src/common/base/lock.util.ts' && /lock:\s*\{\s*mode:/.test(stripComments(read(file))))
       .map((file) => `${file}: khoá dòng trực tiếp — dùng findLocked (@common/base/lock.util)`);
     expect(offenders).toEqual([]);
+  });
+
+  it('writes tables of other modules only through functions of the owner module', () => {
+    const ownerOf = new Map<string, string>();
+    for (const file of listFiles('src/modules', (f) => f.endsWith('.entity.ts'))) {
+      const module = file.split('/')[2];
+      for (const [, name] of stripComments(read(file)).matchAll(/export class (\w+)/g)) ownerOf.set(name, module);
+    }
+
+    const actual: Record<string, number> = {};
+    for (const file of listFiles(
+      'src/modules',
+      (f) => isSource(f) && !f.endsWith('.entity.ts') && !f.endsWith('.module.ts') && !f.endsWith('.spec.ts'),
+    )) {
+      const module = file.split('/')[2];
+      const code = stripComments(read(file));
+      const foreign = [...ownerOf].filter(([, owner]) => owner !== module).map(([entity]) => entity);
+
+      let writes = 0;
+      for (const entity of foreign) {
+        writes += count(new RegExp(`\\b(?:update|delete|insert|remove|upsert|create)\\(\\s*${entity}\\b`, 'g'), code);
+        for (const [, repo] of code.matchAll(
+          new RegExp(`@InjectRepository\\(${entity}\\)\\s*(?:private|protected|public)?\\s*(?:readonly\\s+)?(\\w+)`, 'g'),
+        )) {
+          writes += count(
+            new RegExp(`this\\.${repo}\\.(?:save|update|delete|remove|insert|upsert|create|softDelete|increment|decrement)\\(`, 'g'),
+            code,
+          );
+        }
+      }
+      if (writes) actual[file] = writes;
+    }
+    expect(compareToAllowlist(actual, CROSS_MODULE_WRITES, 'chỗ ghi bảng của module khác (dùng hàm *-state.util của module chủ)')).toEqual(
+      [],
+    );
   });
 
   it('declares entity status columns with a type union, not string', () => {
