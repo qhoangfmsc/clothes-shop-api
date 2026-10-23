@@ -17,14 +17,6 @@
     }
   },
   "missing": {
-    "DELETE /api/admin/products/:id": [
-      "success",
-      "error"
-    ],
-    "PATCH /api/admin/products/:id": [
-      "success",
-      "error"
-    ],
     "GET /api/categories": [
       "success",
       "error"
@@ -92,7 +84,6 @@
       "error"
     ],
     "POST /api/wishlist/:productId": [
-      "success",
       "error"
     ],
     "GET /api/wishlist/check/:productId": [

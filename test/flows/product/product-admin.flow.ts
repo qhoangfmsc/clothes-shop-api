@@ -1,6 +1,8 @@
 import { type Builders, bearer, createBuilders, createTestApp, type TestApp, truncateAll } from '../../support';
+import { deliveredPaidOrder } from '../order-payment/steps';
+import { writeReview } from '../review/steps';
 
-/** Batch 13 (product, admin tạo) — batch 14 thêm sửa và xoá ở cùng file. */
+/** Batch 13 (admin tạo) và batch 14 (sửa, xoá) của product. */
 describe('Flow: products (admin write)', () => {
   let t: TestApp;
   let b: Builders;
@@ -189,6 +191,257 @@ describe('Flow: products (admin write)', () => {
 
       expect([res.status, res.body.errorCode]).toEqual([400, undefined]);
       expect(await productRows()).toHaveLength(0);
+    });
+  });
+
+  describe('PATCH /api/admin/products/:id', () => {
+    const patch = (admin: User, id: string, body: object) => t.api.patch(`/api/admin/products/${id}`).set(bearer(t, admin)).send(body);
+    const row = (id: string) =>
+      rows<{
+        slug: string;
+        sku: string;
+        name: string;
+        price: string;
+        original_price: string | null;
+        badge: string | null;
+        status: string;
+        rating_average: string | null;
+        rating_count: number;
+      }>('SELECT slug, sku, name, price, original_price, badge, status, rating_average, rating_count FROM products WHERE id = $1', [
+        id,
+      ]).then((r) => r[0]);
+
+    it('changes only the fields sent, keeps the SKU, and returns the product with Vnd/Usd prices', async () => {
+      const [admin, product] = [await b.admin(), await b.product({ price: 350_000, originalPrice: 500_000 })];
+
+      const res = await patch(admin, product.id, {
+        name: 'Tên mới',
+        priceVnd: 400_000,
+        originalPriceVnd: 450_000,
+        badge: 'new',
+        sizes: ['M', 'L'],
+        tags: ['x'],
+      }).expect(200);
+
+      expect(res.body.data).toMatchObject({
+        id: product.id,
+        name: 'Tên mới',
+        priceVnd: 400_000,
+        priceUsd: 16,
+        originalPriceVnd: 450_000,
+        originalPriceUsd: 18,
+        badge: 'new',
+        sizes: ['M', 'L'],
+        tags: ['x'],
+        category: { id: product.category.id },
+        subcategory: { id: product.subcategory.id },
+      });
+      expect(await row(product.id)).toMatchObject({
+        name: 'Tên mới',
+        slug: product.slug,
+        sku: product.sku,
+        price: '400000',
+        original_price: '450000',
+        badge: 'new',
+      });
+      const detail = await t.api.get(`/api/products/${product.id}`).expect(200);
+      expect(detail.body.data).toMatchObject({ description: product.description, images: product.images, sizes: ['M', 'L'] });
+    });
+
+    it('clears the badge with null, replaces images and colours, and accepts an empty body as no change', async () => {
+      const [admin, product] = [await b.admin(), await b.product({ badge: 'sale' })];
+
+      const none = await patch(admin, product.id, {}).expect(200);
+      expect(none.body.data.id).toBe(product.id);
+      expect(await row(product.id)).toMatchObject({ badge: 'sale', name: product.name });
+      const res = await patch(admin, product.id, {
+        badge: null,
+        images: ['https://cdn.flow.test/new.jpg'],
+        colors: [{ name: 'Red', hex: '#f00' }],
+      }).expect(200);
+
+      expect(res.body.data).toMatchObject({
+        badge: null,
+        images: ['https://cdn.flow.test/new.jpg'],
+        colors: [{ name: 'Red', hex: '#f00' }],
+      });
+    });
+
+    it('disables a product, which removes it from the public list while the admin list keeps it, and it can be edited again', async () => {
+      const [admin, product] = [await b.admin(), await b.product()];
+
+      await patch(admin, product.id, { status: 'disabled' }).expect(200);
+
+      expect((await t.api.get('/api/products').expect(200)).body.total).toBe(0);
+      expect((await t.api.get('/api/admin/products').set(bearer(t, admin)).expect(200)).body.total).toBe(1);
+      await patch(admin, product.id, { name: 'Vẫn sửa được' }).expect(200);
+      await patch(admin, product.id, { status: 'active' }).expect(200);
+      expect((await t.api.get('/api/products').expect(200)).body.total).toBe(1);
+    });
+
+    it('leaves the rating figures alone', async () => {
+      const [admin, product] = [await b.admin(), await b.product({ ratingAverage: 4.5, ratingCount: 3 })];
+
+      await patch(admin, product.id, { name: 'Đổi tên' }).expect(200);
+
+      expect(await row(product.id)).toMatchObject({ rating_average: '4.5', rating_count: 3 });
+    });
+
+    it('regenerates the SKU when the slug changes (or uses the SKU sent), but not when only other fields change', async () => {
+      const [admin, product] = [await b.admin(), await b.product({ sku: 'CUSTOM' })];
+
+      await patch(admin, product.id, { name: 'Khác' }).expect(200);
+      expect((await row(product.id)).sku).toBe('CUSTOM');
+      await patch(admin, product.id, { slug: 'slug-moi' }).expect(200);
+      expect((await row(product.id)).sku).toBe(`${product.category.slug}-${product.subcategory.slug}-slug-moi`);
+      await patch(admin, product.id, { slug: 'slug-moi-2', sku: 'EXPLICIT-1' }).expect(200);
+      expect(await row(product.id)).toMatchObject({ slug: 'slug-moi-2', sku: 'EXPLICIT-1' });
+    });
+
+    it('moves the product to another category together with its subcategory', async () => {
+      const [admin, product, other] = [await b.admin(), await b.product(), await b.category()];
+
+      const res = await patch(admin, product.id, { categoryId: other.id, subcategoryId: other.subcategories[0].id, sku: 'MOVED-1' }).expect(
+        200,
+      );
+
+      expect(res.body.data).toMatchObject({ category: { id: other.id }, subcategory: { id: other.subcategories[0].id } });
+      expect(await row(product.id)).toMatchObject({ slug: product.slug, sku: 'MOVED-1' });
+      expect(await rows('SELECT category_id, subcategory_id FROM products')).toEqual([
+        { category_id: other.id, subcategory_id: other.subcategories[0].id },
+      ]);
+    });
+
+    it('accepts its own slug and SKU again, and the prices at their limits', async () => {
+      const [admin, product] = [await b.admin(), await b.product({ price: 350_000, originalPrice: 350_000 })];
+
+      await patch(admin, product.id, { slug: product.slug, sku: product.sku }).expect(200);
+      const res = await patch(admin, product.id, { priceVnd: 1_000_000_000, originalPriceVnd: 1_000_000_000 }).expect(200);
+
+      expect(res.body.data).toMatchObject({ priceVnd: 1_000_000_000, originalPriceVnd: 1_000_000_000 });
+    });
+
+    it('refuses a slug or SKU used by another product (1002 / 1003) and keeps the product', async () => {
+      const [admin, product, other] = [await b.admin(), await b.product(), await b.product()];
+
+      const slug = await patch(admin, product.id, { slug: other.slug });
+      const sku = await patch(admin, product.id, { sku: other.sku });
+
+      expect(error(slug)).toMatchObject({ status: 400, errorCode: 1002 });
+      expect(error(sku)).toMatchObject({ status: 400, errorCode: 1003 });
+      expect(await row(product.id)).toMatchObject({ slug: product.slug, sku: product.sku });
+    });
+
+    it('checks the original price against the final price (1009): raising the price alone or lowering the original alone', async () => {
+      const [admin, product] = [await b.admin(), await b.product({ price: 350_000, originalPrice: 400_000 })];
+
+      const raisePrice = await patch(admin, product.id, { priceVnd: 450_000 });
+      const lowerOriginal = await patch(admin, product.id, { originalPriceVnd: 349_999 });
+      const both = await patch(admin, product.id, { priceVnd: 450_000, originalPriceVnd: 450_000 }).expect(200);
+
+      expect(error(raisePrice)).toMatchObject({ status: 400, errorCode: 1009 });
+      expect(error(lowerOriginal)).toMatchObject({ status: 400, errorCode: 1009 });
+      expect(both.body.data).toMatchObject({ priceVnd: 450_000, originalPriceVnd: 450_000 });
+      expect(await row(product.id)).toMatchObject({ price: '450000', original_price: '450000' });
+    });
+
+    it('refuses an unknown category or subcategory (1004) and a subcategory of another category (1005), changing nothing', async () => {
+      const [admin, product, other] = [await b.admin(), await b.product(), await b.category()];
+
+      const noCategory = await patch(admin, product.id, { categoryId: 'zzzzzzzzzzzzzzzz' });
+      const noSubcategory = await patch(admin, product.id, { subcategoryId: 'zzzzzzzzzzzzzzzz' });
+      const mismatch = await patch(admin, product.id, { subcategoryId: other.subcategories[0].id });
+      const onlyCategory = await patch(admin, product.id, { categoryId: other.id });
+
+      expect(error(noCategory)).toMatchObject({ status: 400, errorCode: 1004 });
+      expect(error(noSubcategory)).toMatchObject({ status: 400, errorCode: 1004 });
+      expect(error(mismatch)).toMatchObject({ status: 400, errorCode: 1005 });
+      expect(error(onlyCategory)).toMatchObject({ status: 400, errorCode: 1005 });
+      expect(await rows('SELECT category_id, subcategory_id FROM products')).toEqual([
+        { category_id: product.category.id, subcategory_id: product.subcategory.id },
+      ]);
+    });
+
+    it('answers 404 / 1001 for an unknown product', async () => {
+      const res = await patch(await b.admin(), 'zzzzzzzzzzzzzzzz', { name: 'x' });
+
+      expect(error(res)).toMatchObject({ status: 404, errorCode: 1001 });
+    });
+
+    it.each([
+      ['a price of 0', { priceVnd: 0 }],
+      ['a price above 1.000.000.000', { priceVnd: 1_000_000_001 }],
+      ['a fractional price', { priceVnd: 10.5 }],
+      ['the legacy `price` field', { price: 100_000 }],
+      ['the legacy `originalPrice` field', { originalPrice: 100_000 }],
+      ['an original price of 0', { originalPriceVnd: 0 }],
+      ['no images', { images: [] }],
+      ['no sizes', { sizes: [] }],
+      ['a colour without a hex', { colors: [{ name: 'Red' }] }],
+      ['an unknown badge', { badge: 'hot' }],
+      ['an unknown status', { status: 'archived' }],
+      ['a slug longer than 255 characters', { slug: 'x'.repeat(256) }],
+      ['a material longer than 255 characters', { material: 'x'.repeat(256) }],
+      ['a care longer than 500 characters', { care: 'x'.repeat(501) }],
+      ['non-string tags', { tags: [1] }],
+      ['the rating fields', { ratingAverage: 5 }],
+      ['an unknown field', { id: 'other' }],
+    ])('rejects %s with a validation error (no errorCode) and changes nothing', async (_name, body) => {
+      const [admin, product] = [await b.admin(), await b.product()];
+      const before = await row(product.id);
+
+      const res = await patch(admin, product.id, body);
+
+      expect([res.status, res.body.errorCode]).toEqual([400, undefined]);
+      expect(await row(product.id)).toEqual(before);
+    });
+  });
+
+  describe('DELETE /api/admin/products/:id', () => {
+    const remove = (admin: User, id: string) => t.api.delete(`/api/admin/products/${id}`).set(bearer(t, admin));
+
+    it('deletes the product, which disappears from the lists and the detail', async () => {
+      const [admin, product, kept] = [await b.admin(), await b.product(), await b.product()];
+
+      const res = await remove(admin, product.id).expect(200);
+
+      expect(res.body).toEqual({ message: 'Product deleted successfully' });
+      expect(await rows('SELECT id FROM products')).toEqual([{ id: kept.id }]);
+      expect((await t.api.get('/api/products').expect(200)).body.total).toBe(1);
+      expect(error(await t.api.get(`/api/products/${product.id}`))).toMatchObject({ status: 404, errorCode: 1001 });
+    });
+
+    it('removes the product’s cart lines, wishlist entries, reviews and votes, and keeps the order line as a snapshot with no product', async () => {
+      const admin = await b.admin();
+      const entry = await deliveredPaidOrder(t, b);
+      const review = await writeReview(t, entry);
+      const voter = await b.user();
+      await t.api.post(`/api/reviews/${review.id}/helpful`).set(bearer(t, voter)).expect(201);
+      await t.api.post(`/api/wishlist/${entry.product.id}`).set(bearer(t, voter)).expect(201);
+      await b.cart(voter, [{ product: entry.product }]);
+
+      await remove(admin, entry.product.id).expect(200);
+
+      expect(await rows('SELECT 1 FROM reviews')).toHaveLength(0);
+      expect(await rows('SELECT 1 FROM review_votes')).toHaveLength(0);
+      expect(await rows('SELECT 1 FROM cart_items')).toHaveLength(0);
+      expect(await rows('SELECT 1 FROM wishlists')).toHaveLength(0);
+      expect(await rows('SELECT product_id, product_name, price FROM order_items')).toEqual([
+        { product_id: null, product_name: entry.product.name, price: '350000' },
+      ]);
+      const detail = await t.api.get(`/api/orders/${entry.order.id}`).set(bearer(t, entry.customer)).expect(200);
+      expect(detail.body.data.items[0]).toMatchObject({ productName: entry.product.name, priceVnd: 350_000, product: null });
+    });
+
+    it('answers 404 / 1001 for an unknown product and for a second delete', async () => {
+      const [admin, product] = [await b.admin(), await b.product()];
+      await remove(admin, product.id).expect(200);
+
+      const again = await remove(admin, product.id);
+      const unknown = await remove(admin, 'zzzzzzzzzzzzzzzz');
+
+      expect(error(again)).toMatchObject({ status: 404, errorCode: 1001 });
+      expect(error(unknown)).toMatchObject({ status: 404, errorCode: 1001 });
     });
   });
 });
