@@ -16,6 +16,8 @@ Cấu trúc: `docs/specs/<module>/NNNN-slug.md` (số tăng dần theo từng mo
 | order | [0003 — Kế hoạch flow test cho module order](order/0003-flow-test-plan.md) | Implemented | Báo giá, đặt hàng, danh sách/chi tiết/đổi trạng thái admin: 8/8 route đủ ca |
 | return | [0001 — Kế hoạch flow test cho module return](return/0001-flow-test-plan.md) | Implemented | Điều kiện, tạo, huỷ, duyệt, từ chối, nhận hàng và liên kết khoản hoàn: 10/10 route đủ ca |
 | cart | [0001 — Kế hoạch flow test cho module cart](cart/0001-flow-test-plan.md) | Implemented | Xem, thêm, đổi số lượng, xoá dòng, xoá sạch: 5/5 route đủ ca; 2 phát hiện 500 chờ quyết định |
+| auth | [0001 — Kế hoạch flow test cho module auth](auth/0001-flow-test-plan.md) | Implemented | Đăng nhập Google (giả ở biên), refresh, me, permissions: 4/4 route đủ ca; 2 phát hiện chờ quyết định |
+| user | [0001 — Kế hoạch flow test cho module user](user/0001-flow-test-plan.md) | Implemented | Danh sách, chi tiết, sửa quyền/trạng thái: 3/3 route đủ ca; 1 phát hiện chờ quyết định |
 | wishlist | [0001 — Kế hoạch flow test cho module wishlist](wishlist/0001-flow-test-plan.md) | Implemented | Thêm, danh sách, kiểm tra, bỏ: 4/4 route đủ ca; 1 phát hiện chờ quyết định |
 | address | [0001 — Kế hoạch flow test cho module address](address/0001-flow-test-plan.md) | Implemented | Danh sách, tạo, sửa, xoá và cờ mặc định: 4/4 route đủ ca; 1 phát hiện chờ quyết định |
 | collection | [0001 — Kế hoạch flow test cho module collection](collection/0001-flow-test-plan.md) | Implemented | Đọc công khai/admin, tạo, sửa, xoá: 5/5 route đủ ca; 2 phát hiện chờ quyết định |

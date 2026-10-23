@@ -1,6 +1,6 @@
 # user (`src/modules/user`)
 
-> Cập nhật lần cuối: 2026-10-14
+> Cập nhật lần cuối: 2026-10-23
 
 ## 1. Tổng quan
 
@@ -106,9 +106,12 @@ Không phụ thuộc module khác. Được import bởi nhiều module khác qu
 
 ### 4.7 Test
 
-Chưa có test riêng. `AdminUserQueryDto` được `list-query.dto.spec.ts` kiểm tra tự động.
+Chưa có unit spec riêng. `AdminUserQueryDto` được `list-query.dto.spec.ts` kiểm tra tự động.
+
+Flow test trên Postgres thật: `test/flows/user/user.flow.ts` (batch 20–21) — danh sách (không lộ `password`/`providerId`, lọc `role`/`status`, tìm theo tên/email, sort, phân trang, tham số sai); chi tiết (404 / 1401); sửa (đổi `role`, `status`, `permissions` có hiệu lực ngay ở request kế tiếp, kể cả token đã cấp và refresh, chỉ field được gửi đổi, body rỗng không đổi gì, admin đổi `role`/`status` của admin khác được, tự đổi `role`/`status` → 400 / 1402 nhưng tự đổi `permissions` được, 404 / 1401, validation).
 
 ### 4.8 Lưu ý hiện trạng
 
+- `permissions` nhận mọi mảng số nguyên, không kiểm mã có nằm trong enum `Permission` hay không (vd `99999` được lưu).
 - Vì danh sách permission lưu theo từng user, user được tạo trước khi có permission mới sẽ không tự có permission đó; admin cần cập nhật qua `PATCH`.
 - Không có endpoint xoá user; FK từ `orders`/`reviews` đặt `SET NULL`, từ `carts`/`addresses`/`wishlists` đặt `CASCADE` (đã sẵn ở DB).

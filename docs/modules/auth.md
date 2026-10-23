@@ -1,6 +1,6 @@
 # auth (`src/modules/auth`)
 
-> Cập nhật lần cuối: 2026-10-22
+> Cập nhật lần cuối: 2026-10-23
 
 ## 1. Tổng quan
 
@@ -121,8 +121,12 @@ Lỗi permission (9001/9002) do `PermissionsGuard` phát sinh — xem [common](c
 - `AuthService tokens` (tiếp): mọi nguyên nhân refresh thất bại đều trả 401 / 2202 `Invalid refresh token` (access token, token cũ không có `type`, user bị khoá, user không tồn tại, chuỗi rác); `getMe` với user không còn tồn tại → 401 / 2201.
 - `google-auth.service.spec.ts` (Google giả bằng mock `OAuth2Client` và `fetch`): `verifyIdToken` (hợp lệ, thiếu email, lỗi thư viện → 2210), `exchangeAuthCode` (không có token, lỗi thư viện → 2211; lỗi của `id_token` giữ nguyên mã 2210, không bị bọc lại), `fetchUserInfo` (hợp lệ, phản hồi không OK và lỗi mạng → 2212, thiếu email → 2210); mọi lỗi HTTP 401.
 
+- Flow test trên Postgres thật: `test/flows/auth/auth.flow.ts` (batch 20; Google giả ở biên bằng `jest.spyOn(OAuth2Client.prototype, 'verifyIdToken' | 'getToken')` và `jest.spyOn(globalThis, 'fetch')`) — đăng nhập (tạo user lần đầu với role/permission/status mặc định và token đúng hạn 1 ngày/30 ngày, đăng nhập lại cập nhật tên/ảnh/providerId nhưng giữ role/permission/status, tên/ảnh rỗng từ Google không ghi đè, phân loại ID token / mã đổi token / access token, 2210/2211/2212 và không tạo user, validation); refresh (access token mới, không có refresh token mới, 2202 cho mọi nguyên nhân, dừng khi user bị khoá); `me` (hồ sơ, theo dõi đổi permission ngay, 401 không `errorCode` cho refresh token/user bị khoá/đã xoá, 403 / 9001); `permissions` (admin thấy toàn bộ, khách 403 / 9001).
+
 ### 4.8 Lưu ý hiện trạng
 
+- Đăng nhập Google không kiểm `status` của user: user `disabled` vẫn nhận token (response có `status: 'disabled'`), nhưng mọi request sau đó bị `JwtStrategy` từ chối 401 và refresh trả 2202.
+- Hai lần đăng nhập đồng thời lần đầu của cùng một email: tìm user trước khi tạo và không bắt lỗi UNIQUE `UQ_users_email`, nên request thua trả 500.
 - Access và refresh token dùng chung `JWT_SECRET`, phân biệt bằng claim `type`; refresh không xoay vòng (response chỉ có `accessToken` mới, không phát refresh token mới).
 - Token phát hành trước khi có claim `type` bị từ chối, người dùng phải đăng nhập lại.
 - Cách phân loại credential coi chuỗi không phải JWT và ngắn hơn 200 ký tự là auth code, kể cả khi đó là access token.

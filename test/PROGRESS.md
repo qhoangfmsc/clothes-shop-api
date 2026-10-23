@@ -266,7 +266,7 @@ Trạng thái: **Xong** · Ghi chú: 2026-10-23; 12 flow mới (`flows/wishlist/
 | 4 | POST | `/api/auth/refresh` | Public | — |
 | 5 | GET | `/api/admin/users` | JWT | 10000 |
 
-Trạng thái: **Chưa làm** · Ghi chú: —
+Trạng thái: **Xong** · Ghi chú: 2026-10-23; 23 flow auth (`flows/auth/auth.flow.ts`) + danh sách user trong `flows/user/user.flow.ts`; `GET /api/auth/me` và `GET /api/auth/permissions` không có ca lỗi nghiệp vụ → `exempt`; 3 phát hiện (xem bảng)
 
 
 ### Batch 21 — auth+user (2 route)
@@ -276,7 +276,7 @@ Trạng thái: **Chưa làm** · Ghi chú: —
 | 1 | GET | `/api/admin/users/:id` | JWT | 10000 |
 | 2 | PATCH | `/api/admin/users/:id` | JWT | 10001 |
 
-Trạng thái: **Chưa làm** · Ghi chú: —
+Trạng thái: **Xong** · Ghi chú: 2026-10-23; làm chung file `flows/user/user.flow.ts` (26 flow cho 3 route user). Module auth (4/4) và user (3/3) hoàn tất
 
 
 ### Batch 22 — site-config+shipping+size-guide (5 route)
@@ -354,6 +354,7 @@ Trạng thái: **Chưa làm** · Ghi chú: —
 | Batch 17 | 2026-10-23 | collection: danh sách công khai/admin, tạo, sửa, xoá | +54 flow (595 → 649) | 67 → 72/98 | 64 → 69/93 | Baseline 34 → 29. Phá thử 14 điểm đều bị bắt (2 mutation đầu không biên dịch được nên làm lại bằng cách khác). 2 phát hiện (PATCH nhận chuỗi rỗng và response thiếu field không gửi; đua tạo cùng slug → 500). Module collection xong (5/5) |
 | Batch 18 | 2026-10-23 | address: danh sách, tạo, sửa, xoá | +40 flow (649 → 688) | 72 → 76/98 | 69 → 70/92 (miễn thêm: `GET /api/addresses`) | Baseline 29 → 25. Phá thử 8 điểm: 7 bị bắt; 1 mutant tương đương (lấy chủ sở hữu từ body: DTO đã cấm `userId` nên không thể đi qua HTTP, test DTO ghim lớp này). 1 phát hiện (PATCH nhận chuỗi rỗng; response thiếu field không gửi). Module address xong (4/4) |
 | Batch 19 | 2026-10-23 | wishlist: thêm, danh sách, kiểm tra, bỏ | +12 flow (688 → 700) | 76 → 79/98 | 70 → 71/92 (miễn thêm 3 route) | Baseline 25 → 21. Phá thử 8 điểm đều bị bắt. 1 phát hiện: thêm đồng thời cùng sản phẩm (bấm đúp) cho `[201, 500, 500]`. Module wishlist xong (4/4) |
+| Batch 20–21 | 2026-10-23 | auth (đăng nhập Google, refresh, me, permissions) + user (danh sách, chi tiết, sửa) | +49 flow (700 → 749) | 79 → 86/98 | 71 → 76/87 (miễn thêm: `GET /api/auth/me`, `GET /api/auth/permissions`) | Baseline 21 → 14. Phá thử 15 điểm (role/permission mặc định, phân loại credential, loại token, trạng thái user, tự sửa, lọc/tìm) đều bị bắt. 3 phát hiện: đăng nhập lần đầu đồng thời → 500; user bị khoá vẫn đăng nhập được; PATCH nhận mã permission lạ. Module auth, user xong |
 
 ## Phát hiện cần người dùng quyết định
 
@@ -374,3 +375,6 @@ Test lộ ra hành vi nghi là lỗi trong code thì ghi ở đây (route, hành
 | 17 | `POST /api/admin/collections` | Hai request đồng thời cùng `slug` cho `[201, 500, 400/1202]` (kiểm tra trùng chạy trước khi lưu, không bắt UNIQUE `slug`) | `COLLECTION_SLUG_DUPLICATE (1202)`; CLAUDE.md: bắt lỗi DB ra mã đẹp | Chờ người dùng quyết định (test không khẳng định) |
 | 18 | `PATCH /api/addresses/:id` | `UpdateAddressDto` thiếu `@IsNotEmpty` cho `fullName`/`phone`/`addressLine1`/`city`: PATCH với chuỗi rỗng trả 200 và lưu; response chỉ chứa `id`, `userId`, timestamp và field đã gửi (cùng nguyên nhân với product/category/collection) | `docs/modules/address.md` 4.1: update có cùng các field như create (create yêu cầu not empty); response là địa chỉ đầy đủ | Chờ người dùng quyết định (test không khẳng định) |
 | 19 | `POST /api/wishlist/:productId` | Ba request đồng thời cho cùng sản phẩm (vd bấm đúp) cho `[201, 500, 500]` (kiểm tra đã có chạy trước khi lưu, không bắt UNIQUE `(user_id, product_id)`) | Request thua trả `created: false` như thêm lại (docs 4.4: thêm lại là idempotent) | Chờ người dùng quyết định (test không khẳng định) |
+| 20 | `POST /api/auth/google` | Ba lần đăng nhập đồng thời lần đầu của cùng một email cho `[201, 500, 500]` (tìm user rồi tạo, không bắt UNIQUE `UQ_users_email`) | Lần thua đăng nhập bằng user vừa tạo; CLAUDE.md: bắt lỗi DB | Chờ người dùng quyết định (test không khẳng định) |
+| 20 | `POST /api/auth/google` | User `status = 'disabled'` đăng nhập vẫn nhận 201 và cả hai token (response `status: 'disabled'`); token bị từ chối ở request kế tiếp | Docs 4.3 chỉ nói user không active bị 401 khi refresh/xác thực; chưa nêu đăng nhập | Chờ người dùng quyết định (test chỉ kiểm token của user bị khoá bị từ chối) |
+| 21 | `PATCH /api/admin/users/:id` | `permissions` nhận mọi số nguyên, kể cả mã không có trong enum `Permission` (`99999` được lưu) | `docs/modules/user.md` 4.1: "mảng mã permission" | Chờ người dùng quyết định (test không khẳng định) |

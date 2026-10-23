@@ -104,7 +104,8 @@ Trạng thái: **Có** = đã có test cover luồng · **Unit** = chỉ có uni
 | order (báo giá, đặt hàng) | Báo giá (phí, ngưỡng miễn ship, tỷ giá, không tác dụng phụ), checkout (express, một phần giỏ, store-pickup, chốt giá/tên/tỷ giá, tổ hợp địa chỉ 1304-1306, 1303), validation | Flow | `flows/order/order-checkout.flow.ts` | Có (batch 04) |
 | order (admin) | Danh sách (sắp xếp, tìm, trang vượt cuối, validation), chi tiết, status body sai | Flow | `flows/order/order-admin.flow.ts` | Có (batch 05) |
 | order (admin) | Đổi trạng thái đơn theo bảng chuyển (pending → … → completed), chuyển sai → 1302, trạng thái cuối, trạng thái không tồn tại | Flow | `flows/order-payment/order-status.flow.ts` | Có |
-| auth | Đăng nhập Google, refresh token, `GET /auth/me` | Flow | — | Unit |
+| auth | Đăng nhập Google (Google giả ở biên), tạo/cập nhật user, refresh token (2202), `me`, danh sách permission, 401/403 của guard | Flow | `flows/auth/auth.flow.ts` | Có (batch 20) |
+| user (admin) | Danh sách, chi tiết, sửa `role`/`status`/`permissions` (hiệu lực ngay, tự sửa 1402, 1401) | Flow | `flows/user/user.flow.ts` | Có (batch 20–21) |
 | cart | Xem giỏ (Vnd/Usd, giá hiện tại), thêm (cộng dồn, size/màu, 1001/2003/1303), đổi số lượng, xoá dòng, xoá sạch, validation từng field | Flow | `flows/cart/cart.flow.ts` | Có (batch 08) |
 | wishlist | Thêm (idempotent, 404 / 1001), danh sách (chỉ của mình, Vnd/Usd), kiểm tra, bỏ (idempotent), dọn khi xoá sản phẩm | Flow | `flows/wishlist/wishlist.flow.ts` | Có (batch 19) |
 | media | Upload / xoá ảnh admin | Flow | — | Unit |
