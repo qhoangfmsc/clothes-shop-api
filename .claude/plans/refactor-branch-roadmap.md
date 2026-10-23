@@ -26,7 +26,7 @@ Báo cáo mỗi phần: đã đổi gì (file), số liệu trước/sau, patter
 | 9 | Gom khoá dòng: `findLocked` thay 25 literal (không có wrapper `withLock` chung vì các khung khác nhau, xem spec common/0004), hợp đồng khoá + flow song song | Xong |
 | 10 | Tách `OrderService` thành `OrderQueryService`, `OrderCheckoutService`, `OrderStatusService` (di chuyển nguyên văn, có flow đặc tả truy vấn viết trước) | Xong |
 | 11 | Ranh giới module: bỏ việc module khác với tay vào bảng `orders`/`products` (qua service export) — thiết kế trong spec, quyết định cùng người dùng | Chưa làm |
-| 12+ | Chiến dịch test toàn diện: 25 batch theo `test/PROGRESS.md` (nhóm theo module, mỗi lần một batch). Thứ tự đã đổi: làm trước Phần 11 để có lưới an toàn | Đang làm (batch 01–16/25 xong; payment, order, return, cart, review, product và category hoàn tất) |
+| 12+ | Chiến dịch test toàn diện: 25 batch theo `test/PROGRESS.md` (nhóm theo module, mỗi lần một batch). Thứ tự đã đổi: làm trước Phần 11 để có lưới an toàn | Đang làm (batch 01–17/25 xong; payment, order, return, cart, review, product, category và collection hoàn tất) |
 | Cuối | Đối chiếu toàn bộ docs/spec/test matrix với code, chạy kiểm tra toàn bộ, báo cáo tổng kết | Chưa làm |
 
 Thứ tự phần 5–11 có thể đổi theo ý người dùng. Phần 7–11 đụng code production nên mỗi phần có spec riêng ở `docs/specs/<module>/` và cần người dùng duyệt thiết kế trước khi code.

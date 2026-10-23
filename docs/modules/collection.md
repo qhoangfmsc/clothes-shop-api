@@ -1,6 +1,6 @@
 # collection (`src/modules/collection`)
 
-> Cập nhật lần cuối: 2026-10-19
+> Cập nhật lần cuối: 2026-10-23
 
 ## 1. Tổng quan
 
@@ -114,7 +114,13 @@ Bảng nối `collection_products` (`@ManyToMany` + `@JoinTable`): `collection_i
 
 `collection.service.spec.ts` — public list/detail, admin list, create, update đều nạp `products` kèm `category` và `subcategory`. `PublicCollectionQueryDto` và `AdminCollectionQueryDto` được `list-query.dto.spec.ts` kiểm tra tự động.
 
+Flow test trên Postgres thật: `test/flows/collection/collection.flow.ts` (batch 17) — danh sách công khai (mới nhất trước, sản phẩm đúng hình dạng chuẩn với `Vnd`/`Usd`, tìm theo tên/slug, sort, phân trang tính trên collection chứ không trên dòng sản phẩm, tra theo `slug` bỏ qua tham số list, 404 / 1201, `season` bị từ chối ở public); danh sách admin (lọc `season` khớp chính xác, tìm theo slug/tên, sort, phân trang); tạo (mặc định, 1202, 1203 kèm id thiếu, validation); sửa (từng phần, thay hẳn danh sách sản phẩm và xoá bằng `[]`, nhận lại slug của chính mình, 1202, 1203 giữ nguyên dữ liệu cũ, 404); xoá (xoá bảng nối, giữ sản phẩm và collection khác, 404).
+
 ### 4.8 Lưu ý hiện trạng
+
+- `UpdateCollectionDto` không có `@IsNotEmpty` cho `slug`, `name`, `image` (create có): `PATCH` với chuỗi rỗng ở các field này được chấp nhận và lưu.
+- Response `PATCH` là entity đã lưu trong đó các field không được gửi là `undefined` (DTO có sẵn thuộc tính `undefined` được gán lên entity): thiếu `slug`, `subtitle`, `description`, `image`, `season` khi không gửi chúng; DB đúng và `GET` trả đủ.
+- Hai request tạo đồng thời cùng `slug`: kiểm tra trùng chạy trước khi lưu và không bắt lỗi UNIQUE của DB, nên request thua có thể trả 500 thay vì `COLLECTION_SLUG_DUPLICATE`.
 
 - Public chi tiết (`?slug=`) và public list trả mọi sản phẩm của bộ sưu tập, không lọc theo `status` của sản phẩm.
 - `resolveProducts` giữ thứ tự theo `productIds` ở bộ nhớ khi trả về, nhưng bảng nối không lưu thứ tự nên thứ tự đọc lại từ DB không được đảm bảo.

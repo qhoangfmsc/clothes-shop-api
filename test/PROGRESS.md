@@ -229,7 +229,7 @@ Trạng thái: **Xong** · Ghi chú: 2026-10-23; làm chung file với batch 15.
 | 4 | DELETE | `/api/admin/collections/:id` | JWT | 8002 |
 | 5 | PATCH | `/api/admin/collections/:id` | JWT | 8001 |
 
-Trạng thái: **Chưa làm** · Ghi chú: —
+Trạng thái: **Xong** · Ghi chú: 2026-10-23; 54 flow mới (`flows/collection/collection.flow.ts`); 2 phát hiện (xem bảng). Module collection hoàn tất (5/5 route)
 
 
 ### Batch 18 — address (4 route)
@@ -351,6 +351,7 @@ Trạng thái: **Chưa làm** · Ghi chú: —
 | Batch 13 | 2026-10-23 | product: danh sách, chi tiết, autocomplete (công khai), danh sách admin, tạo | +85 flow (405 → 490) | 53 → 58/98 | 51 → 56/93 | Baseline 47 → 42. Phá thử 18 điểm đều bị bắt; 1 điểm lọt lúc đầu (xếp hạng khớp-đầu của autocomplete, vì tên có dấu "Á" vốn đã xếp sau "P") rồi đã bịt bằng tên ASCII. 3 phát hiện cần quyết định (500 khi tạo đồng thời cùng slug, 500 khi SKU tự sinh trùng, PATCH nhận chuỗi rỗng) |
 | Batch 14 | 2026-10-23 | product (admin): sửa, xoá | +31 flow (490 → 521) | 58 → 61/98 | 56 → 58/93 | Baseline 42 → 40. Phá thử 10 điểm (giá cuối, slug/SKU trùng, sinh lại SKU, khớp danh mục, 404) đều bị bắt. 2 phát hiện: response PATCH thiếu các field không gửi; PATCH đổi danh mục mà không gửi `slug` lưu `sku` dạng `…-undefined` (cùng nguyên nhân: DTO có thuộc tính `undefined`). Module product xong (7/7) |
 | Batch 15–16 | 2026-10-23 | category: danh sách công khai/admin, tạo, sửa, xoá, reorder | +74 flow (521 → 595) | 61 → 67/98 | 58 → 64/93 | Baseline 40 → 34. Phá thử 19 điểm (thứ hạng, tìm, khoá advisory ở create/reorder, trùng slug, dịch hạng, đồng bộ subcategory, ánh xạ FK, dồn hạng khi xoá, ba kiểm tra reorder, 404) đều bị bắt. 1 phát hiện (PATCH nhận chuỗi rỗng; response thiếu field không gửi). Module category xong (6/6) |
+| Batch 17 | 2026-10-23 | collection: danh sách công khai/admin, tạo, sửa, xoá | +54 flow (595 → 649) | 67 → 72/98 | 64 → 69/93 | Baseline 34 → 29. Phá thử 14 điểm đều bị bắt (2 mutation đầu không biên dịch được nên làm lại bằng cách khác). 2 phát hiện (PATCH nhận chuỗi rỗng và response thiếu field không gửi; đua tạo cùng slug → 500). Module collection xong (5/5) |
 
 ## Phát hiện cần người dùng quyết định
 
@@ -367,3 +368,5 @@ Test lộ ra hành vi nghi là lỗi trong code thì ghi ở đây (route, hành
 | 14 | `PATCH /api/admin/products/:id` | Response chỉ chứa field được gửi cùng quan hệ/giá/điểm: `slug`, `sku`, `images`, `status`, `description`, `material`, `care`, `sizes`, `colors`, `tags` vắng mặt khi không gửi (DB đúng, `GET` đủ). Nguyên nhân: `dto` là instance có sẵn thuộc tính `undefined`, `Object.assign(product, rest)` ghi `undefined` lên entity rồi mới `save` | `docs/modules/product.md` 4.1: response là sản phẩm đầy đủ như create | Chờ người dùng quyết định (test chỉ kiểm field đã gửi và đọc phần còn lại qua DB/`GET`) |
 | 14 | `PATCH /api/admin/products/:id` | Gửi `categoryId` hoặc `subcategoryId` mà không gửi `slug` và `sku` lưu `sku` = `{category}-{subcategory}-undefined` vào DB (cùng nguyên nhân: `product.slug` bị ghi `undefined` trước khi sinh SKU) | SKU sinh lại theo công thức mặc định với slug hiện có (`docs/modules/product.md` 4.4) | Chờ người dùng quyết định (test dùng `sku` tường minh khi đổi danh mục) |
 | 15 | `PATCH /api/admin/categories/:id` | `UpdateCategoryDto` thiếu `@IsNotEmpty` cho `slug`/`title`: PATCH `{ "slug": "", "title": "" }` trả 200 và lưu chuỗi rỗng. Cùng nguyên nhân với product, response `PATCH` thiếu `slug`/`description` khi không gửi và response `POST` thiếu `subcategories` khi không gửi (DTO có sẵn thuộc tính `undefined` gán lên entity) | `docs/modules/category.md` 4.1: create yêu cầu not empty; response là entity đầy đủ | Chờ người dùng quyết định (test không khẳng định) |
+| 17 | `PATCH /api/admin/collections/:id` | `UpdateCollectionDto` thiếu `@IsNotEmpty` cho `slug`/`name`/`image`: PATCH `{ "slug": "", "name": "", "image": "" }` trả 200 và lưu chuỗi rỗng; response thiếu các field không gửi (cùng nguyên nhân với product/category) | `docs/modules/collection.md` 4.1: create yêu cầu not empty; response là collection đầy đủ | Chờ người dùng quyết định (test không khẳng định) |
+| 17 | `POST /api/admin/collections` | Hai request đồng thời cùng `slug` cho `[201, 500, 400/1202]` (kiểm tra trùng chạy trước khi lưu, không bắt UNIQUE `slug`) | `COLLECTION_SLUG_DUPLICATE (1202)`; CLAUDE.md: bắt lỗi DB ra mã đẹp | Chờ người dùng quyết định (test không khẳng định) |
