@@ -32,37 +32,21 @@
     },
     "GET /api/auth/permissions": {
       "error": "Không có input; chỉ có lỗi của guard (401/403, ma trận auth đã kiểm)"
+    },
+    "GET /api/admin/site-config": {
+      "error": "Không có input; chưa có cấu hình nào thì trả danh sách rỗng nên không có ca lỗi nghiệp vụ"
+    },
+    "GET /api/admin/site-config/keys": {
+      "error": "Không có input; danh sách key lấy từ registry cố định nên không có ca lỗi nghiệp vụ"
+    },
+    "GET /api/shipping": {
+      "error": "Không có input; thiếu hoặc hỏng cấu hình thì dùng giá trị mặc định nên không có ca lỗi nghiệp vụ"
+    },
+    "GET /api/size-guides/:category": {
+      "error": "Nhóm không có trả 200 với data null (docs 4.1) nên không có ca lỗi nghiệp vụ"
     }
   },
   "missing": {
-    "GET /api/site-config": [
-      "success",
-      "error"
-    ],
-    "GET /api/admin/site-config": [
-      "success",
-      "error"
-    ],
-    "DELETE /api/admin/site-config/:key": [
-      "success",
-      "error"
-    ],
-    "PUT /api/admin/site-config/:key": [
-      "success",
-      "error"
-    ],
-    "GET /api/admin/site-config/keys": [
-      "success",
-      "error"
-    ],
-    "GET /api/shipping": [
-      "success",
-      "error"
-    ],
-    "GET /api/size-guides/:category": [
-      "success",
-      "error"
-    ],
     "GET /api/admin/media": [
       "error"
     ],
