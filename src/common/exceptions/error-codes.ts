@@ -142,6 +142,7 @@ export enum ECartErrorCode {
   CART_NOT_FOUND = 2001,
   CART_ITEM_NOT_FOUND = 2002,
   CART_PRODUCT_UNAVAILABLE = 2003,
+  CART_QUANTITY_LIMIT = 2004,
 }
 
 // ============================================
@@ -157,6 +158,7 @@ export enum EAddressErrorCode {
 export enum EAuthErrorCode {
   AUTH_USER_NOT_FOUND = 2201,
   AUTH_REFRESH_TOKEN_INVALID = 2202,
+  AUTH_USER_DISABLED = 2203,
   AUTH_GOOGLE_TOKEN_INVALID = 2210,
   AUTH_GOOGLE_EXCHANGE_FAILED = 2211,
   AUTH_GOOGLE_VERIFY_FAILED = 2212,
@@ -171,9 +173,23 @@ export enum EPermissionErrorCode {
 }
 
 // ============================================
+// DATABASE INTEGRITY ERRORS (91xx) — lưới an toàn của AllExceptionFilter cho vi phạm ràng buộc chưa được ánh xạ riêng
+// ============================================
+export enum EDatabaseErrorCode {
+  DB_NOT_NULL_VIOLATION = 9101,
+  DB_CHECK_VIOLATION = 9102,
+  DB_UNIQUE_VIOLATION = 9103,
+  DB_FOREIGN_KEY_VIOLATION = 9104,
+}
+
+// ============================================
 // ERROR MESSAGES - Map error code to message
 // ============================================
 export const ErrorMessages: Record<number, string> = {
+  [EDatabaseErrorCode.DB_NOT_NULL_VIOLATION]: 'A required value is missing',
+  [EDatabaseErrorCode.DB_CHECK_VIOLATION]: 'A value is outside the allowed range',
+  [EDatabaseErrorCode.DB_UNIQUE_VIOLATION]: 'This value already exists',
+  [EDatabaseErrorCode.DB_FOREIGN_KEY_VIOLATION]: 'This record conflicts with related data',
   [EProductErrorCode.PRODUCT_NOT_FOUND]: 'Product not found',
   [EProductErrorCode.PRODUCT_SLUG_DUPLICATE]: 'Product slug already exists',
   [EProductErrorCode.PRODUCT_SKU_DUPLICATE]: 'Product SKU already exists',
@@ -246,9 +262,11 @@ export const ErrorMessages: Record<number, string> = {
   [ECartErrorCode.CART_NOT_FOUND]: 'Cart not found',
   [ECartErrorCode.CART_ITEM_NOT_FOUND]: 'Cart item not found',
   [ECartErrorCode.CART_PRODUCT_UNAVAILABLE]: 'Product is not available',
+  [ECartErrorCode.CART_QUANTITY_LIMIT]: 'Cart item quantity limit reached',
   [EAddressErrorCode.ADDRESS_NOT_FOUND]: 'Address not found',
   [EAuthErrorCode.AUTH_USER_NOT_FOUND]: 'User not found',
   [EAuthErrorCode.AUTH_REFRESH_TOKEN_INVALID]: 'Invalid refresh token',
+  [EAuthErrorCode.AUTH_USER_DISABLED]: 'User account is disabled',
   [EAuthErrorCode.AUTH_GOOGLE_TOKEN_INVALID]: 'Invalid Google token',
   [EAuthErrorCode.AUTH_GOOGLE_EXCHANGE_FAILED]: 'Failed to exchange authorization code',
   [EAuthErrorCode.AUTH_GOOGLE_VERIFY_FAILED]: 'Failed to verify Google access token',
