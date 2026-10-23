@@ -1,3 +1,4 @@
+import { saveOrThrowOnConstraint } from '@common/base/db-error.util';
 import { getPaging, paginated } from '@common/base/pagination.util';
 import { pickProvided } from '@common/base/provided-fields.util';
 import { parseSort } from '@common/base/sort.util';
@@ -13,6 +14,8 @@ import { Collection } from './collection.entity';
 import { AdminCollectionQueryDto } from './dtos/admin-collection-query.dto';
 import { CreateCollectionDto, UpdateCollectionDto } from './dtos/collection.dto';
 import { PublicCollectionQueryDto } from './dtos/public-collection-query.dto';
+
+const COLLECTION_UNIQUE_ERRORS = { UQ_collections_slug: ECollectionErrorCode.COLLECTION_SLUG_DUPLICATE };
 
 /** Collection kèm products và category/subcategory của từng sản phẩm — mọi response collection cùng một hình dạng */
 const COLLECTION_RELATIONS = ['products', ...PRODUCT_RELATIONS.map((relation) => `products.${relation}`)];
@@ -145,7 +148,12 @@ export class CollectionService {
       ...pickProvided({ subtitle: dto.subtitle, description: dto.description, season: dto.season }),
       products,
     });
-    return { data: this.present(await this.collectionRepo.save(collection), await this.currencyService.getVndPerUsd()) };
+    return {
+      data: this.present(
+        await saveOrThrowOnConstraint(this.collectionRepo, collection, COLLECTION_UNIQUE_ERRORS),
+        await this.currencyService.getVndPerUsd(),
+      ),
+    };
   }
 
   async update(id: string, dto: UpdateCollectionDto) {
@@ -169,7 +177,12 @@ export class CollectionService {
     const { productIds, ...rest } = dto;
     Object.assign(collection, pickProvided(rest));
 
-    return { data: this.present(await this.collectionRepo.save(collection), await this.currencyService.getVndPerUsd()) };
+    return {
+      data: this.present(
+        await saveOrThrowOnConstraint(this.collectionRepo, collection, COLLECTION_UNIQUE_ERRORS),
+        await this.currencyService.getVndPerUsd(),
+      ),
+    };
   }
 
   async delete(id: string) {

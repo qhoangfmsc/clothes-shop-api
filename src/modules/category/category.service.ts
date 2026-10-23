@@ -1,3 +1,4 @@
+import { throwOnConstraint } from '@common/base/db-error.util';
 import { getPaging, paginated } from '@common/base/pagination.util';
 import { pickProvided } from '@common/base/provided-fields.util';
 import { parseSort } from '@common/base/sort.util';
@@ -11,6 +12,11 @@ import { AdminCategoryQueryDto } from './dtos/admin-category-query.dto';
 import { CreateCategoryDto, CreateSubCategoryDto, ReorderCategoriesDto, UpdateCategoryDto } from './dtos/category.dto';
 import { PublicCategoryQueryDto } from './dtos/public-category-query.dto';
 import { SubCategory } from './sub-category.entity';
+
+const CATEGORY_UNIQUE_ERRORS = {
+  UQ_categories_slug: ECategoryErrorCode.CATEGORY_SLUG_DUPLICATE,
+  UQ_subcategories_category_slug: ECategoryErrorCode.CATEGORY_SUBSLUG_DUPLICATE,
+};
 
 @Injectable()
 export class CategoryService {
@@ -159,10 +165,7 @@ export class CategoryService {
         return { data: await manager.save(category) };
       });
     } catch (err: any) {
-      // Catch UQ_subcategories_category_slug collision (DB unique constraint)
-      if (err.code === '23505') {
-        throwAppError(ECategoryErrorCode.CATEGORY_SUBSLUG_DUPLICATE);
-      }
+      throwOnConstraint(err, CATEGORY_UNIQUE_ERRORS);
       throw err;
     }
   }
@@ -210,9 +213,7 @@ export class CategoryService {
         return { data: await manager.save(category) };
       });
     } catch (err: any) {
-      if (err.code === '23505') {
-        throwAppError(ECategoryErrorCode.CATEGORY_SUBSLUG_DUPLICATE);
-      }
+      throwOnConstraint(err, CATEGORY_UNIQUE_ERRORS);
       throw err;
     }
   }

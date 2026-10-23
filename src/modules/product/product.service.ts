@@ -1,3 +1,4 @@
+import { saveOrThrowOnConstraint } from '@common/base/db-error.util';
 import { getPaging, paginated } from '@common/base/pagination.util';
 import { pickProvided } from '@common/base/provided-fields.util';
 import { parseSort } from '@common/base/sort.util';
@@ -17,6 +18,11 @@ import { ProductDetailQueryDto, RELATED_DEFAULT_LIMIT } from './dtos/product-det
 import { PublicProductQueryDto } from './dtos/public-product-query.dto';
 import { Product } from './product.entity';
 import { PRODUCT_RELATIONS, presentProduct, presentProductSummary } from './product.presenter';
+
+const PRODUCT_UNIQUE_ERRORS = {
+  UQ_products_slug: EProductErrorCode.PRODUCT_SLUG_DUPLICATE,
+  UQ_products_sku: EProductErrorCode.PRODUCT_SKU_DUPLICATE,
+};
 
 @Injectable()
 export class ProductService {
@@ -40,27 +46,22 @@ export class ProductService {
       .leftJoinAndSelect('p.subcategory', 'sub')
       .where('p.status = :status', { status: 'active' });
 
-    // Search: ILIKE on name, slug, description
     if (search) {
       qb.andWhere('(p.name ILIKE :q OR p.slug ILIKE :q OR p.description ILIKE :q)', { q: `%${search}%` });
     }
 
-    // Filter by category slug
     if (category) {
       qb.andWhere('cat.slug = :catSlug', { catSlug: category });
     }
 
-    // Filter by subcategory slug
     if (subcategory) {
       qb.andWhere('sub.slug = :subSlug', { subSlug: subcategory });
     }
 
-    // Filter by badge
     if (badge) {
       qb.andWhere('p.badge = :badge', { badge });
     }
 
-    // Filter by price range (VND)
     if (minPrice != null) {
       qb.andWhere('p.price >= :minPrice', { minPrice: Number(minPrice) });
     }
@@ -95,12 +96,10 @@ export class ProductService {
       }
     }
 
-    // Sort: `field` = ASC, `-field` = DESC
     // Sản phẩm chưa có đánh giá (rating_average NULL) luôn xếp cuối, kể cả khi sort tăng dần; `id` làm thứ tự phụ để phân trang ổn định
     const { field, direction } = parseSort(sort, '-createdAt');
     qb.orderBy(`p.${field}`, direction, 'NULLS LAST').addOrderBy('p.id', 'ASC');
 
-    // Pagination
     qb.skip((page - 1) * limit).take(limit);
 
     const [data, total] = await qb.getManyAndCount();
@@ -168,13 +167,11 @@ export class ProductService {
     const { search, status, category, badge, sort, minRating } = query;
     const { page, limit } = getPaging(query);
 
-    // Build base conditions (non-search filters)
     const baseConditions: FindOptionsWhere<Product> = {};
     if (status) baseConditions.status = status;
     if (badge) baseConditions.badge = badge;
     if (minRating != null) baseConditions.ratingAverage = MoreThanOrEqual(Number(minRating));
 
-    // Resolve category slug → ID
     if (category) {
       const cat = await this.categoryRepo.findOne({ where: { slug: category } });
       if (cat) {
@@ -184,7 +181,6 @@ export class ProductService {
       }
     }
 
-    // Build where: search creates OR conditions, otherwise use baseConditions directly
     let where: FindOptionsWhere<Product> | FindOptionsWhere<Product>[];
     if (search) {
       const like = ILike(`%${search}%`);
@@ -198,7 +194,6 @@ export class ProductService {
       where = baseConditions;
     }
 
-    // Sort: `field` = ASC, `-field` = DESC
     const { field, direction } = parseSort(sort, '-createdAt');
     const order: FindOptionsOrder<Product> = { [field]: { direction, nulls: 'LAST' }, id: 'ASC' };
 
@@ -225,26 +220,28 @@ export class ProductService {
       await this.ensureSkuUnique(dto.sku);
     }
 
-    // Validate price logic
     if (dto.originalPriceVnd != null && dto.originalPriceVnd < dto.priceVnd) {
       throwAppError(EProductErrorCode.PRODUCT_INVALID_PRICE);
     }
 
-    // Validate FK
     const category = await this.categoryRepo.findOne({ where: { id: dto.categoryId } });
     if (!category) throwAppError(EProductErrorCode.PRODUCT_CATEGORY_NOT_FOUND);
 
     const subcategory = await this.subCategoryRepo.findOne({ where: { id: dto.subcategoryId } });
     if (!subcategory) throwAppError(EProductErrorCode.PRODUCT_CATEGORY_NOT_FOUND);
 
-    // Validate subcategory belongs to category
     await this.validateSubcategoryBelongsToCategory(subcategory.id, category.id);
 
     const sku = dto.sku || `${category.slug}-${subcategory.slug}-${dto.slug}`;
 
     const { priceVnd, originalPriceVnd, ...rest } = pickProvided(dto, ['badge', 'originalPriceVnd']);
     const product = this.productRepo.create({ ...rest, price: priceVnd, originalPrice: originalPriceVnd, sku, category, subcategory });
-    return { data: presentProduct(await this.productRepo.save(product), await this.currencyService.getVndPerUsd()) };
+    return {
+      data: presentProduct(
+        await saveOrThrowOnConstraint(this.productRepo, product, PRODUCT_UNIQUE_ERRORS),
+        await this.currencyService.getVndPerUsd(),
+      ),
+    };
   }
 
   async update(id: string, dto: UpdateProductDto) {
@@ -257,7 +254,6 @@ export class ProductService {
     if (dto.slug && dto.slug !== product.slug) await this.ensureSlugUnique(dto.slug);
     if (dto.sku && dto.sku !== product.sku) await this.ensureSkuUnique(dto.sku);
 
-    // Handle FK changes
     if (dto.categoryId) {
       const category = await this.categoryRepo.findOne({ where: { id: dto.categoryId } });
       if (!category) throwAppError(EProductErrorCode.PRODUCT_CATEGORY_NOT_FOUND);
@@ -269,30 +265,31 @@ export class ProductService {
       product.subcategory = subcategory;
     }
 
-    // Validate subcategory ∈ category
     if (product.category?.id && product.subcategory?.id) {
       await this.validateSubcategoryBelongsToCategory(product.subcategory.id, product.category.id);
     }
 
-    // Validate price logic
     const finalPrice = dto.priceVnd != null ? dto.priceVnd : product.price;
     const finalOriginalPrice = dto.originalPriceVnd !== undefined ? dto.originalPriceVnd : product.originalPrice;
     if (finalOriginalPrice != null && finalOriginalPrice < finalPrice) {
       throwAppError(EProductErrorCode.PRODUCT_INVALID_PRICE);
     }
 
-    // Merge remaining fields (exclude FK fields handled above)
     const { categoryId, subcategoryId, priceVnd, originalPriceVnd, ...rest } = pickProvided(dto, ['badge', 'originalPriceVnd']);
     Object.assign(product, rest);
     if (priceVnd !== undefined) product.price = priceVnd;
     if (originalPriceVnd !== undefined) product.originalPrice = originalPriceVnd;
 
-    // Regenerate SKU if dependencies changed
     if (categoryId || subcategoryId || dto.slug) {
       product.sku = dto.sku || `${product.category.slug}-${product.subcategory.slug}-${product.slug}`;
     }
 
-    return { data: presentProduct(await this.productRepo.save(product), await this.currencyService.getVndPerUsd()) };
+    return {
+      data: presentProduct(
+        await saveOrThrowOnConstraint(this.productRepo, product, PRODUCT_UNIQUE_ERRORS),
+        await this.currencyService.getVndPerUsd(),
+      ),
+    };
   }
 
   async delete(id: string) {
