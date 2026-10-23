@@ -17,25 +17,6 @@
     }
   },
   "missing": {
-    "POST /api/reviews/:reviewId/helpful": [
-      "error"
-    ],
-    "POST /api/reviews/images": [
-      "success",
-      "error"
-    ],
-    "GET /api/my-reviews": [
-      "success",
-      "error"
-    ],
-    "GET /api/my-reviews/pending": [
-      "success",
-      "error"
-    ],
-    "GET /api/my-reviews/votes": [
-      "success",
-      "error"
-    ],
     "GET /api/admin/reviews": [
       "success",
       "error"
@@ -219,7 +200,6 @@
       "error"
     ],
     "GET /api/admin/media": [
-      "success",
       "error"
     ],
     "POST /api/admin/media": [

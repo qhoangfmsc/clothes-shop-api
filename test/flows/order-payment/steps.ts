@@ -1,8 +1,9 @@
+import type { User } from '../../../src/modules/user/user.entity';
 import { type Builders, bearer, sepayWebhook, type TestApp } from '../../support';
 
 /** Giỏ 1 sản phẩm 350.000đ × quantity + địa chỉ, checkout giao tiêu chuẩn (phí ship 30.000). */
-export async function placeOrder(t: TestApp, b: Builders, options: { quantity?: number } = {}) {
-  const customer = await b.user();
+export async function placeOrder(t: TestApp, b: Builders, options: { quantity?: number; customer?: User } = {}) {
+  const customer = options.customer ?? (await b.user());
   const product = await b.product();
   await b.cart(customer, [{ product, quantity: options.quantity ?? 2 }]);
   const address = await b.address(customer);
@@ -32,16 +33,16 @@ export function sendTransfer(
 }
 
 /** Đặt hàng → QR → chuyển đủ tiền. */
-export async function placeAndPayOrder(t: TestApp, b: Builders) {
-  const placed = await placeOrder(t, b);
+export async function placeAndPayOrder(t: TestApp, b: Builders, options: { customer?: User } = {}) {
+  const placed = await placeOrder(t, b, options);
   const qr = await createQr(t, placed.customer, placed.order.id);
   await sendTransfer(t, qr).expect(200);
   return { ...placed, qr };
 }
 
 /** Đơn đã trả tiền và đã giao (trong hạn đổi trả): 2 × 350.000đ + 30.000đ ship = 730.000đ. */
-export async function deliveredPaidOrder(t: TestApp, b: Builders) {
-  const placed = await placeAndPayOrder(t, b);
+export async function deliveredPaidOrder(t: TestApp, b: Builders, options: { customer?: User } = {}) {
+  const placed = await placeAndPayOrder(t, b, options);
   const admin = await b.admin();
   for (const status of ['shipping', 'delivered']) {
     await t.api.patch(`/api/admin/orders/${placed.order.id}/status`).set(bearer(t, admin)).send({ status }).expect(200);
