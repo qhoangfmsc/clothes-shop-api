@@ -253,7 +253,7 @@ Trạng thái: **Xong** · Ghi chú: 2026-10-23; 40 flow mới (`flows/address/a
 | 3 | POST | `/api/wishlist/:productId` | JWT | 5001 |
 | 4 | GET | `/api/wishlist/check/:productId` | JWT | 5003 |
 
-Trạng thái: **Chưa làm** · Ghi chú: —
+Trạng thái: **Xong** · Ghi chú: 2026-10-23; 12 flow mới (`flows/wishlist/wishlist.flow.ts`). `GET /api/wishlist`, `DELETE /api/wishlist/:productId`, `GET /api/wishlist/check/:productId` không có ca lỗi nghiệp vụ → `exempt`. 1 phát hiện (xem bảng). Module wishlist hoàn tất (4/4 route)
 
 
 ### Batch 20 — auth+user (5 route)
@@ -353,6 +353,7 @@ Trạng thái: **Chưa làm** · Ghi chú: —
 | Batch 15–16 | 2026-10-23 | category: danh sách công khai/admin, tạo, sửa, xoá, reorder | +74 flow (521 → 595) | 61 → 67/98 | 58 → 64/93 | Baseline 40 → 34. Phá thử 19 điểm (thứ hạng, tìm, khoá advisory ở create/reorder, trùng slug, dịch hạng, đồng bộ subcategory, ánh xạ FK, dồn hạng khi xoá, ba kiểm tra reorder, 404) đều bị bắt. 1 phát hiện (PATCH nhận chuỗi rỗng; response thiếu field không gửi). Module category xong (6/6) |
 | Batch 17 | 2026-10-23 | collection: danh sách công khai/admin, tạo, sửa, xoá | +54 flow (595 → 649) | 67 → 72/98 | 64 → 69/93 | Baseline 34 → 29. Phá thử 14 điểm đều bị bắt (2 mutation đầu không biên dịch được nên làm lại bằng cách khác). 2 phát hiện (PATCH nhận chuỗi rỗng và response thiếu field không gửi; đua tạo cùng slug → 500). Module collection xong (5/5) |
 | Batch 18 | 2026-10-23 | address: danh sách, tạo, sửa, xoá | +40 flow (649 → 688) | 72 → 76/98 | 69 → 70/92 (miễn thêm: `GET /api/addresses`) | Baseline 29 → 25. Phá thử 8 điểm: 7 bị bắt; 1 mutant tương đương (lấy chủ sở hữu từ body: DTO đã cấm `userId` nên không thể đi qua HTTP, test DTO ghim lớp này). 1 phát hiện (PATCH nhận chuỗi rỗng; response thiếu field không gửi). Module address xong (4/4) |
+| Batch 19 | 2026-10-23 | wishlist: thêm, danh sách, kiểm tra, bỏ | +12 flow (688 → 700) | 76 → 79/98 | 70 → 71/92 (miễn thêm 3 route) | Baseline 25 → 21. Phá thử 8 điểm đều bị bắt. 1 phát hiện: thêm đồng thời cùng sản phẩm (bấm đúp) cho `[201, 500, 500]`. Module wishlist xong (4/4) |
 
 ## Phát hiện cần người dùng quyết định
 
@@ -372,3 +373,4 @@ Test lộ ra hành vi nghi là lỗi trong code thì ghi ở đây (route, hành
 | 17 | `PATCH /api/admin/collections/:id` | `UpdateCollectionDto` thiếu `@IsNotEmpty` cho `slug`/`name`/`image`: PATCH `{ "slug": "", "name": "", "image": "" }` trả 200 và lưu chuỗi rỗng; response thiếu các field không gửi (cùng nguyên nhân với product/category) | `docs/modules/collection.md` 4.1: create yêu cầu not empty; response là collection đầy đủ | Chờ người dùng quyết định (test không khẳng định) |
 | 17 | `POST /api/admin/collections` | Hai request đồng thời cùng `slug` cho `[201, 500, 400/1202]` (kiểm tra trùng chạy trước khi lưu, không bắt UNIQUE `slug`) | `COLLECTION_SLUG_DUPLICATE (1202)`; CLAUDE.md: bắt lỗi DB ra mã đẹp | Chờ người dùng quyết định (test không khẳng định) |
 | 18 | `PATCH /api/addresses/:id` | `UpdateAddressDto` thiếu `@IsNotEmpty` cho `fullName`/`phone`/`addressLine1`/`city`: PATCH với chuỗi rỗng trả 200 và lưu; response chỉ chứa `id`, `userId`, timestamp và field đã gửi (cùng nguyên nhân với product/category/collection) | `docs/modules/address.md` 4.1: update có cùng các field như create (create yêu cầu not empty); response là địa chỉ đầy đủ | Chờ người dùng quyết định (test không khẳng định) |
+| 19 | `POST /api/wishlist/:productId` | Ba request đồng thời cho cùng sản phẩm (vd bấm đúp) cho `[201, 500, 500]` (kiểm tra đã có chạy trước khi lưu, không bắt UNIQUE `(user_id, product_id)`) | Request thua trả `created: false` như thêm lại (docs 4.4: thêm lại là idempotent) | Chờ người dùng quyết định (test không khẳng định) |

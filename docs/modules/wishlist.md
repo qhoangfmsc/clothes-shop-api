@@ -1,6 +1,6 @@
 # wishlist (`src/modules/wishlist`)
 
-> Cập nhật lần cuối: 2026-10-19
+> Cập nhật lần cuối: 2026-10-23
 
 ## 1. Tổng quan
 
@@ -79,7 +79,11 @@ Không có error code riêng của module; sản phẩm không tồn tại trả
 
 `wishlist.service.spec.ts` — `WishlistService.findAll` nạp kèm `product.category` và `product.subcategory`.
 
+Flow test trên Postgres thật: `test/flows/wishlist/wishlist.flow.ts` (batch 19) — thêm (`created: true`, thêm lại là `created: false` không tạo hàng mới, nhiều user cùng một sản phẩm, không kiểm tra `status`, sản phẩm lạ → 404 / 1001); danh sách (chỉ của mình, mới nhất trước, sản phẩm đúng hình dạng chuẩn với `Vnd`/`Usd`, rỗng, giữ cả sản phẩm `disabled`); kiểm tra (chỉ tính của mình, id lạ → `false`); bỏ (chỉ bản ghi của mình, idempotent, xoá sản phẩm thì wishlist tự sạch).
+
 ### 4.8 Lưu ý hiện trạng
+
+- Hai request `POST /api/wishlist/:productId` đồng thời cho cùng một sản phẩm (vd bấm đúp): kiểm tra đã có chạy trước khi lưu và không bắt lỗi UNIQUE `(user_id, product_id)`, nên request thua trả 500 thay vì `created: false`.
 
 - `add` chỉ kiểm tra sản phẩm tồn tại, không kiểm tra `status`; `findAll` trả kèm sản phẩm kể cả `disabled`.
 - Không có `GET /api/wishlist/:productId`, nên route `check/:productId` không xung đột với route khác.
