@@ -1,6 +1,6 @@
 # address (`src/modules/address`)
 
-> Cập nhật lần cuối: 2026-10-22
+> Cập nhật lần cuối: 2026-10-23
 
 ## 1. Tổng quan
 
@@ -99,9 +99,15 @@ Bảng `addresses` (entity `Address extends BaseEntity`):
 
 ### 4.7 Test
 
-Flow test `test/flows/address/address-errors.flow.ts` (Postgres thật): sửa/xoá địa chỉ lạ hoặc của người khác → 404 / 2101 và địa chỉ của người khác không đổi. Các đường thành công (list/tạo/sửa/xoá, đặt mặc định) chưa có test tự động.
+Flow test trên Postgres thật (`test/flows/address/`):
+
+- `address-errors.flow.ts` — sửa/xoá địa chỉ lạ hoặc của người khác → 404 / 2101 và địa chỉ của người khác không đổi.
+- `address.flow.ts` (batch 18) — danh sách (chỉ của mình, mặc định trước rồi mới nhất trước, `{ data, total }`, rỗng); tạo (giá trị mặc định của các field tuỳ chọn, địa chỉ mặc định mới thay mặc định cũ chỉ trong địa chỉ của chính mình, validation từng field, `userId` và field lạ bị từ chối); sửa (chỉ field được gửi đổi, body rỗng không đổi gì, đặt/bỏ mặc định, 404 / 2101, validation); xoá (không tự chọn mặc định mới, đơn đã đặt vẫn giữ bản sao địa chỉ, 404 / 2101 kể cả xoá lần hai).
 
 ### 4.8 Lưu ý hiện trạng
+
+- `UpdateAddressDto` không có `@IsNotEmpty` cho `fullName`, `phone`, `addressLine1`, `city` (create có): `PATCH` với chuỗi rỗng ở các field này được chấp nhận và lưu.
+- Response `PATCH` là entity đã lưu trong đó các field không được gửi là `undefined` (DTO có sẵn thuộc tính `undefined` được gán lên entity bằng `Object.assign`): chỉ còn `id`, `createdAt`, `updatedAt`, `userId` và field đã gửi; DB đúng và `GET` trả đủ.
 
 - Thao tác đổi cờ mặc định không nằm trong transaction.
 - Địa chỉ đầu tiên không tự động là mặc định; xoá địa chỉ mặc định không tự chọn địa chỉ khác làm mặc định.
