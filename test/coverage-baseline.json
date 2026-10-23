@@ -17,26 +17,6 @@
     }
   },
   "missing": {
-    "GET /api/products": [
-      "success",
-      "error"
-    ],
-    "GET /api/products/:id": [
-      "success",
-      "error"
-    ],
-    "GET /api/products/autocomplete": [
-      "success",
-      "error"
-    ],
-    "GET /api/admin/products": [
-      "success",
-      "error"
-    ],
-    "POST /api/admin/products": [
-      "success",
-      "error"
-    ],
     "DELETE /api/admin/products/:id": [
       "success",
       "error"
