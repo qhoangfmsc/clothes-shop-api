@@ -17,30 +17,6 @@
     }
   },
   "missing": {
-    "GET /api/admin/reviews": [
-      "success",
-      "error"
-    ],
-    "GET /api/admin/reviews/:reviewId": [
-      "success",
-      "error"
-    ],
-    "POST /api/admin/reviews/:reviewId/hide": [
-      "success",
-      "error"
-    ],
-    "POST /api/admin/reviews/:reviewId/publish": [
-      "success",
-      "error"
-    ],
-    "DELETE /api/admin/reviews/:reviewId/reply": [
-      "success",
-      "error"
-    ],
-    "PUT /api/admin/reviews/:reviewId/reply": [
-      "success",
-      "error"
-    ],
     "GET /api/products": [
       "success",
       "error"
