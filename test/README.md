@@ -106,10 +106,7 @@ Trạng thái: **Có** = đã có test cover luồng · **Unit** = chỉ có uni
 | order (admin) | Đổi trạng thái đơn theo bảng chuyển (pending → … → completed), chuyển sai → 1302, trạng thái cuối, trạng thái không tồn tại | Flow | `flows/order-payment/order-status.flow.ts` | Có |
 | auth | Đăng nhập Google, refresh token, `GET /auth/me` | Flow | — | Unit |
 | cart | Xem giỏ (Vnd/Usd, giá hiện tại), thêm (cộng dồn, size/màu, 1001/2003/1303), đổi số lượng, xoá dòng, xoá sạch, validation từng field | Flow | `flows/cart/cart.flow.ts` | Có (batch 08) |
-| product / collection | List public (filter, sort, phân trang) và CRUD admin | Flow | — | Unit |
-| category | List public và CRUD admin, thứ hạng `priority` | Flow | — | Chưa có |
 | wishlist | Thêm / xoá / kiểm tra sản phẩm yêu thích | Flow | — | Unit |
-| address | CRUD sổ địa chỉ của khách (ca thành công) | Flow | — | Chưa có |
 | media | Upload / xoá ảnh admin | Flow | — | Unit |
 | site-config / shipping / currency | Admin sửa cấu hình, ảnh hưởng báo giá | Flow | — | Unit |
 
