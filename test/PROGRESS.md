@@ -149,7 +149,7 @@ Trạng thái: **Xong** · Ghi chú: 2026-10-23; 56 flow mới (`flows/review/re
 | 4 | GET | `/api/my-reviews/pending` | JWT | 17001 |
 | 5 | GET | `/api/my-reviews/votes` | JWT | 17001 |
 
-Trạng thái: **Đang làm** · Ghi chú: —
+Trạng thái: **Xong** · Ghi chú: 2026-10-23; 33 flow mới (`flows/review/review-customer.flow.ts`); `placeOrder`/`placeAndPayOrder`/`deliveredPaidOrder` nhận `customer` để một khách có nhiều đơn
 
 
 ### Batch 11 — review (5 route)
@@ -346,6 +346,7 @@ Trạng thái: **Chưa làm** · Ghi chú: —
 | Batch 06–07 | 2026-10-22 | return: khách (điều kiện, tạo, danh sách, chi tiết, huỷ) và admin (danh sách, chi tiết, duyệt, từ chối, nhận hàng) | +67 flow (180 → 247) | 21 → 31/98 | 26 → 36/96 | Baseline 78 → 68. Phá thử 7 điểm (trần số lượng, sở hữu khi huỷ/xem, trạng thái nhận hàng, khoá đơn, hoàn lại khi từ chối khoản hoàn, hoàn xong → REFUNDED, số lượng chấp nhận mặc định) đều bị bắt; 2 điểm sống sót lúc đầu rồi đã bịt: cộng dồn `previousValueVnd` chỉ khác khi làm tròn (thêm ca số tiền nhận 300.000đ → 143.836 + 143.835) và kiểm phí ship một lần (thêm assert message vì nhánh 'vượt tổng đơn' cũng ra 1805). Module return xong (10/10) |
 | Batch 08 | 2026-10-22 | cart: xem, thêm, đổi số lượng, xoá dòng, xoá sạch | +32 flow (247 → 279) | 31 → 36/98 | 36/94 (miễn thêm 2: `GET /api/cart`, `DELETE /api/cart/clear`) | Baseline 68 → 63. Phá thử 6 điểm (cộng dồn, khớp theo size, sở hữu dòng khi sửa, xoá sạch theo giỏ, USD tính từ tổng VND, kiểm badge) đều bị bắt. 2 phát hiện 500 (xem bảng bên dưới). Lưu ý: chạy hai lần `test:flows` chồng nhau trên một DB làm test đỏ ngẫu nhiên và chậm hàng chục phút — chỉ chạy một tiến trình tại một thời điểm |
 | Batch 09 | 2026-10-23 | review: tạo, danh sách công khai, tổng hợp, sửa, bỏ "hữu ích" | +56 flow (279 → 335) | 36 → 42/98 | 36 → 40/93 (miễn thêm: `GET /api/reviews/:productId/summary`) | Baseline 63 → 58. Phá thử 11 điểm (sở hữu khi tạo/sửa, lọc `PUBLISHED` ở danh sách và tổng hợp, tính lại điểm sản phẩm, chặn sửa lần hai, ánh xạ UNIQUE → 409, bỏ phiếu của người khác, làm tròn trung bình, hạn đánh giá, kiểm liên kết) đều bị bắt ngay |
+| Batch 10 | 2026-10-23 | review (khách): vote, upload ảnh, đánh giá của tôi, chờ đánh giá, phiếu đã bấm | +33 flow (335 → 368) | 42 → 47/98 | 40 → 45/93 | Baseline 58 → 53. Phá thử 14 điểm đều bị bắt; 2 điểm lọt lúc đầu rồi đã bịt: kiểm trạng thái thanh toán ở `pending` (thêm ca đơn đã giao nhưng chưa trả, dựng bằng SQL) và mutation loại ảnh (lỗi biên dịch của chính mutation, làm lại) |
 
 ## Phát hiện cần người dùng quyết định
 

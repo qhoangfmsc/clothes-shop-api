@@ -17,7 +17,7 @@ Mỗi route review có ≥ 1 ca thành công và ≥ 1 ca lỗi nghiệp vụ tr
 | Batch | Route | Flow |
 |---|---|---|
 | 09 | `POST /api/reviews`, `GET /api/reviews/:productId`, `GET /api/reviews/:productId/summary`, `PATCH /api/reviews/:reviewId`, `DELETE /api/reviews/:reviewId/helpful` | `test/flows/review/review.flow.ts` |
-| 10 | `POST /api/reviews/:reviewId/helpful`, `POST /api/reviews/images`, `GET /api/my-reviews`, `/pending`, `/votes` | _(chưa làm)_ |
+| 10 | `POST /api/reviews/:reviewId/helpful`, `POST /api/reviews/images`, `GET /api/my-reviews`, `/pending`, `/votes` | `test/flows/review/review-customer.flow.ts` |
 | 11 | `GET /api/admin/reviews`, `GET /api/admin/reviews/:reviewId`, `POST .../hide`, `POST .../publish`, `DELETE .../reply` | _(chưa làm)_ |
 | 12 | `PUT /api/admin/reviews/:reviewId/reply` | _(chưa làm)_ |
 
@@ -31,4 +31,5 @@ Theo skill `test-campaign`; phá thử các điểm tính điểm sản phẩm, 
 
 ## 6. Kết quả triển khai
 
+- **Batch 10:** 33 flow test; storage giả bằng `jest.spyOn(globalThis, 'fetch')`. Phá thử 14 điểm (vote: tự vote, trùng, khoá dòng, đếm lại; `my-reviews`; `pending`: đã đánh giá, thanh toán, hạn; `votes`: người, sản phẩm; upload: giới hạn, người, cửa sổ 24 giờ, magic bytes) đều bị bắt sau khi bổ sung ca đơn đã giao nhưng chưa trả.
 - **Batch 09:** 56 flow test. Phá thử 11 điểm đều bị bắt. `GET /api/reviews/:productId/summary` không có ca lỗi nghiệp vụ (`exempt`).
