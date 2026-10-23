@@ -1,6 +1,6 @@
 # category (`src/modules/category`)
 
-> Cập nhật lần cuối: 2026-10-12
+> Cập nhật lần cuối: 2026-10-23
 
 ## 1. Tổng quan
 
@@ -158,10 +158,14 @@ Quan hệ: `Category.subcategories` là `OneToMany` với `eager: true, cascade:
 
 ### 4.7 Test
 
-Chưa có spec riêng. `PublicCategoryQueryDto` và `AdminCategoryQueryDto` được `list-query.dto.spec.ts` kiểm tra tự động.
+Chưa có unit spec riêng. `PublicCategoryQueryDto` và `AdminCategoryQueryDto` được `list-query.dto.spec.ts` kiểm tra tự động.
+
+Flow test trên Postgres thật: `test/flows/category/category.flow.ts` (batch 15–16; dựng category qua API để `priority` là dãy 1..N) — danh sách công khai (đúng hình dạng, thứ hạng, tìm theo tên/slug/mô tả, sort, phân trang tính trên category chứ không trên dòng subcategory, tra theo `slug` bỏ qua tham số list, 404 / 1101, tham số sai); danh sách admin; tạo (xếp cuối, mặc định, hai category dùng chung slug subcategory, tạo đồng thời vẫn cho dãy thứ hạng duy nhất, chờ khoá advisory rồi lấy hạng kế tiếp, 1102/1103, validation, `priority` không nhận khi tạo); sửa (từng phần, đổi slug và nhận lại slug của chính mình, dịch chỗ lên/xuống, 1108, đồng bộ subcategory theo slug giữ nguyên id, bỏ subcategory còn sản phẩm → 1105 và không đổi gì, 1103, 404); xoá (dồn thứ hạng, xoá theo dây chuyền subcategory, còn sản phẩm → 1104, 404); reorder (thứ tự mới, 1106/1101/1107, chờ khoá advisory, validation).
 
 ### 4.8 Lưu ý hiện trạng
 
+- `UpdateCategoryDto` không có `@IsNotEmpty` cho `slug` và `title` (create có): `PATCH` với chuỗi rỗng ở hai field này được chấp nhận và lưu.
+- `POST` và `PATCH` trả về entity đã lưu trong đó các field không được gửi là `undefined` (DTO có sẵn thuộc tính `undefined` được gán lên entity): response `PATCH` thiếu `slug`/`description` khi không gửi chúng, response `POST` thiếu `subcategories` khi không gửi; DB đúng và `GET` trả đủ.
 - `subcategories.count` là giá trị admin nhập, không được tự tính từ số sản phẩm.
 - Khi bắt lỗi `23505` ở create/update, mọi vi phạm UNIQUE đều được map sang `CATEGORY_SUBSLUG_DUPLICATE`.
 - `CategoryService.findAll()` (trả `{ data, total }` không phân trang) còn trong service nhưng không có nơi nào gọi.

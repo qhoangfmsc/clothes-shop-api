@@ -16,6 +16,7 @@ Cấu trúc: `docs/specs/<module>/NNNN-slug.md` (số tăng dần theo từng mo
 | order | [0003 — Kế hoạch flow test cho module order](order/0003-flow-test-plan.md) | Implemented | Báo giá, đặt hàng, danh sách/chi tiết/đổi trạng thái admin: 8/8 route đủ ca |
 | return | [0001 — Kế hoạch flow test cho module return](return/0001-flow-test-plan.md) | Implemented | Điều kiện, tạo, huỷ, duyệt, từ chối, nhận hàng và liên kết khoản hoàn: 10/10 route đủ ca |
 | cart | [0001 — Kế hoạch flow test cho module cart](cart/0001-flow-test-plan.md) | Implemented | Xem, thêm, đổi số lượng, xoá dòng, xoá sạch: 5/5 route đủ ca; 2 phát hiện 500 chờ quyết định |
+| category | [0001 — Kế hoạch flow test cho module category](category/0001-flow-test-plan.md) | Implemented | Đọc công khai/admin, tạo, sửa, xoá, reorder và bất biến thứ hạng: 6/6 route đủ ca; 1 phát hiện chờ quyết định |
 | product | [0001 — Kế hoạch flow test cho module product](product/0001-flow-test-plan.md) | Implemented | Đọc công khai, autocomplete, danh sách/tạo/sửa/xoá admin: 7/7 route đủ ca; 5 phát hiện chờ quyết định |
 | review | [0001 — Kế hoạch flow test cho module review](review/0001-flow-test-plan.md) | Implemented | Đọc công khai, viết, sửa, vote, upload ảnh, kiểm duyệt, phản hồi: 16/16 route đủ ca |
 | order | [0002 — Tách `OrderService` theo use case](order/0002-split-order-service.md) | Implemented | OrderQueryService, OrderCheckoutService, OrderStatusService; di chuyển nguyên văn, có flow đặc tả truy vấn |
