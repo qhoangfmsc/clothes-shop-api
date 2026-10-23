@@ -1,3 +1,4 @@
+import { pickProvided } from '@common/base/provided-fields.util';
 import { throwAppError } from '@common/exceptions/app.exception';
 import { EAddressErrorCode } from '@common/exceptions/error-codes';
 import { HttpStatus, Injectable } from '@nestjs/common';
@@ -27,7 +28,7 @@ export class AddressService {
       await this.addressRepo.update({ userId, isDefault: true }, { isDefault: false });
     }
 
-    const address = this.addressRepo.create({ ...dto, userId });
+    const address = this.addressRepo.create({ ...pickProvided(dto), userId });
     const saved = await this.addressRepo.save(address);
     return { data: saved };
   }
@@ -40,7 +41,7 @@ export class AddressService {
       await this.addressRepo.update({ userId, isDefault: true }, { isDefault: false });
     }
 
-    Object.assign(address, dto);
+    Object.assign(address, pickProvided(dto));
     const saved = await this.addressRepo.save(address);
     return { data: saved };
   }

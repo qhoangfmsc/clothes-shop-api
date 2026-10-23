@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { IsBoolean, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class CreateAddressDto {
@@ -62,63 +62,4 @@ export class CreateAddressDto {
   isDefault?: boolean;
 }
 
-export class UpdateAddressDto {
-  @ApiPropertyOptional()
-  @IsString()
-  @IsOptional()
-  @MaxLength(100)
-  label?: string;
-
-  @ApiPropertyOptional()
-  @IsString()
-  @IsOptional()
-  @MaxLength(255)
-  fullName?: string;
-
-  @ApiPropertyOptional()
-  @IsString()
-  @IsOptional()
-  @MaxLength(50)
-  phone?: string;
-
-  @ApiPropertyOptional()
-  @IsString()
-  @IsOptional()
-  @MaxLength(500)
-  addressLine1?: string;
-
-  @ApiPropertyOptional()
-  @IsString()
-  @IsOptional()
-  @MaxLength(500)
-  addressLine2?: string;
-
-  @ApiPropertyOptional()
-  @IsString()
-  @IsOptional()
-  @MaxLength(255)
-  city?: string;
-
-  @ApiPropertyOptional()
-  @IsString()
-  @IsOptional()
-  @MaxLength(255)
-  province?: string;
-
-  @ApiPropertyOptional()
-  @IsString()
-  @IsOptional()
-  @MaxLength(20)
-  postalCode?: string;
-
-  @ApiPropertyOptional({ default: 'Vietnam' })
-  @IsString()
-  @IsOptional()
-  @MaxLength(100)
-  country?: string;
-
-  @ApiPropertyOptional({ default: false })
-  @IsBoolean()
-  @IsOptional()
-  isDefault?: boolean;
-}
+export class UpdateAddressDto extends PartialType(CreateAddressDto, { skipNullProperties: false }) {}

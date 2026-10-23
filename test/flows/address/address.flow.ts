@@ -163,7 +163,17 @@ describe('Flow: addresses', () => {
 
       const res = await update(me, address.id, { phone: '0912345678', addressLine2: 'Tầng 5' }).expect(200);
 
-      expect(res.body.data).toMatchObject({ id: address.id, phone: '0912345678', addressLine2: 'Tầng 5' });
+      expect(res.body.data).toMatchObject({
+        id: address.id,
+        userId: me.id,
+        label: 'Nhà',
+        fullName: me.name,
+        phone: '0912345678',
+        addressLine1: '1 Test Street',
+        addressLine2: 'Tầng 5',
+        city: 'Hà Nội',
+        isDefault: true,
+      });
       expect(await rows('SELECT label, city, phone, address_line_2, full_name FROM addresses')).toEqual([
         { label: 'Nhà', city: 'Hà Nội', phone: '0912345678', address_line_2: 'Tầng 5', full_name: me.name },
       ]);
@@ -195,6 +205,16 @@ describe('Flow: addresses', () => {
       expect(a.id).not.toBe(c.id);
     });
 
+    it('treats null on an optional field as not sent', async () => {
+      const me = await b.user();
+      const address = await b.address(me, { label: 'Nhà', isDefault: true });
+
+      const res = await update(me, address.id, { label: null, isDefault: null, province: null }).expect(200);
+
+      expect(res.body.data).toMatchObject({ label: 'Nhà', isDefault: true });
+      expect(await rows('SELECT label, province, is_default FROM addresses')).toEqual([{ label: 'Nhà', province: '', is_default: true }]);
+    });
+
     it('answers 404 / 2101 for an unknown address and for another user’s address, which stays unchanged', async () => {
       const [me, other] = [await b.user(), await b.user()];
       const theirs = await b.address(other, { label: 'Của họ' });
@@ -216,6 +236,11 @@ describe('Flow: addresses', () => {
       ['a non-boolean isDefault', { isDefault: 'yes' }],
       ['a non-string label', { label: 5 }],
       ['a userId (not accepted)', { userId: 'someone-else' }],
+      ['an empty fullName', { fullName: '' }],
+      ['an empty phone', { phone: '' }],
+      ['an empty addressLine1', { addressLine1: '' }],
+      ['an empty city', { city: '' }],
+      ['a null phone', { phone: null }],
       ['an unknown field', { id: 'other' }],
     ])('rejects %s with a validation error (no errorCode) and changes nothing', async (_name, body) => {
       const me = await b.user();

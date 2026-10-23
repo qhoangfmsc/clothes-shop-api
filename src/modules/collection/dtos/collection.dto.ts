@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { ArrayMaxSize, IsArray, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class CreateCollectionDto {
@@ -46,47 +46,4 @@ export class CreateCollectionDto {
   season?: string;
 }
 
-export class UpdateCollectionDto {
-  @ApiPropertyOptional()
-  @IsString()
-  @IsOptional()
-  @MaxLength(255)
-  slug?: string;
-
-  @ApiPropertyOptional()
-  @IsString()
-  @IsOptional()
-  @MaxLength(255)
-  name?: string;
-
-  @ApiPropertyOptional()
-  @IsString()
-  @IsOptional()
-  @MaxLength(500)
-  subtitle?: string;
-
-  @ApiPropertyOptional()
-  @IsString()
-  @IsOptional()
-  description?: string;
-
-  @ApiPropertyOptional()
-  @IsString()
-  @IsOptional()
-  @MaxLength(500)
-  image?: string;
-
-  @ApiPropertyOptional({ example: ['abc123', 'def456'] })
-  @IsArray()
-  @ArrayMaxSize(100)
-  @IsString({ each: true })
-  @IsNotEmpty({ each: true })
-  @IsOptional()
-  productIds?: string[];
-
-  @ApiPropertyOptional()
-  @IsString()
-  @IsOptional()
-  @MaxLength(100)
-  season?: string;
-}
+export class UpdateCollectionDto extends PartialType(CreateCollectionDto, { skipNullProperties: false }) {}

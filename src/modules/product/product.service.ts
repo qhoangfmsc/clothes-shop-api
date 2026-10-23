@@ -1,4 +1,5 @@
 import { getPaging, paginated } from '@common/base/pagination.util';
+import { pickProvided } from '@common/base/provided-fields.util';
 import { parseSort } from '@common/base/sort.util';
 import { throwAppError } from '@common/exceptions/app.exception';
 import { EProductErrorCode } from '@common/exceptions/error-codes';
@@ -28,10 +29,6 @@ export class ProductService {
     private readonly subCategoryRepo: Repository<SubCategory>,
     private readonly currencyService: CurrencyService,
   ) {}
-
-  // ============================================
-  // PUBLIC METHODS (Phase 1)
-  // ============================================
 
   async findAllPublic(query: PublicProductQueryDto) {
     const { search, category, subcategory, badge, sort, minPrice, maxPrice, minRating, sizes, colors } = query;
@@ -167,10 +164,6 @@ export class ProductService {
     return { data: presentProduct(product, rate), related: related.map((item) => presentProduct(item, rate)) };
   }
 
-  // ============================================
-  // ADMIN METHODS
-  // ============================================
-
   async findAllAdmin(query: AdminProductQueryDto) {
     const { search, status, category, badge, sort, minRating } = query;
     const { page, limit } = getPaging(query);
@@ -249,7 +242,7 @@ export class ProductService {
 
     const sku = dto.sku || `${category.slug}-${subcategory.slug}-${dto.slug}`;
 
-    const { priceVnd, originalPriceVnd, ...rest } = dto;
+    const { priceVnd, originalPriceVnd, ...rest } = pickProvided(dto, ['badge', 'originalPriceVnd']);
     const product = this.productRepo.create({ ...rest, price: priceVnd, originalPrice: originalPriceVnd, sku, category, subcategory });
     return { data: presentProduct(await this.productRepo.save(product), await this.currencyService.getVndPerUsd()) };
   }
@@ -289,7 +282,7 @@ export class ProductService {
     }
 
     // Merge remaining fields (exclude FK fields handled above)
-    const { categoryId, subcategoryId, priceVnd, originalPriceVnd, ...rest } = dto;
+    const { categoryId, subcategoryId, priceVnd, originalPriceVnd, ...rest } = pickProvided(dto, ['badge', 'originalPriceVnd']);
     Object.assign(product, rest);
     if (priceVnd !== undefined) product.price = priceVnd;
     if (originalPriceVnd !== undefined) product.originalPrice = originalPriceVnd;
@@ -308,10 +301,6 @@ export class ProductService {
     await this.productRepo.remove(product);
     return { message: 'Product deleted successfully' };
   }
-
-  // ============================================
-  // PRIVATE HELPERS
-  // ============================================
 
   private async ensureSlugUnique(slug: string, excludeId?: string) {
     const where: FindOptionsWhere<Product> = { slug };

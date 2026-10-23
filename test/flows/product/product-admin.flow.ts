@@ -287,6 +287,39 @@ describe('Flow: products (admin write)', () => {
       expect(await row(product.id)).toMatchObject({ rating_average: '4.5', rating_count: 3 });
     });
 
+    it('treats null on an optional field as not sent, while null on badge or originalPriceVnd still clears it', async () => {
+      const [admin, product] = [await b.admin(), await b.product({ badge: 'sale', originalPrice: 500_000, sku: 'KEEP-2' })];
+
+      await patch(admin, product.id, { sku: null, status: null }).expect(200);
+      expect(await row(product.id)).toMatchObject({ sku: 'KEEP-2', status: 'active', badge: 'sale' });
+      const cleared = await patch(admin, product.id, { badge: null, originalPriceVnd: null }).expect(200);
+
+      expect(cleared.body.data).toMatchObject({ badge: null, originalPriceVnd: null, originalPriceUsd: null });
+    });
+
+    it('returns the whole product in the response, not only the fields that were sent', async () => {
+      const [admin, product] = [await b.admin(), await b.product({ price: 350_000, originalPrice: 500_000, sku: 'KEEP-1' })];
+
+      const res = await patch(admin, product.id, { name: 'Chỉ đổi tên' }).expect(200);
+
+      expect(res.body.data).toMatchObject({
+        id: product.id,
+        slug: product.slug,
+        sku: 'KEEP-1',
+        name: 'Chỉ đổi tên',
+        description: product.description,
+        material: product.material,
+        care: product.care,
+        images: product.images,
+        sizes: product.sizes,
+        colors: product.colors,
+        tags: product.tags,
+        status: 'active',
+        priceVnd: 350_000,
+        originalPriceVnd: 500_000,
+      });
+    });
+
     it('regenerates the SKU when the slug changes (or uses the SKU sent), but not when only other fields change', async () => {
       const [admin, product] = [await b.admin(), await b.product({ sku: 'CUSTOM' })];
 
@@ -301,12 +334,16 @@ describe('Flow: products (admin write)', () => {
     it('moves the product to another category together with its subcategory', async () => {
       const [admin, product, other] = [await b.admin(), await b.product(), await b.category()];
 
-      const res = await patch(admin, product.id, { categoryId: other.id, subcategoryId: other.subcategories[0].id, sku: 'MOVED-1' }).expect(
-        200,
-      );
+      const res = await patch(admin, product.id, { categoryId: other.id, subcategoryId: other.subcategories[0].id }).expect(200);
 
-      expect(res.body.data).toMatchObject({ category: { id: other.id }, subcategory: { id: other.subcategories[0].id } });
-      expect(await row(product.id)).toMatchObject({ slug: product.slug, sku: 'MOVED-1' });
+      const generated = `${other.slug}-${other.subcategories[0].slug}-${product.slug}`;
+      expect(res.body.data).toMatchObject({
+        slug: product.slug,
+        sku: generated,
+        category: { id: other.id },
+        subcategory: { id: other.subcategories[0].id },
+      });
+      expect(await row(product.id)).toMatchObject({ slug: product.slug, sku: generated });
       expect(await rows('SELECT category_id, subcategory_id FROM products')).toEqual([
         { category_id: other.id, subcategory_id: other.subcategories[0].id },
       ]);
@@ -385,6 +422,14 @@ describe('Flow: products (admin write)', () => {
       ['a care longer than 500 characters', { care: 'x'.repeat(501) }],
       ['non-string tags', { tags: [1] }],
       ['the rating fields', { ratingAverage: 5 }],
+      ['an empty slug', { slug: '' }],
+      ['an empty name', { name: '' }],
+      ['an empty description', { description: '' }],
+      ['an empty categoryId', { categoryId: '' }],
+      ['a null name', { name: null }],
+      ['a null price', { priceVnd: null }],
+      ['a null slug', { slug: null }],
+      ['null images', { images: null }],
       ['an unknown field', { id: 'other' }],
     ])('rejects %s with a validation error (no errorCode) and changes nothing', async (_name, body) => {
       const [admin, product] = [await b.admin(), await b.product()];

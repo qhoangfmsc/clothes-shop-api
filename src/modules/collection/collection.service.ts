@@ -1,4 +1,5 @@
 import { getPaging, paginated } from '@common/base/pagination.util';
+import { pickProvided } from '@common/base/provided-fields.util';
 import { parseSort } from '@common/base/sort.util';
 import { throwAppError } from '@common/exceptions/app.exception';
 import { ECollectionErrorCode } from '@common/exceptions/error-codes';
@@ -140,10 +141,8 @@ export class CollectionService {
     const collection = this.collectionRepo.create({
       slug: dto.slug,
       name: dto.name,
-      subtitle: dto.subtitle,
-      description: dto.description,
       image: dto.image,
-      season: dto.season,
+      ...pickProvided({ subtitle: dto.subtitle, description: dto.description, season: dto.season }),
       products,
     });
     return { data: this.present(await this.collectionRepo.save(collection), await this.currencyService.getVndPerUsd()) };
@@ -162,13 +161,13 @@ export class CollectionService {
       await this.ensureSlugUnique(dto.slug);
     }
 
-    if (dto.productIds !== undefined) {
+    if (dto.productIds != null) {
       collection.products = await this.resolveProducts(dto.productIds);
     }
 
     // Merge các field còn lại (trừ productIds đã xử lý riêng)
     const { productIds, ...rest } = dto;
-    Object.assign(collection, rest);
+    Object.assign(collection, pickProvided(rest));
 
     return { data: this.present(await this.collectionRepo.save(collection), await this.currencyService.getVndPerUsd()) };
   }

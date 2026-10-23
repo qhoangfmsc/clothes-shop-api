@@ -17,7 +17,7 @@ export const OVERSIZED_SERVICES: Record<string, number> = {
   'src/modules/media/media.service.ts': 333,
   'src/modules/payment/payment.service.ts': 549,
   'src/modules/payment/refund.service.ts': 363,
-  'src/modules/product/product.service.ts': 340,
+  'src/modules/product/product.service.ts': 329,
   'src/modules/return/return.service.ts': 450,
   'src/modules/review/review.service.ts': 559,
 };

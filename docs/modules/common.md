@@ -56,6 +56,7 @@ Phần hạ tầng dùng chung cho mọi module: bootstrap ứng dụng, guard x
 | Request id | `RequestIdMiddleware`: dùng `x-request-id` của request hoặc sinh `randomUUID()`, trả lại trong header response |
 | Body | JSON và urlencoded giới hạn `5mb`. Parser JSON có `verify` giữ bytes gốc vào `req.rawBody` cho request có đường dẫn bắt đầu `/api/webhooks/` (webhook ký trên raw body; xem [payment](payment.md)) |
 | ValidationPipe toàn cục | `transform: true`, `whitelist: true`, `forbidNonWhitelisted: true` (field lạ bị từ chối) |
+| Cờ compiler cho DTO | `tsconfig.json`: `useDefineForClassFields: false` — với `target: esnext` mặc định `true` làm mọi field khai báo thành thuộc tính `undefined` ngay khi `new Dto()`, nên `Object.assign(entity, dto)` ghi `undefined` lên entity (response thiếu field, `sku` sinh sai); `exposeUnsetFields: false` không sửa được (khoá sinh từ khai báo, không từ body) |
 | Exception filter | `AllExceptionFilter` |
 | Shutdown hooks | bật |
 | Swagger | `/api-docs`, title "Clothes Shop API", `persistAuthorization`, `docExpansion: none`; tag mô tả: Products, Categories, Collections, Reviews, Shipping, Size Guides |
@@ -288,6 +289,7 @@ yarn migration:run              # chạy migration
 
 ### 4.13 Lưu ý hiện trạng
 
+- Quy ước `PATCH` (spec 0007): `Update*Dto` luôn là `PartialType(Create*Dto, { skipNullProperties: false })` — được ép bởi `src/common/dto/update-dto.spec.ts` (mọi cặp `Create<X>Dto`/`Update<X>Dto`: không khoá "ma", giữ mọi ràng buộc của create trên các field chung). `null` ở field bắt buộc → 400; field tuỳ chọn mang `@IsOptional()` coi `null` là "không gửi" nên service ghi entity qua `pickProvided(dto, nullableKeys)` (`common/base/provided-fields.util.ts`), chỉ giữ `null` ở field cố ý nhận null (`badge`, `heroImage`, `originalPriceVnd`).
 - Port đọc từ `PORT` (không có biến `APP_PORT`); `APP_ENV` còn trong `.env` cục bộ nhưng code không đọc.
 - `PermissionsGuard` trả HTTP 500 (`NO_PERMISSION_DEFINED`) cho route không public mà quên `@Permissions` (với user không phải admin); admin vẫn truy cập được route đó.
 - Trong `JwtStrategy`, mỗi request đều đọc user từ DB nên role/permissions/status thay đổi có hiệu lực ngay, không cần chờ token hết hạn.
@@ -296,6 +298,6 @@ yarn migration:run              # chạy migration
 - `@ApiEndpoint` (`decorator/api-endpoint.decorator.ts`) chưa module nào dùng; skill `.agent/skills/nest-best-practices` quy định dùng nó thay cho `@ApiOperation`.
 - `common/guards/permissions.guard.ts` import entity `User` từ `src/modules/user`; ngoài ra `common/` và `core/` không import `modules/` (được ép bởi `architecture.spec.ts`, ngoại lệ nằm trong allowlist).
 - `auth/jwt.strategy.ts` cố ý ném `UnauthorizedException` thô (401 của guard không có `errorCode`, khác với 401 nghiệp vụ có `errorCode`); mọi `*.service.ts` đều dùng `throwAppError`. `throwAppError` mặc định trả HTTP 400, nên một số chỗ admin dùng `ORDER_NOT_FOUND` mà không truyền 404 sẽ trả 400 (khác khách hàng: 404).
-- Service vượt 300 dòng: `review` (559), `payment` (549), `return` (450), `category` (382), `refund` (363), `product` (340), `media` (333); `PaymentService` có 6 dependency constructor. Trần hiện tại ghi trong allowlist, không được tăng. `OrderService` đã được tách thành `OrderQueryService`, `OrderCheckoutService`, `OrderStatusService` (xem `order.md` 4.9).
+- Service vượt 300 dòng: `review` (559), `payment` (549), `return` (450), `category` (382), `refund` (363), `product` (329), `media` (333); `PaymentService` có 6 dependency constructor. Trần hiện tại ghi trong allowlist, không được tăng. `OrderService` đã được tách thành `OrderQueryService`, `OrderCheckoutService`, `OrderStatusService` (xem `order.md` 4.9).
 - Trạng thái dùng type union cho mọi cột `status` (xem 4.5). Chuyển trạng thái chỉ có bảng tường minh cho đơn (`ORDER_TRANSITIONS`, cạnh do admin thực hiện); `return` kiểm theo hành động (`assertStatus` với danh sách trạng thái xuất phát từng hành động) và có thêm cạnh do hệ thống (`RECEIVED → APPROVED` khi khoản hoàn bị từ chối, `RECEIVED → REFUNDED` khi hoàn xong); `refund`, `payment attempt`, `review` kiểm trực tiếp trong service.
 - Entity `Order` được import và đăng ký `TypeOrmModule.forFeature` trực tiếp ở module `payment`, `return`, `review`; entity `Product` ở `cart`, `wishlist`, `collection` (bên cạnh module `product`). Các module này truy cập bảng của nhau không qua service.

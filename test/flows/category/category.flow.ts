@@ -219,7 +219,7 @@ describe('Flow: categories', () => {
 
       const res = await create(admin, { slug: 'bags', title: 'Bags' }).expect(201);
 
-      expect(res.body.data).toMatchObject({ description: '', heroImage: null, priority: 1 });
+      expect(res.body.data).toMatchObject({ description: '', heroImage: null, priority: 1, subcategories: [] });
       expect(await rows('SELECT 1 FROM subcategories')).toHaveLength(0);
     });
 
@@ -323,7 +323,15 @@ describe('Flow: categories', () => {
 
       const res = await update(admin, tops.id, { title: 'Áo các loại' }).expect(200);
 
-      expect(res.body.data).toMatchObject({ id: tops.id, title: 'Áo các loại', priority: 1 });
+      expect(res.body.data).toMatchObject({
+        id: tops.id,
+        slug: 'tops',
+        title: 'Áo các loại',
+        description: 'Áo',
+        heroImage: 'https://cdn.flow.test/t.jpg',
+        priority: 1,
+        subcategories: [],
+      });
       expect(await rows('SELECT slug, title, description, hero_image, priority FROM categories')).toEqual([
         { slug: 'tops', title: 'Áo các loại', description: 'Áo', hero_image: 'https://cdn.flow.test/t.jpg', priority: 1 },
       ]);
@@ -457,6 +465,26 @@ describe('Flow: categories', () => {
       expect(await rows('SELECT subcategory_id FROM products WHERE id = $1', [product.id])).toEqual([{ subcategory_id: sub.id }]);
     });
 
+    it('treats null on an optional field as not sent, and still clears the hero image with null', async () => {
+      const admin = await b.admin();
+      const tops = await make(admin, 'tops', {
+        description: 'Áo',
+        heroImage: 'https://cdn.flow.test/t.jpg',
+        subcategories: [{ slug: 'polo', label: 'Polo' }],
+      });
+
+      const ignored = await update(admin, tops.id, { description: null, subcategories: null, priority: null }).expect(200);
+      expect(ignored.body.data).toMatchObject({
+        description: 'Áo',
+        heroImage: 'https://cdn.flow.test/t.jpg',
+        subcategories: [{ slug: 'polo' }],
+      });
+      const cleared = await update(admin, tops.id, { heroImage: null }).expect(200);
+
+      expect(cleared.body.data.heroImage).toBeNull();
+      expect(await rows('SELECT description, hero_image FROM categories')).toEqual([{ description: 'Áo', hero_image: null }]);
+    });
+
     it('answers 404 / 1101 for an unknown category', async () => {
       const res = await update(await b.admin(), 'zzzzzzzzzzzzzzzz', { title: 'x' });
 
@@ -472,6 +500,10 @@ describe('Flow: categories', () => {
       ['subcategories that are not an array', { subcategories: 'polo' }],
       ['a subcategory without a label', { subcategories: [{ slug: 'x' }] }],
       ['a negative subcategory count', { subcategories: [{ slug: 'x', label: 'L', count: -1 }] }],
+      ['an empty slug', { slug: '' }],
+      ['an empty title', { title: '' }],
+      ['a null slug', { slug: null }],
+      ['a null title', { title: null }],
       ['an unknown field', { id: 'other' }],
     ])('rejects %s with a validation error (no errorCode) and changes nothing', async (_name, body) => {
       const admin = await b.admin();

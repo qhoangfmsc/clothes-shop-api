@@ -1,4 +1,5 @@
 import { getPaging, paginated } from '@common/base/pagination.util';
+import { pickProvided } from '@common/base/provided-fields.util';
 import { parseSort } from '@common/base/sort.util';
 import { throwAppError } from '@common/exceptions/app.exception';
 import { ECategoryErrorCode } from '@common/exceptions/error-codes';
@@ -119,10 +120,6 @@ export class CategoryService {
     };
   }
 
-  // ============================================
-  // ADMIN METHODS
-  // ============================================
-
   async findAllAdmin(query: AdminCategoryQueryDto) {
     const { search, sort } = query;
     const { page, limit } = getPaging(query);
@@ -158,7 +155,7 @@ export class CategoryService {
         // Danh mục mới luôn xếp cuối (priority thấp nhất); muốn đổi vị trí thì update priority / reorder
         await this.lockPriorities(manager);
         const priority = (await this.maxPriority(manager)) + 1;
-        const category = manager.create(Category, { ...dto, priority });
+        const category = manager.create(Category, { subcategories: [], ...pickProvided(dto, ['heroImage']), priority });
         return { data: await manager.save(category) };
       });
     } catch (err: any) {
@@ -176,7 +173,7 @@ export class CategoryService {
       throwAppError(ECategoryErrorCode.CATEGORY_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
     }
 
-    const { subcategories, priority, ...rest } = dto;
+    const { subcategories, priority, ...rest } = pickProvided(dto, ['heroImage']);
 
     // Check slug uniqueness nếu slug được thay đổi
     if (dto.slug) {
@@ -251,10 +248,6 @@ export class CategoryService {
 
     return { data: ids.map((id, index) => ({ id, priority: index + 1 })) };
   }
-
-  // ============================================
-  // PRIVATE HELPERS
-  // ============================================
 
   private async ensureSlugUnique(slug: string) {
     const existing = await this.categoryRepo.findOne({ where: { slug } });

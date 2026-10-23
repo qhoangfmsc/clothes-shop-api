@@ -118,8 +118,7 @@ Flow test trên Postgres thật: `test/flows/collection/collection.flow.ts` (bat
 
 ### 4.8 Lưu ý hiện trạng
 
-- `UpdateCollectionDto` không có `@IsNotEmpty` cho `slug`, `name`, `image` (create có): `PATCH` với chuỗi rỗng ở các field này được chấp nhận và lưu.
-- Response `PATCH` là entity đã lưu trong đó các field không được gửi là `undefined` (DTO có sẵn thuộc tính `undefined` được gán lên entity): thiếu `slug`, `subtitle`, `description`, `image`, `season` khi không gửi chúng; DB đúng và `GET` trả đủ.
+- `PATCH` dùng `Update*Dto = PartialType(Create*Dto, { skipNullProperties: false })`: mọi ràng buộc của create được kế thừa (chuỗi rỗng ở field bắt buộc → 400), `null` ở field bắt buộc → 400, `null` ở field tuỳ chọn được coi như không gửi (trừ không có field nào như vậy). Response là bản ghi đầy đủ, không thiếu field chưa gửi (xem [common](common.md) 4.13).
 - Hai request tạo đồng thời cùng `slug`: kiểm tra trùng chạy trước khi lưu và không bắt lỗi UNIQUE của DB, nên request thua có thể trả 500 thay vì `COLLECTION_SLUG_DUPLICATE`.
 
 - Public chi tiết (`?slug=`) và public list trả mọi sản phẩm của bộ sưu tập, không lọc theo `status` của sản phẩm.

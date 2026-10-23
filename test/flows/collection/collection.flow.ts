@@ -297,7 +297,16 @@ describe('Flow: collections', () => {
 
       const res = await update(admin, summer.id, { name: 'Tên mới', description: 'Mô tả mới' }).expect(200);
 
-      expect(res.body.data).toMatchObject({ id: summer.id, name: 'Tên mới', description: 'Mô tả mới' });
+      expect(res.body.data).toMatchObject({
+        id: summer.id,
+        slug: 'summer',
+        name: 'Tên mới',
+        subtitle: 'Nắng',
+        description: 'Mô tả mới',
+        image: 'https://cdn.flow.test/summer.jpg',
+        season: 'SS26',
+      });
+      expect(res.body.data.products.map((p: { id: string }) => p.id)).toEqual([product.id]);
       expect(await rows('SELECT slug, name, subtitle, description, season FROM collections')).toEqual([
         { slug: 'summer', name: 'Tên mới', subtitle: 'Nắng', description: 'Mô tả mới', season: 'SS26' },
       ]);
@@ -350,6 +359,17 @@ describe('Flow: collections', () => {
       expect(await rows('SELECT name FROM collections')).toEqual([{ name: 'Name summer' }]);
     });
 
+    it('treats null on an optional field as not sent (the product list is kept)', async () => {
+      const admin = await b.admin();
+      const product = await b.product();
+      const summer = await make(admin, 'summer', { subtitle: 'Nắng', productIds: [product.id] });
+
+      const res = await update(admin, summer.id, { subtitle: null, season: null, description: null, productIds: null }).expect(200);
+
+      expect(res.body.data).toMatchObject({ subtitle: 'Nắng', season: '' });
+      expect(await links()).toEqual([{ collection_id: summer.id, product_id: product.id }]);
+    });
+
     it('answers 404 / 1201 for an unknown collection', async () => {
       const res = await update(await b.admin(), 'zzzzzzzzzzzzzzzz', { name: 'x' });
 
@@ -365,6 +385,10 @@ describe('Flow: collections', () => {
       ['productIds that are not an array', { productIds: 'abc' }],
       ['an empty product id', { productIds: [''] }],
       ['more than 100 product ids', { productIds: Array.from({ length: 101 }, (_, i) => `p-${String(i)}`) }],
+      ['an empty slug', { slug: '' }],
+      ['an empty name', { name: '' }],
+      ['an empty image', { image: '' }],
+      ['a null name', { name: null }],
       ['an unknown field', { id: 'other' }],
     ])('rejects %s with a validation error (no errorCode) and changes nothing', async (_name, body) => {
       const admin = await b.admin();

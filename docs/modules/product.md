@@ -197,11 +197,9 @@ Flow test trên Postgres thật (`test/flows/product/`; builder `b.product()` nh
 
 ### 4.8 Lưu ý hiện trạng
 
+- `PATCH` dùng `Update*Dto = PartialType(Create*Dto, { skipNullProperties: false })`: mọi ràng buộc của create được kế thừa (chuỗi rỗng ở field bắt buộc → 400), `null` ở field bắt buộc → 400, `null` ở field tuỳ chọn được coi như không gửi (trừ `badge` và `originalPriceVnd`, nơi `null` xoá giá trị). Response là bản ghi đầy đủ, không thiếu field chưa gửi (xem [common](common.md) 4.13).
 - Tạo hai sản phẩm đồng thời cùng `slug` (hoặc cùng `sku`): kiểm tra trùng chạy trước khi lưu và không bắt lỗi UNIQUE của DB, nên request thua trả 500 thay vì `PRODUCT_SLUG_DUPLICATE` / `PRODUCT_SKU_DUPLICATE`.
 - `sku` tự sinh (khi không gửi `sku`) không được kiểm tra trùng; nếu trùng `sku` của sản phẩm khác (vd sản phẩm kia dùng `sku` tuỳ chỉnh đúng bằng chuỗi này) thì vi phạm UNIQUE `UQ_products_sku` và trả 500.
-- `PATCH` trả về sản phẩm trong đó mọi field không được gửi là `undefined` (DTO có sẵn các thuộc tính `undefined`, `Object.assign` ghi lên entity): DB giữ nguyên các cột đó nhưng response thiếu `slug`, `sku`, `images`, `status`, `description`, `material`, `care`, `sizes`, `colors`, `tags` khi không gửi chúng (`GET` trả đủ).
-- Vì cùng nguyên nhân, `PATCH` có `categoryId` hoặc `subcategoryId` mà không có `slug` và `sku` sinh lại `sku` thành `{category}-{subcategory}-undefined` và lưu giá trị đó.
-- `UpdateProductDto` không có `@IsNotEmpty` cho `slug`, `name`, `description`, `categoryId`, `subcategoryId` (create có): `PATCH` với chuỗi rỗng ở các field này được chấp nhận và lưu.
 
 - `GET /api/products/:id` không lọc theo `status`: sản phẩm `disabled` vẫn xem được chi tiết theo id; `related` thì chỉ gồm `active`.
 - `sort=price` và `minPrice`/`maxPrice` luôn theo VND (tiền gốc); không có lọc/sắp xếp theo USD.

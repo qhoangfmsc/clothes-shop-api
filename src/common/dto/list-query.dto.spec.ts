@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '@common/base/pagination.util';
 import { ValidationPipe } from '@nestjs/common';
+import { getMetadataStorage } from 'class-validator';
 import { PaginationQueryDto } from './pagination-query.dto';
 
 // Same options as main.ts
@@ -32,7 +33,12 @@ const listDtos: [string, new () => object][] = fs
   );
 
 // DTO có sort: whitelist field → thử 1 giá trị sort hợp lệ lấy từ metadata Swagger
-const sortable = listDtos.filter(([, dto]) => 'sort' in new dto());
+// (đọc từ metadata của class-validator: DTO không còn thuộc tính rỗng do khai báo field, xem tsconfig `useDefineForClassFields`)
+const hasProperty = (dto: new () => object, name: string) =>
+  getMetadataStorage()
+    .getTargetValidationMetadatas(dto, '', true, false)
+    .some((metadata) => metadata.propertyName === name);
+const sortable = listDtos.filter(([, dto]) => hasProperty(dto, 'sort'));
 
 describe('List query DTOs', () => {
   it('finds the list DTOs', () => {
