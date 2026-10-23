@@ -171,16 +171,18 @@ Format `[MM][EE]` (4 chữ số). `throwAppError(errorCode, message?, statusCode
 | 17xx | Payment | `EPaymentErrorCode` | 1701–1714 |
 | 18xx | Return | `EReturnErrorCode` | 1801–1805 |
 | 19xx | Review | `EReviewErrorCode` | 1901–1909 |
-| 20xx | Cart | `ECartErrorCode` | 2001–2003 |
+| 20xx | Cart | `ECartErrorCode` | 2001–2004 |
 | 21xx | Address | `EAddressErrorCode` | 2101 |
-| 22xx | Auth | `EAuthErrorCode` | 2201–2202, 2210–2212 |
+| 22xx | Auth | `EAuthErrorCode` | 2201–2203, 2210–2212 |
 | 90xx | Permission | `EPermissionErrorCode` | 9001 `PERMISSION_DENIED`, 9002 `NO_PERMISSION_DEFINED` |
+| 91xx | Toàn vẹn DB (lưới an toàn của filter) | `EDatabaseErrorCode` | 9101 `DB_NOT_NULL_VIOLATION`, 9102 `DB_CHECK_VIOLATION` (HTTP 400), 9103 `DB_UNIQUE_VIOLATION`, 9104 `DB_FOREIGN_KEY_VIOLATION` (HTTP 409) |
 
 Chi tiết từng mã nằm ở mục Error code của module tương ứng.
 
 `AllExceptionFilter` (`@Catch()` mọi lỗi):
 
 - `HttpException` → giữ status, body = response của exception (string được bọc thành `{ statusCode, message }`).
+- Lỗi vi phạm ràng buộc DB mà service chưa ánh xạ riêng (SQLSTATE `23502` NOT NULL, `23514` CHECK → 400; `23505` UNIQUE, `23503` FK → 409) → body `{ statusCode, errorCode: 91xx, message }`, message chỉ nêu tên cột (không lộ SQL hay giá trị), log `warn` kèm tên constraint. Đây là lưới cuối: lỗi dữ liệu của client không được là 500 (spec 0008).
 - Lỗi khác → HTTP 500, body `{ statusCode: 500, message: 'Internal server error' }`; chi tiết chỉ ghi log (không lộ ra client). Mọi lỗi ≥ 500 đều được log.
 - Lỗi validation của `ValidationPipe` giữ định dạng mặc định của Nest (`message` là mảng chuỗi).
 
@@ -195,6 +197,7 @@ Entity **không** extends `BaseEntity` (tự khai báo id nanoid16): `Wishlist` 
 | File | Nội dung | Dùng ở |
 |---|---|---|
 | `utils/money.util.ts` | Tiền tệ gốc VND: `MAX_MONEY_VND` (1 tỷ), `vndToUsd(vnd, vndPerUsd)` (làm tròn 2 chữ số), `money(tên, vnd, tỷ giá)` → `{ <tên>Vnd, <tên>Usd }`, `moneyOrNull(...)` (`null` ở cả hai field khi vắng giá trị) | mọi module trả tiền (xem [currency](currency.md)) |
+| `base/db-error.util.ts` | `dbError(err)` đọc SQLSTATE/constraint/cột từ lỗi `pg` (bọc trong `driverError` của TypeORM); `isUniqueViolation(err, constraint?)`; `throwOnConstraint(err, { [constraint]: errorCode })` và `saveOrThrowOnConstraint(repo, entity, map)` ánh xạ vi phạm UNIQUE/CHECK theo **tên constraint** sang mã nghiệp vụ. Thao tác idempotent (yêu thích, thêm giỏ, đăng nhập lần đầu) dùng `isUniqueViolation` rồi đọc lại bản ghi của bên thắng | product, collection, category, wishlist, cart, auth, `AllExceptionFilter` |
 | `base/lock.util.ts` | `findLocked(manager, Entity, where, { select?, order? })`: `SELECT … FOR UPDATE` (`pessimistic_write`) một dòng; nơi duy nhất chọn chiến lược khoá (luật kiến trúc cấm viết `lock: { mode:` ở chỗ khác). Thứ tự khoá toàn dự án: `Order` trước, rồi bản ghi con (`PaymentTransaction` → `PaymentAttempt` / `Refund` / `ReturnRequest`); `Review` và `Product` (tính lại điểm sao) khoá riêng, không cùng `Order` trong một transaction. `category` dùng khoá cố vấn `pg_advisory_xact_lock` riêng | order, payment (3 service), return, review |
 | `base/column-transformers.ts` | `bigintTransformer` (bigint → number, dùng cho mọi cột tiền VND), `numericTransformer` (numeric → number, dùng cho `orders.exchange_rate`) | entity product, order, order_item, payment_attempt, payment_transaction, refund |
 
@@ -289,6 +292,7 @@ yarn migration:run              # chạy migration
 
 ### 4.13 Lưu ý hiện trạng
 
+- Mọi service tạo bản ghi theo mẫu "kiểm tra rồi ghi" (`ensure*Unique`) vẫn giữ kiểm tra cho đường thường nhưng phải bắt thêm vi phạm ràng buộc khi hai request đồng thời (spec 0008): dùng `saveOrThrowOnConstraint` hoặc `isUniqueViolation` + đọc lại.
 - Quy ước `PATCH` (spec 0007): `Update*Dto` luôn là `PartialType(Create*Dto, { skipNullProperties: false })` — được ép bởi `src/common/dto/update-dto.spec.ts` (mọi cặp `Create<X>Dto`/`Update<X>Dto`: không khoá "ma", giữ mọi ràng buộc của create trên các field chung). `null` ở field bắt buộc → 400; field tuỳ chọn mang `@IsOptional()` coi `null` là "không gửi" nên service ghi entity qua `pickProvided(dto, nullableKeys)` (`common/base/provided-fields.util.ts`), chỉ giữ `null` ở field cố ý nhận null (`badge`, `heroImage`, `originalPriceVnd`).
 - Port đọc từ `PORT` (không có biến `APP_PORT`); `APP_ENV` còn trong `.env` cục bộ nhưng code không đọc.
 - `PermissionsGuard` trả HTTP 500 (`NO_PERMISSION_DEFINED`) cho route không public mà quên `@Permissions` (với user không phải admin); admin vẫn truy cập được route đó.

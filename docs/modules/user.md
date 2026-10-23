@@ -57,7 +57,7 @@ Response `paginated(...)`: mỗi phần tử `{ id, email, name, image, provider
 |---|---|
 | `role` | `IsString`, `IsIn(USER_ROLES)`, `MaxLength(20)` |
 | `status` | `IsString`, `IsIn(ACTIVE_STATUSES)`, `MaxLength(20)` |
-| `permissions` | `IsArray`, `IsInt({ each: true })` — mảng mã permission |
+| `permissions` | `IsArray`, `IsInt({ each: true })`, `IsIn(PERMISSION_CODES, { each: true })`, `ArrayUnique` — mảng mã permission có thật (giá trị số của enum `Permission`), không lặp; `[]` thu hồi hết quyền (spec user/0002) |
 
 Response `{ data: {...user} }`.
 
@@ -112,6 +112,5 @@ Flow test trên Postgres thật: `test/flows/user/user.flow.ts` (batch 20–21) 
 
 ### 4.8 Lưu ý hiện trạng
 
-- `permissions` nhận mọi mảng số nguyên, không kiểm mã có nằm trong enum `Permission` hay không (vd `99999` được lưu).
 - Vì danh sách permission lưu theo từng user, user được tạo trước khi có permission mới sẽ không tự có permission đó; admin cần cập nhật qua `PATCH`.
 - Không có endpoint xoá user; FK từ `orders`/`reviews` đặt `SET NULL`, từ `carts`/`addresses`/`wishlists` đặt `CASCADE` (đã sẵn ở DB).

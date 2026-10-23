@@ -70,6 +70,23 @@ describe('Flow: bank transactions and refund requests (admin)', () => {
       expect(unmatched.paymentAttempt).toBeNull();
     });
 
+    it('keeps the original bank payload and the receiving account for reconciliation, which the sessions list deliberately leaves out', async () => {
+      const admin = await b.admin();
+      const paid = await placeAndPayOrder(t, b);
+
+      const transactions = await list(admin).expect(200);
+      const attempts = await t.api.get('/api/admin/payments/attempts').set(bearer(t, admin)).expect(200);
+
+      const row = transactions.body.data[0];
+      expect(row.rawPayload).toMatchObject({
+        accountNumber: expect.any(String),
+        content: expect.stringContaining(paid.qr.transferContent),
+      });
+      expect(row.paymentAttempt.bankAccount).toEqual(expect.any(String));
+      expect(JSON.stringify(attempts.body)).not.toContain('rawPayload');
+      expect(attempts.body.data[0]).not.toHaveProperty('bankAccount');
+    });
+
     it('filters by verification status, order id and search text', async () => {
       const { admin, paid, mismatchQr } = await seed();
 

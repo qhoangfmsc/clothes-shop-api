@@ -63,6 +63,7 @@ UNIQUE `(user_id, product_id)`.
 
 ### 4.4 Luồng xử lý & quy tắc nghiệp vụ
 
+- `add` idempotent cả khi đồng thời (bấm đúp): request thua `UQ_wishlists_user_product` đọc lại bản ghi của request thắng và trả `created: false`; đúng một phản hồi có `created: true`.
 - `add`: sản phẩm không tồn tại → `PRODUCT_NOT_FOUND (1001)`, HTTP 404; đã có bản ghi → trả bản ghi đó với `created: false`; chưa có → tạo và trả `created: true`.
 - `remove`: idempotent — không có bản ghi vẫn trả `{ success: true }`.
 - `check`: chỉ trả có/không.
@@ -83,7 +84,6 @@ Flow test trên Postgres thật: `test/flows/wishlist/wishlist.flow.ts` (batch 1
 
 ### 4.8 Lưu ý hiện trạng
 
-- Hai request `POST /api/wishlist/:productId` đồng thời cho cùng một sản phẩm (vd bấm đúp): kiểm tra đã có chạy trước khi lưu và không bắt lỗi UNIQUE `(user_id, product_id)`, nên request thua trả 500 thay vì `created: false`.
 
 - `add` chỉ kiểm tra sản phẩm tồn tại, không kiểm tra `status`; `findAll` trả kèm sản phẩm kể cả `disabled`.
 - Không có `GET /api/wishlist/:productId`, nên route `check/:productId` không xung đột với route khác.

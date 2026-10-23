@@ -73,7 +73,7 @@ Dùng bảng `users` — xem [user](user.md). Module chỉ đọc/ghi các cột
    - `exchangeAuthCode`: `getToken({ code, redirect_uri: 'postmessage' })` (luồng popup của `@react-oauth/google`); có `id_token` thì verify, không thì dùng `access_token` gọi userinfo; không có token nào → 401.
    - `fetchUserInfo`: `GET https://www.googleapis.com/oauth2/v3/userinfo` với Bearer access token; yêu cầu có `email`.
    - Mọi lỗi được đổi thành `AppException` HTTP 401 (mã 2210–2212, xem 4.5).
-3. Upsert user theo `email`:
+3. Upsert user theo `email` (user `disabled` → `AUTH_USER_DISABLED 2203` bị chặn ở đây, trước khi cập nhật hồ sơ; hai lần đăng nhập lần đầu đồng thời: bên thua `UQ_users_email` đọc lại user của bên thắng và đi tiếp nhánh cập nhật):
    - Chưa có → tạo với `provider='google'`, `providerId=sub`, `role='user'`, `permissions=DEFAULT_USER_PERMISSIONS`, `status='active'`.
    - Đã có → cập nhật `name`, `image` (giữ giá trị cũ nếu Google trả rỗng), `provider='google'`, `providerId`. Không đổi `role`, `permissions`, `status`.
 4. Ký `accessToken` và `refreshToken`.
@@ -98,6 +98,7 @@ Lỗi nghiệp vụ dùng `throwAppError` (HTTP 401, enum `EAuthErrorCode`, ti�
 | Code | Tên | Message | Khi nào |
 |---|---|---|---|
 | 2201 | `AUTH_USER_NOT_FOUND` | `User not found` | `GET /me` với user không còn tồn tại |
+| 2203 | `AUTH_USER_DISABLED` | `User account is disabled` | Đăng nhập Google của user `status = 'disabled'` — HTTP **403**, không phát hành token, không cập nhật hồ sơ (spec auth/0002) |
 | 2202 | `AUTH_REFRESH_TOKEN_INVALID` | `Invalid refresh token` | Refresh thất bại vì bất kỳ lý do nào: token hỏng/hết hạn/sai secret, không phải refresh token, user không tồn tại hoặc bị khoá, lỗi DB khi tra user |
 | 2210 | `AUTH_GOOGLE_TOKEN_INVALID` | `Invalid Google token` · `Invalid Google token: missing email` · `Google user info missing email` | ID token sai hoặc thiếu email; userinfo thiếu email |
 | 2211 | `AUTH_GOOGLE_EXCHANGE_FAILED` | `Failed to exchange authorization code` · `No token received from Google` | Đổi auth code thất bại hoặc không trả token nào |
@@ -125,8 +126,6 @@ Lỗi permission (9001/9002) do `PermissionsGuard` phát sinh — xem [common](c
 
 ### 4.8 Lưu ý hiện trạng
 
-- Đăng nhập Google không kiểm `status` của user: user `disabled` vẫn nhận token (response có `status: 'disabled'`), nhưng mọi request sau đó bị `JwtStrategy` từ chối 401 và refresh trả 2202.
-- Hai lần đăng nhập đồng thời lần đầu của cùng một email: tìm user trước khi tạo và không bắt lỗi UNIQUE `UQ_users_email`, nên request thua trả 500.
 - Access và refresh token dùng chung `JWT_SECRET`, phân biệt bằng claim `type`; refresh không xoay vòng (response chỉ có `accessToken` mới, không phát refresh token mới).
 - Token phát hành trước khi có claim `type` bị từ chối, người dùng phải đăng nhập lại.
 - Cách phân loại credential coi chuỗi không phải JWT và ngắn hơn 200 ký tự là auth code, kể cả khi đó là access token.

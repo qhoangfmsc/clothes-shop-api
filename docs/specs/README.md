@@ -15,15 +15,20 @@ Cấu trúc: `docs/specs/<module>/NNNN-slug.md` (số tăng dần theo từng mo
 | payment | [0001 — Kế hoạch flow test cho module payment](payment/0001-flow-test-plan.md) | Implemented | Phủ ca thành công và ca lỗi cho 12 route payment theo batch |
 | order | [0003 — Kế hoạch flow test cho module order](order/0003-flow-test-plan.md) | Implemented | Báo giá, đặt hàng, danh sách/chi tiết/đổi trạng thái admin: 8/8 route đủ ca |
 | return | [0001 — Kế hoạch flow test cho module return](return/0001-flow-test-plan.md) | Implemented | Điều kiện, tạo, huỷ, duyệt, từ chối, nhận hàng và liên kết khoản hoàn: 10/10 route đủ ca |
+| cart | [0002 — Giới hạn số lượng một dòng giỏ](cart/0002-quantity-limit-and-atomic-add.md) | Implemented | Lỗi 2004 khi vượt 99, cộng dồn nguyên tử |
 | cart | [0001 — Kế hoạch flow test cho module cart](cart/0001-flow-test-plan.md) | Implemented | Xem, thêm, đổi số lượng, xoá dòng, xoá sạch: 5/5 route đủ ca; 2 phát hiện 500 chờ quyết định |
 | media | [0001 — Kế hoạch flow test cho module media](media/0001-flow-test-plan.md) | Implemented | Ping, danh sách, upload, xoá với Storage giả ở biên: 4/4 route đủ ca |
 | pending-count | [0001 — Kế hoạch flow test cho module pending-count](pending-count/0001-flow-test-plan.md) | Implemented | Số việc chờ theo quyền, khớp danh sách |
+| common | [0008 — Lỗi toàn vẹn của DB trả mã lỗi đúng](common/0008-db-integrity-errors.md) | Implemented | Ánh xạ theo tên constraint, idempotent khi thua cuộc đua, lưới an toàn ở filter |
+| common | [0007 — Cập nhật một phần an toàn (`PATCH`)](common/0007-safe-partial-update.md) | Implemented | `useDefineForClassFields: false`, `Update*Dto` = `PartialType(Create*Dto)`, quy ước `null` |
 | common | [0006 — Ranh giới ghi giữa các module](common/0006-module-boundaries.md) | Draft | 4 nhóm ghi chéo module đo được, 5 phương án, đề xuất B (hàm của module chủ nhận `EntityManager`) + luật máy; chờ quyết định |
 | common | [0005 — Kế hoạch flow test cho health](common/0005-health-flow-test-plan.md) | Implemented | `GET /` và `GET /health` |
 | site-config | [0001 — Kế hoạch flow test cho module site-config](site-config/0001-flow-test-plan.md) | Implemented | Registry key, đặt/xoá cấu hình, chuẩn hoá và hiệu lực tức thời: 5/5 route đủ ca |
 | shipping | [0001 — Kế hoạch flow test cho module shipping](shipping/0001-flow-test-plan.md) | Implemented | `GET /api/shipping` theo cấu hình admin, kiểm chéo với báo giá và hạn đổi trả |
 | size-guide | [0001 — Kế hoạch flow test cho module size-guide](size-guide/0001-flow-test-plan.md) | Implemented | Bảng size tĩnh theo nhóm |
+| auth | [0002 — Từ chối đăng nhập của user bị khoá](auth/0002-disabled-user-login.md) | Implemented | 403 / 2203 |
 | auth | [0001 — Kế hoạch flow test cho module auth](auth/0001-flow-test-plan.md) | Implemented | Đăng nhập Google (giả ở biên), refresh, me, permissions: 4/4 route đủ ca; 2 phát hiện chờ quyết định |
+| user | [0002 — Chỉ nhận mã permission có thật](user/0002-validate-permission-codes.md) | Implemented | `IsIn` + `ArrayUnique` |
 | user | [0001 — Kế hoạch flow test cho module user](user/0001-flow-test-plan.md) | Implemented | Danh sách, chi tiết, sửa quyền/trạng thái: 3/3 route đủ ca; 1 phát hiện chờ quyết định |
 | wishlist | [0001 — Kế hoạch flow test cho module wishlist](wishlist/0001-flow-test-plan.md) | Implemented | Thêm, danh sách, kiểm tra, bỏ: 4/4 route đủ ca; 1 phát hiện chờ quyết định |
 | address | [0001 — Kế hoạch flow test cho module address](address/0001-flow-test-plan.md) | Implemented | Danh sách, tạo, sửa, xoá và cờ mặc định: 4/4 route đủ ca; 1 phát hiện chờ quyết định |

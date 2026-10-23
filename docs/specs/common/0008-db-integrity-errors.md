@@ -1,6 +1,6 @@
 # 0008 — Lỗi toàn vẹn của DB trả mã lỗi đúng, không phải 500
 
-> Module: `common` (+ product, collection, wishlist, auth, cart, category chỉ đổi cách bắt lỗi) · Trạng thái: Approved · Ngày: 2026-10-23
+> Module: `common` (+ product, collection, wishlist, auth, cart, category chỉ đổi cách bắt lỗi) · Trạng thái: Implemented · Ngày: 2026-10-23
 
 ## 1. Bối cảnh & vấn đề
 
@@ -110,4 +110,7 @@ Rủi ro thấp: chỉ thêm nhánh bắt lỗi; lưới ở filter chỉ đổi
 
 ## 6. Kết quả triển khai
 
-_Điền sau khi làm xong._
+- **File:** `common/base/db-error.util.ts` (+ spec), `common/filter/exception.filter.ts` (+ spec), `error-codes.ts` (9101–9104); dùng ở product, collection, category (ánh xạ theo tên constraint thay cho phép ánh xạ chung), wishlist, cart, auth.
+- **Khác thiết kế:** thêm `saveOrThrowOnConstraint` (gói `repo.save` + ánh xạ) vì 3 chỗ lặp cùng mẫu. Thử nghiệm race bắt được một lỗi trong chính cách cài đặt đầu tiên của giỏ hàng (xem cart/0002).
+- **Docs:** `common.md` (4.6 mã lỗi và filter, 4.8 utils, 4.13), `product.md`, `collection.md`, `category.md`, `wishlist.md`, `cart.md`, `auth.md`.
+- **Test:** unit cho helper và filter; flow song song thật: tạo cùng slug (product, collection, category: chỉ một 201, còn lại 400 với đúng mã), cùng SKU và SKU tự sinh trùng → 1003, bấm đúp yêu thích → cả hai 201 và đúng một `created: true`, đăng nhập lần đầu đồng thời → một user. Phá thử 12 điểm đều bị bắt.

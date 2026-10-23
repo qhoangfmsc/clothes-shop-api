@@ -101,7 +101,7 @@ Bảng nối `collection_products` (`@ManyToMany` + `@JoinTable`): `collection_i
 
 | Code | Tên | Khi nào |
 |---|---|---|
-| 1202 | `COLLECTION_SLUG_DUPLICATE` | Slug đã tồn tại |
+| 1202 | `COLLECTION_SLUG_DUPLICATE` | Slug đã tồn tại, kể cả khi hai request đồng thời cùng slug (`UQ_collections_slug` được ánh xạ) |
 | 1203 | `COLLECTION_PRODUCT_NOT_FOUND` | Có `productIds` không tồn tại |
 | 1201 | `COLLECTION_NOT_FOUND` | Bộ sưu tập không tồn tại (`findBySlug`, `update`, `delete`) — HTTP 404 |
 
@@ -119,7 +119,6 @@ Flow test trên Postgres thật: `test/flows/collection/collection.flow.ts` (bat
 ### 4.8 Lưu ý hiện trạng
 
 - `PATCH` dùng `Update*Dto = PartialType(Create*Dto, { skipNullProperties: false })`: mọi ràng buộc của create được kế thừa (chuỗi rỗng ở field bắt buộc → 400), `null` ở field bắt buộc → 400, `null` ở field tuỳ chọn được coi như không gửi (trừ không có field nào như vậy). Response là bản ghi đầy đủ, không thiếu field chưa gửi (xem [common](common.md) 4.13).
-- Hai request tạo đồng thời cùng `slug`: kiểm tra trùng chạy trước khi lưu và không bắt lỗi UNIQUE của DB, nên request thua có thể trả 500 thay vì `COLLECTION_SLUG_DUPLICATE`.
 
 - Public chi tiết (`?slug=`) và public list trả mọi sản phẩm của bộ sưu tập, không lọc theo `status` của sản phẩm.
 - `resolveProducts` giữ thứ tự theo `productIds` ở bộ nhớ khi trả về, nhưng bảng nối không lưu thứ tự nên thứ tự đọc lại từ DB không được đảm bảo.

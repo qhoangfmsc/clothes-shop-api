@@ -1,6 +1,6 @@
 # 0002 — Chỉ nhận mã permission có thật
 
-> Module: `user` · Trạng thái: Approved · Ngày: 2026-10-23 · Cỡ: rút gọn
+> Module: `user` · Trạng thái: Implemented · Ngày: 2026-10-23 · Cỡ: rút gọn
 
 ## 1. Bối cảnh & vấn đề
 
@@ -27,4 +27,6 @@ Thấp. Rollback: `git revert`.
 
 ## 6. Kết quả triển khai
 
-_Điền sau khi làm xong._
+- **File:** `permissions.constant.ts` (`PERMISSION_CODES`), `user/dtos/user.dto.ts`.
+- **Docs:** `user.md` (4.1, 4.8).
+- **Test:** flow: mã lạ, mã trùng → 400; mã đúng → 200; `[]` thu hồi hết. Phá thử bỏ `IsIn`/`ArrayUnique` → đỏ. Ca cũ dùng permission `[1]` (không tồn tại) đã đổi sang mã thật.

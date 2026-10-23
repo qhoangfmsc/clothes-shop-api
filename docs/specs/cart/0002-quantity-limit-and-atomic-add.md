@@ -1,6 +1,6 @@
 # 0002 — Giới hạn số lượng một dòng giỏ có mã lỗi rõ ràng, cộng dồn nguyên tử
 
-> Module: `cart` · Trạng thái: Approved · Ngày: 2026-10-23 · Cỡ: rút gọn
+> Module: `cart` · Trạng thái: Implemented · Ngày: 2026-10-23 · Cỡ: rút gọn
 
 ## 1. Bối cảnh & vấn đề
 
@@ -61,4 +61,7 @@ Thấp; không đổi schema. Rollback: `git revert`.
 
 ## 6. Kết quả triển khai
 
-_Điền sau khi làm xong._
+- **File:** `cart.constant.ts`, `cart.service.ts` (`addQuantity`, `getOrCreateCart`), `cart.dto.ts`, `error-codes.ts` (2004), `cart.service.spec.ts`.
+- **Khác thiết kế:** cài đặt đầu tiên (UPDATE → kiểm tra tồn tại → INSERT) báo nhầm "đạt giới hạn" khi dòng vừa được request khác tạo giữa hai câu lệnh; flow đồng thời bắt được. Sửa: chỉ kết luận "đạt giới hạn" khi UPDATE đã thất bại hai lần dù dòng đã tồn tại (xem comment ở `addQuantity`). Đã chạy ổn định 8 lần liên tiếp.
+- **Docs:** `cart.md` (4.4, 4.5, 4.7, 4.8), `common.md` (bảng mã lỗi).
+- **Test:** 45 flow (13 mới): 98+1, 99+1, 98+2, 50+50, 1+99, size khác là dòng khác, PATCH đặt tuyệt đối, 6 lần thêm đồng thời cộng đúng, giỏ/dòng đầu tiên đồng thời, 60+60 đồng thời → một 201 và một 2004. Phá thử 5 điểm đều bị bắt.

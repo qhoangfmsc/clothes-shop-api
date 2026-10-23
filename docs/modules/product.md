@@ -170,8 +170,8 @@ Tham chiếu tới `products`: `reviews`, `wishlists`, `cart_items`, `collection
 
 | Code | Tên | Khi nào |
 |---|---|---|
-| 1002 | `PRODUCT_SLUG_DUPLICATE` | Slug đã tồn tại |
-| 1003 | `PRODUCT_SKU_DUPLICATE` | SKU đã tồn tại |
+| 1002 | `PRODUCT_SLUG_DUPLICATE` | Slug đã tồn tại, kể cả khi hai request tạo đồng thời cùng slug (ràng buộc `UQ_products_slug` được ánh xạ thay vì 500; xem [common](common.md) 4.6) |
+| 1003 | `PRODUCT_SKU_DUPLICATE` | SKU đã tồn tại, kể cả SKU tự sinh trùng SKU có sẵn |
 | 1004 | `PRODUCT_CATEGORY_NOT_FOUND` | Không thấy category hoặc subcategory |
 | 1005 | `PRODUCT_SUBCATEGORY_MISMATCH` | Subcategory không thuộc category |
 | 1009 | `PRODUCT_INVALID_PRICE` | `originalPriceVnd < priceVnd` |
@@ -198,8 +198,6 @@ Flow test trên Postgres thật (`test/flows/product/`; builder `b.product()` nh
 ### 4.8 Lưu ý hiện trạng
 
 - `PATCH` dùng `Update*Dto = PartialType(Create*Dto, { skipNullProperties: false })`: mọi ràng buộc của create được kế thừa (chuỗi rỗng ở field bắt buộc → 400), `null` ở field bắt buộc → 400, `null` ở field tuỳ chọn được coi như không gửi (trừ `badge` và `originalPriceVnd`, nơi `null` xoá giá trị). Response là bản ghi đầy đủ, không thiếu field chưa gửi (xem [common](common.md) 4.13).
-- Tạo hai sản phẩm đồng thời cùng `slug` (hoặc cùng `sku`): kiểm tra trùng chạy trước khi lưu và không bắt lỗi UNIQUE của DB, nên request thua trả 500 thay vì `PRODUCT_SLUG_DUPLICATE` / `PRODUCT_SKU_DUPLICATE`.
-- `sku` tự sinh (khi không gửi `sku`) không được kiểm tra trùng; nếu trùng `sku` của sản phẩm khác (vd sản phẩm kia dùng `sku` tuỳ chỉnh đúng bằng chuỗi này) thì vi phạm UNIQUE `UQ_products_sku` và trả 500.
 
 - `GET /api/products/:id` không lọc theo `status`: sản phẩm `disabled` vẫn xem được chi tiết theo id; `related` thì chỉ gồm `active`.
 - `sort=price` và `minPrice`/`maxPrice` luôn theo VND (tiền gốc); không có lọc/sắp xếp theo USD.

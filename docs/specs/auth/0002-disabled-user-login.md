@@ -1,6 +1,6 @@
 # 0002 — Từ chối đăng nhập của user bị khoá
 
-> Module: `auth` · Trạng thái: Approved · Ngày: 2026-10-23 · Cỡ: rút gọn
+> Module: `auth` · Trạng thái: Implemented · Ngày: 2026-10-23 · Cỡ: rút gọn
 
 ## 1. Bối cảnh & vấn đề
 
@@ -31,4 +31,6 @@ Thấp. Frontend cần xử lý mã 2203 (hiển thị tài khoản bị khoá).
 
 ## 6. Kết quả triển khai
 
-_Điền sau khi làm xong._
+- **File:** `auth.service.ts` (`assertActive`, dùng cho cả nhánh thua cuộc đua), `error-codes.ts` (2203).
+- **Docs:** `auth.md` (4.4, 4.5, 4.8), `common.md`.
+- **Test:** flow: user `disabled` → 403 / 2203, không có token, hồ sơ giữ nguyên, bật lại thì đăng nhập được. Phá thử bỏ kiểm tra → đỏ.

@@ -113,7 +113,7 @@ Quan hệ: `Category.subcategories` là `OneToMany` với `eager: true, cascade:
 - **Service**:
   - `ensureSlugUnique` cho category.
   - `validateSubCategorySlugs`: slug subcategory không trùng nhau trong cùng payload.
-  - Lỗi DB `23505` khi create/update → `CATEGORY_SUBSLUG_DUPLICATE`.
+  - Lỗi DB `23505` khi create/update được ánh xạ theo tên constraint: `UQ_categories_slug` → `CATEGORY_SLUG_DUPLICATE (1102)`, `UQ_subcategories_category_slug` → `CATEGORY_SUBSLUG_DUPLICATE (1103)`.
   - `priority` phải nằm trong `1..max`.
   - `reorder` phải gửi đủ mọi category đúng 1 lần.
   - Xoá subcategory còn sản phẩm tham chiếu, hoặc xoá category còn sản phẩm: bắt lỗi FK `23503`.
@@ -166,7 +166,6 @@ Flow test trên Postgres thật: `test/flows/category/category.flow.ts` (batch 1
 
 - `PATCH` dùng `Update*Dto = PartialType(Create*Dto, { skipNullProperties: false })`: mọi ràng buộc của create được kế thừa (chuỗi rỗng ở field bắt buộc → 400), `null` ở field bắt buộc → 400, `null` ở field tuỳ chọn được coi như không gửi (trừ `heroImage`, nơi `null` xoá ảnh). Response là bản ghi đầy đủ, không thiếu field chưa gửi (xem [common](common.md) 4.13).
 - `subcategories.count` là giá trị admin nhập, không được tự tính từ số sản phẩm.
-- Khi bắt lỗi `23505` ở create/update, mọi vi phạm UNIQUE đều được map sang `CATEGORY_SUBSLUG_DUPLICATE`.
 - `CategoryService.findAll()` (trả `{ data, total }` không phân trang) còn trong service nhưng không có nơi nào gọi.
 - `PublicCategoryQueryDto` có field `slug` nhưng controller đọc `slug` riêng bằng `@Query('slug')` để phân nhánh.
 - Subcategory được trả kèm trong cả list public lẫn admin; subcategory không có endpoint riêng.
