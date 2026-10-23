@@ -1,6 +1,6 @@
 # 0001 — Kế hoạch flow test cho module product
 
-> Module: `product` · Trạng thái: Approved · Ngày: 2026-10-23 · Cỡ: rút gọn
+> Module: `product` · Trạng thái: Implemented · Ngày: 2026-10-23 · Cỡ: rút gọn
 
 ## 1. Bối cảnh & vấn đề
 
@@ -17,7 +17,7 @@ Mỗi route product có ≥ 1 ca thành công và ≥ 1 ca lỗi nghiệp vụ t
 | Batch | Route | Flow |
 |---|---|---|
 | 13 | `GET /api/products`, `GET /api/products/:id`, `GET /api/products/autocomplete`, `GET /api/admin/products`, `POST /api/admin/products` | `test/flows/product/product-read.flow.ts`, `test/flows/product/product-admin.flow.ts` |
-| 14 | `DELETE /api/admin/products/:id`, `PATCH /api/admin/products/:id` | _(chưa làm)_ |
+| 14 | `DELETE /api/admin/products/:id`, `PATCH /api/admin/products/:id` | `test/flows/product/product-admin.flow.ts` |
 
 ## 4. Kế hoạch test
 
@@ -29,4 +29,7 @@ Theo skill `test-campaign`; phá thử các điểm lọc, sort, biên giá và 
 
 ## 6. Kết quả triển khai
 
+- **Batch 14:** 31 flow test. Phá thử 10 điểm đều bị bắt. 2 phát hiện về `PATCH` (response thiếu field không gửi; SKU `…-undefined` khi đổi danh mục không kèm `slug`), cùng một nguyên nhân gốc.
+- **Tổng module:** 7/7 route product có ca thành công và ca lỗi trên Postgres thật; 5 phát hiện cần quyết định (xem `test/PROGRESS.md`). Độ phủ toàn cục sau batch 14: thành công 61/98, lỗi 58/93, baseline 40 route.
+- **Docs:** `product.md` (4.7, 4.8), `test/README.md`, `test/PROGRESS.md`.
 - **Batch 13:** 85 flow test. Phá thử 18 điểm đều bị bắt (1 điểm lọt lúc đầu rồi đã bịt). 3 phát hiện cần quyết định (500 khi tạo đồng thời, 500 khi `sku` tự sinh trùng, `PATCH` nhận chuỗi rỗng).

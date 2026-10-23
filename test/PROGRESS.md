@@ -194,7 +194,7 @@ Trạng thái: **Xong** · Ghi chú: 2026-10-23; 85 flow mới (`flows/product/p
 | 1 | DELETE | `/api/admin/products/:id` | JWT | 6002 |
 | 2 | PATCH | `/api/admin/products/:id` | JWT | 6001 |
 
-Trạng thái: **Chưa làm** · Ghi chú: —
+Trạng thái: **Xong** · Ghi chú: 2026-10-23; 31 flow mới (cùng file `flows/product/product-admin.flow.ts`); thêm 2 phát hiện về PATCH. Module product hoàn tất (7/7 route)
 
 
 ### Batch 15 — category (5 route)
@@ -349,6 +349,7 @@ Trạng thái: **Chưa làm** · Ghi chú: —
 | Batch 10 | 2026-10-23 | review (khách): vote, upload ảnh, đánh giá của tôi, chờ đánh giá, phiếu đã bấm | +33 flow (335 → 368) | 42 → 47/98 | 40 → 45/93 | Baseline 58 → 53. Phá thử 14 điểm đều bị bắt; 2 điểm lọt lúc đầu rồi đã bịt: kiểm trạng thái thanh toán ở `pending` (thêm ca đơn đã giao nhưng chưa trả, dựng bằng SQL) và mutation loại ảnh (lỗi biên dịch của chính mutation, làm lại) |
 | Batch 11–12 | 2026-10-23 | review (admin): danh sách, chi tiết, ẩn, hiện lại, đặt và xoá phản hồi | +37 flow (368 → 405) | 47 → 53/98 | 45 → 51/93 | Baseline 53 → 47. Phá thử 10 điểm (tính lại điểm khi ẩn/hiện, chặn ẩn hai lần, xoá lý do khi hiện lại, đảo bộ lọc `replied`, tìm theo tên sản phẩm, lọc theo slug, xoá `repliedBy`, bỏ khoá dòng, ghi lý do) đều bị bắt ngay. Module review xong (16/16) |
 | Batch 13 | 2026-10-23 | product: danh sách, chi tiết, autocomplete (công khai), danh sách admin, tạo | +85 flow (405 → 490) | 53 → 58/98 | 51 → 56/93 | Baseline 47 → 42. Phá thử 18 điểm đều bị bắt; 1 điểm lọt lúc đầu (xếp hạng khớp-đầu của autocomplete, vì tên có dấu "Á" vốn đã xếp sau "P") rồi đã bịt bằng tên ASCII. 3 phát hiện cần quyết định (500 khi tạo đồng thời cùng slug, 500 khi SKU tự sinh trùng, PATCH nhận chuỗi rỗng) |
+| Batch 14 | 2026-10-23 | product (admin): sửa, xoá | +31 flow (490 → 521) | 58 → 61/98 | 56 → 58/93 | Baseline 42 → 40. Phá thử 10 điểm (giá cuối, slug/SKU trùng, sinh lại SKU, khớp danh mục, 404) đều bị bắt. 2 phát hiện: response PATCH thiếu các field không gửi; PATCH đổi danh mục mà không gửi `slug` lưu `sku` dạng `…-undefined` (cùng nguyên nhân: DTO có thuộc tính `undefined`). Module product xong (7/7) |
 
 ## Phát hiện cần người dùng quyết định
 
@@ -362,3 +363,5 @@ Test lộ ra hành vi nghi là lỗi trong code thì ghi ở đây (route, hành
 | 13 | `POST /api/admin/products` | Hai request tạo đồng thời cùng `slug` cho `[201, 500, 500]` (kiểm tra trùng chạy trước khi lưu, không bắt UNIQUE `UQ_products_slug` / `UQ_products_sku`) | `PRODUCT_SLUG_DUPLICATE (1002)` / `PRODUCT_SKU_DUPLICATE (1003)`; CLAUDE.md: bắt lỗi DB ra mã đẹp | Chờ người dùng quyết định (test không khẳng định) |
 | 13 | `POST /api/admin/products` | `sku` tự sinh `{category}-{subcategory}-{slug}` không được kiểm tra trùng: nếu trùng `sku` có sẵn (vd sản phẩm khác dùng `sku` tuỳ chỉnh đúng chuỗi đó) thì vi phạm `UQ_products_sku` và trả 500 | `PRODUCT_SKU_DUPLICATE (1003)` như khi gửi `sku` trùng | Chờ người dùng quyết định (test không khẳng định) |
 | 13 | `PATCH /api/admin/products/:id` | `UpdateProductDto` thiếu `@IsNotEmpty` cho `slug`/`name`/`description`/`categoryId`/`subcategoryId`: PATCH `{ "slug": "", "name": "" }` trả 200 và lưu chuỗi rỗng | `docs/modules/product.md` 4.1: mọi field của update "cùng ràng buộc" như create (create yêu cầu not empty) | Chờ người dùng quyết định (test batch 14 không khẳng định) |
+| 14 | `PATCH /api/admin/products/:id` | Response chỉ chứa field được gửi cùng quan hệ/giá/điểm: `slug`, `sku`, `images`, `status`, `description`, `material`, `care`, `sizes`, `colors`, `tags` vắng mặt khi không gửi (DB đúng, `GET` đủ). Nguyên nhân: `dto` là instance có sẵn thuộc tính `undefined`, `Object.assign(product, rest)` ghi `undefined` lên entity rồi mới `save` | `docs/modules/product.md` 4.1: response là sản phẩm đầy đủ như create | Chờ người dùng quyết định (test chỉ kiểm field đã gửi và đọc phần còn lại qua DB/`GET`) |
+| 14 | `PATCH /api/admin/products/:id` | Gửi `categoryId` hoặc `subcategoryId` mà không gửi `slug` và `sku` lưu `sku` = `{category}-{subcategory}-undefined` vào DB (cùng nguyên nhân: `product.slug` bị ghi `undefined` trước khi sinh SKU) | SKU sinh lại theo công thức mặc định với slug hiện có (`docs/modules/product.md` 4.4) | Chờ người dùng quyết định (test dùng `sku` tường minh khi đổi danh mục) |
