@@ -14,23 +14,12 @@
     },
     "GET /api/reviews/:productId/summary": {
       "error": "Chỉ có productId trong đường dẫn; id không tồn tại trả bản tổng hợp rỗng nên không có ca lỗi nghiệp vụ"
+    },
+    "GET /api/addresses": {
+      "error": "Không có input; chưa có địa chỉ thì trả danh sách rỗng nên không có ca lỗi nghiệp vụ"
     }
   },
   "missing": {
-    "GET /api/addresses": [
-      "success",
-      "error"
-    ],
-    "POST /api/addresses": [
-      "success",
-      "error"
-    ],
-    "DELETE /api/addresses/:id": [
-      "success"
-    ],
-    "PATCH /api/addresses/:id": [
-      "success"
-    ],
     "GET /api/wishlist": [
       "success",
       "error"
