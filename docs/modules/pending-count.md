@@ -1,6 +1,6 @@
 # pending-count (`src/modules/pending-count`)
 
-> Cập nhật lần cuối: 2026-10-14
+> Cập nhật lần cuối: 2026-10-23
 
 ## 1. Tổng quan
 
@@ -80,7 +80,7 @@ Không có mã riêng. `401` (thiếu/sai JWT) và `403` `PERMISSION_DENIED (900
 
 ### 4.7 Test
 
-`pending-count.spec.ts` — quyền quyết định key nào có và COUNT nào chạy (admin, đủ quyền, chỉ một quyền kể cả chỉ `REVIEW_ADMIN_VIEW`, không quyền, số `0` khác với thiếu key), các COUNT chạy song song, bộ lọc danh sách và COUNT dùng đúng cùng điều kiện SQL (đơn và giao dịch; kết hợp với bộ lọc khác; `false`/bỏ trống không lọc), nội dung các điều kiện SQL, và parse boolean của query (`true`/`false`, giá trị khác bị từ chối, giữ mặc định phân trang). Việc khớp số với danh sách trên Postgres thật (mọi tình huống tạo/xử lý/huỷ) không có test tự động trong repo.
+`pending-count.spec.ts` — quyền quyết định key nào có và COUNT nào chạy (admin, đủ quyền, chỉ một quyền kể cả chỉ `REVIEW_ADMIN_VIEW`, không quyền, số `0` khác với thiếu key), các COUNT chạy song song, bộ lọc danh sách và COUNT dùng đúng cùng điều kiện SQL (đơn và giao dịch; kết hợp với bộ lọc khác; `false`/bỏ trống không lọc), nội dung các điều kiện SQL, và parse boolean của query (`true`/`false`, giá trị khác bị từ chối, giữ mặc định phân trang). Flow test trên Postgres thật: `test/flows/pending-count/pending-count.flow.ts` (batch 24) — shop không có việc gì thì cả năm key bằng `0`; dựng việc ở mỗi nhóm (đơn `pending` chưa có QR và đơn đã trả đang `confirmed` được đếm, đơn có QR còn hạn/đã giao/đã huỷ thì không; giao dịch không khớp phiên nào; khoản hoàn `REQUESTED` sau khi huỷ đơn đã trả; yêu cầu trả hàng `REQUESTED` nhưng không tính `APPROVED`; đánh giá hiển thị chưa phản hồi nhưng không tính đã phản hồi hay đã ẩn) và mỗi số bằng `total` của danh sách mà nó trỏ tới; số giảm khi phản hồi đánh giá, từ chối yêu cầu trả hàng, hoàn tất khoản hoàn; người không phải admin chỉ thấy key theo quyền (`0` khác với thiếu key); khách không có quyền nào → 403 / 9001.
 
 ### 4.8 Lưu ý hiện trạng
 

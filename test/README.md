@@ -108,7 +108,9 @@ Trạng thái: **Có** = đã có test cover luồng · **Unit** = chỉ có uni
 | user (admin) | Danh sách, chi tiết, sửa `role`/`status`/`permissions` (hiệu lực ngay, tự sửa 1402, 1401) | Flow | `flows/user/user.flow.ts` | Có (batch 20–21) |
 | cart | Xem giỏ (Vnd/Usd, giá hiện tại), thêm (cộng dồn, size/màu, 1001/2003/1303), đổi số lượng, xoá dòng, xoá sạch, validation từng field | Flow | `flows/cart/cart.flow.ts` | Có (batch 08) |
 | wishlist | Thêm (idempotent, 404 / 1001), danh sách (chỉ của mình, Vnd/Usd), kiểm tra, bỏ (idempotent), dọn khi xoá sản phẩm | Flow | `flows/wishlist/wishlist.flow.ts` | Có (batch 19) |
-| media | Upload / xoá ảnh admin | Flow | — | Unit |
+| media (admin) | Ping, danh sách thư viện (chỉ `LIBRARY`), upload (key an toàn, loại theo byte, lỗi storage 1601/1605/1606, 413), xoá (storage trước rồi mới dòng DB, 1604) | Flow | `flows/media/media.flow.ts` | Có (batch 24) |
+| pending-count | Số việc chờ theo quyền, khớp `total` của các danh sách, giảm khi xử lý xong | Flow | `flows/pending-count/pending-count.flow.ts` | Có (batch 24) |
+| health | `GET /` và `GET /health` (cả khi DB lỗi) | Flow | `flows/health/health.flow.ts` | Có (batch 25) |
 | site-config | Danh sách key, tạo/thay/xoá cấu hình (1501/1502/1503), chuẩn hoá `SHIPPING_CONFIG`, `EXCHANGE_RATE` có hiệu lực ngay, đọc công khai | Flow | `flows/site-config/site-config.flow.ts` | Có (batch 22) |
 | shipping | `GET /api/shipping` theo cấu hình admin (mặc định, ngưỡng, USD), cùng nguồn với báo giá và hạn đổi trả | Flow | `flows/shipping/shipping.flow.ts` | Có (batch 23) |
 | size-guide | Bảng size theo nhóm, nhóm lạ → `data: null` | Flow | `flows/size-guide/size-guide.flow.ts` | Có (batch 23) |

@@ -1,6 +1,6 @@
 # common & core (`src/common`, `src/core`, `src/main*.ts`, `src/migrations`)
 
-> Cập nhật lần cuối: 2026-10-22
+> Cập nhật lần cuối: 2026-10-23
 
 ## 1. Tổng quan
 
@@ -67,7 +67,7 @@ Phần hạ tầng dùng chung cho mọi module: bootstrap ứng dụng, guard x
 | Method | Path | Response |
 |---|---|---|
 | GET | `/` | chuỗi `Clothes Shop API is running` |
-| GET | `/health` | `{ status: 'ok', timestamp, uptime, db: 'connected' }`; lỗi DB: `{ status: 'error', timestamp, db: 'disconnected' }` (sau khi chạy `SELECT 1`) |
+| GET | `/health` | `{ status: 'ok', timestamp, uptime, db: 'connected' }`; lỗi DB: `{ status: 'error', timestamp, db: 'disconnected' }` (sau khi chạy `SELECT 1`; cả hai trường hợp đều HTTP 200). Flow test: `test/flows/health/health.flow.ts` |
 
 ### 4.2 Cấu hình DB & CoreModule
 
