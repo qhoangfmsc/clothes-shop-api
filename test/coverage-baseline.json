@@ -17,24 +17,18 @@
     },
     "GET /api/addresses": {
       "error": "Không có input; chưa có địa chỉ thì trả danh sách rỗng nên không có ca lỗi nghiệp vụ"
+    },
+    "GET /api/wishlist": {
+      "error": "Không có input; chưa có sản phẩm yêu thích thì trả danh sách rỗng nên không có ca lỗi nghiệp vụ"
+    },
+    "DELETE /api/wishlist/:productId": {
+      "error": "Idempotent: bỏ thứ không có trong wishlist (kể cả productId lạ) vẫn trả success nên không có ca lỗi nghiệp vụ"
+    },
+    "GET /api/wishlist/check/:productId": {
+      "error": "Chỉ trả có/không; productId lạ trả inWishlist false nên không có ca lỗi nghiệp vụ"
     }
   },
   "missing": {
-    "GET /api/wishlist": [
-      "success",
-      "error"
-    ],
-    "DELETE /api/wishlist/:productId": [
-      "success",
-      "error"
-    ],
-    "POST /api/wishlist/:productId": [
-      "error"
-    ],
-    "GET /api/wishlist/check/:productId": [
-      "success",
-      "error"
-    ],
     "POST /api/auth/google": [
       "success",
       "error"
