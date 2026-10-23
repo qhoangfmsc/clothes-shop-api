@@ -29,3 +29,29 @@ export async function requestWhileRowLocked<R>(
     await runner.release();
   }
 }
+
+/** Giữ advisory lock theo transaction (`pg_advisory_xact_lock(hashtext(key))`) từ kết nối riêng, như `requestWhileRowLocked` nhưng cho khoá không gắn với dòng nào. */
+export async function requestWhileAdvisoryLocked<R>(
+  dataSource: DataSource,
+  key: string,
+  request: () => PromiseLike<R>,
+  changeWhileLocked: (runner: QueryRunner) => Promise<unknown>,
+  settleMs = 300,
+): Promise<R> {
+  const runner = dataSource.createQueryRunner();
+  await runner.connect();
+  await runner.startTransaction();
+  try {
+    await runner.query('SELECT pg_advisory_xact_lock(hashtext($1))', [key]);
+    const pending = Promise.resolve(request());
+    await sleep(settleMs);
+    await changeWhileLocked(runner);
+    await runner.commitTransaction();
+    return await pending;
+  } catch (error) {
+    if (runner.isTransactionActive) await runner.rollbackTransaction();
+    throw error;
+  } finally {
+    await runner.release();
+  }
+}

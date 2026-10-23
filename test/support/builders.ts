@@ -55,7 +55,7 @@ export function createBuilders(dataSource: DataSource) {
   // mặc định thoả CHECK của DB (images/sizes/colors không rỗng)
   async function product(overrides: Partial<Product> = {}): Promise<Product> {
     const n = next();
-    const parent = await category();
+    const parent = overrides.category ?? (await category());
     return products.save(
       products.create({
         slug: `product-${n}`,

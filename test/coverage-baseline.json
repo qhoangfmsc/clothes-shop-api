@@ -17,30 +17,6 @@
     }
   },
   "missing": {
-    "GET /api/categories": [
-      "success",
-      "error"
-    ],
-    "GET /api/admin/categories": [
-      "success",
-      "error"
-    ],
-    "POST /api/admin/categories": [
-      "success",
-      "error"
-    ],
-    "DELETE /api/admin/categories/:id": [
-      "success",
-      "error"
-    ],
-    "PATCH /api/admin/categories/:id": [
-      "success",
-      "error"
-    ],
-    "PATCH /api/admin/categories/reorder": [
-      "success",
-      "error"
-    ],
     "GET /api/collections": [
       "success",
       "error"
