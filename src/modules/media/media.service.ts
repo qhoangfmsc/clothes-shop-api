@@ -9,14 +9,9 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { MediaFileDto } from './dtos/media-file.dto';
 import { MediaQueryDto } from './dtos/media-query.dto';
-import {
-  MEDIA_ALLOWED_MIME_TYPES,
-  MEDIA_KEY_PREFIX_LENGTH,
-  MediaMimeType,
-  MediaPurpose,
-  REVIEW_UPLOAD_LIMIT_PER_DAY,
-} from './media.constant';
+import { MEDIA_KEY_PREFIX_LENGTH, MediaPurpose, REVIEW_UPLOAD_LIMIT_PER_DAY } from './media.constant';
 import { MediaFile } from './media-file.entity';
+import { displayName, sanitizeStorageName, sniffImageMime } from './media-file.util';
 
 /** Phần cấu hình đủ để dựng URL công khai (không cần service key) */
 interface PublicStorageConfig {
@@ -92,7 +87,7 @@ export class MediaService {
     }
 
     // Không tin mimetype do client gửi — xác định theo magic bytes
-    const mimeType = this.sniffImageMime(file.buffer);
+    const mimeType = sniffImageMime(file.buffer);
     if (!mimeType) {
       throwAppError(EMediaErrorCode.MEDIA_INVALID_TYPE);
     }
@@ -110,7 +105,7 @@ export class MediaService {
       }
     }
 
-    const key = `${randomBytes(MEDIA_KEY_PREFIX_LENGTH / 2).toString('hex')}-${this.sanitizeName(file.originalname, mimeType)}`;
+    const key = `${randomBytes(MEDIA_KEY_PREFIX_LENGTH / 2).toString('hex')}-${sanitizeStorageName(file.originalname, mimeType)}`;
 
     const res = await this.storageFetch(config, `/object/${encodeURIComponent(config.bucket)}/${encodeURIComponent(key)}`, {
       method: 'POST',
@@ -123,7 +118,7 @@ export class MediaService {
     try {
       media = await this.mediaRepo.save(
         this.mediaRepo.create({
-          name: this.displayName(file.originalname),
+          name: displayName(file.originalname),
           storageKey: key,
           mimeType,
           size: file.size,
@@ -290,43 +285,5 @@ export class MediaService {
       createdAt: m.createdAt.toISOString(),
       url: this.publicUrl(config, m.storageKey),
     };
-  }
-
-  /** Tên hiển thị = tên file gốc, bỏ path/ký tự điều khiển, cắt ≤255 */
-  private displayName(originalName: string): string {
-    const base = [...(originalName.split(/[\\/]/).pop() ?? '')]
-      .filter((ch) => ch.charCodeAt(0) > 0x1f && ch.charCodeAt(0) !== 0x7f)
-      .join('')
-      .trim();
-    return (base || 'image').slice(0, 255);
-  }
-
-  /** Tên an toàn cho storage key: ASCII, [a-z0-9._-], đúng extension theo mime */
-  private sanitizeName(originalName: string, mimeType: MediaMimeType): string {
-    const ext = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif', 'image/avif': 'avif' }[mimeType];
-    const base = originalName
-      .replace(/\.[^.]*$/, '')
-      .normalize('NFD')
-      .replace(/[̀-ͯ]/g, '')
-      .replace(/đ/gi, 'd')
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 80);
-    return `${base || 'image'}.${ext}`;
-  }
-
-  private sniffImageMime(buf: Buffer): MediaMimeType | null {
-    const ascii = (start: number, end: number) => buf.subarray(start, end).toString('latin1');
-
-    let mime: MediaMimeType | null = null;
-    if (buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) mime = 'image/jpeg';
-    else if (buf.length >= 8 && buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])))
-      mime = 'image/png';
-    else if (buf.length >= 6 && ['GIF87a', 'GIF89a'].includes(ascii(0, 6))) mime = 'image/gif';
-    else if (buf.length >= 12 && ascii(0, 4) === 'RIFF' && ascii(8, 12) === 'WEBP') mime = 'image/webp';
-    else if (buf.length >= 12 && ascii(4, 8) === 'ftyp' && ['avif', 'avis'].includes(ascii(8, 12))) mime = 'image/avif';
-
-    return mime && MEDIA_ALLOWED_MIME_TYPES.includes(mime) ? mime : null;
   }
 }
