@@ -1,6 +1,6 @@
 # 0002 — Tách logic thuần của ảnh khỏi `MediaService`
 
-> Module: `media` · Trạng thái: Draft · Ngày: 2026-10-24 · Cỡ: rút gọn (không đổi hành vi)
+> Module: `media` · Trạng thái: Implemented · Ngày: 2026-10-24 · Cỡ: rút gọn (không đổi hành vi)
 
 ## 1. Bối cảnh & vấn đề
 
@@ -57,4 +57,7 @@ Rủi ro thấp (di chuyển nguyên văn). Rollback: `git revert`.
 
 ## 6. Kết quả triển khai
 
-_Điền sau khi làm xong._
+- **File mới:** `media-file.util.ts` (3 hàm, nguyên văn), `media-file.util.spec.ts` (12 ca). **Sửa:** `media.service.ts` (332 → 289 dòng), allowlist kiến trúc (bỏ mục `media.service.ts`).
+- **Khác thiết kế:** không có.
+- **Kiểm chứng:** 841 unit (829 + 12 ca mới) và 883 flow đều xanh, độ phủ route 98/98 và 82/82. Phá thử: bỏ `avis` khỏi danh sách AVIF → 1 unit đỏ.
+- **Docs:** `media.md` (4.7, 4.9), `common.md` (4.13), `test/README.md`.

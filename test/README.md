@@ -125,7 +125,7 @@ Trạng thái: **Có** = đã có test cover luồng · **Unit** = chỉ có uni
 | cart | `modules/cart/cart.service.spec.ts` |
 | collection | `modules/collection/collection.service.spec.ts` |
 | currency | `modules/currency/currency.service.spec.ts` |
-| media | `modules/media/media.service.spec.ts` |
+| media | `modules/media/media.service.spec.ts`, `media-file.util.spec.ts` |
 | order | `modules/order/order-checkout.service.spec.ts`, `order-query.service.spec.ts`, `order-status.service.spec.ts`, `order.presenter.spec.ts`, `order.constant.spec.ts` (bảng chuyển trạng thái), `dtos/order.dto.spec.ts` |
 | payment | `modules/payment/payment.service.spec.ts`, `payment-payable.util.spec.ts`, `payment-confirm.spec.ts`, `payment-expiry.spec.ts`, `payment-attempts-admin.spec.ts`, `refund.service.spec.ts`, `sepay-webhook.service.spec.ts`, `sepay-payload.util.spec.ts`, `sepay-signature.util.spec.ts` |
 | pending-count | `modules/pending-count/pending-count.spec.ts` |
