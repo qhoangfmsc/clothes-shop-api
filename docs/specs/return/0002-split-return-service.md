@@ -1,6 +1,6 @@
 # 0002 — Tách `ReturnService` thành đọc và ghi
 
-> Module: `return` (+ `pending-count` đổi chỗ tiêm) · Trạng thái: Draft · Ngày: 2026-10-24
+> Module: `return` (+ `pending-count` đổi chỗ tiêm) · Trạng thái: Implemented · Ngày: 2026-10-24
 
 ## 1. Bối cảnh & vấn đề
 
@@ -79,4 +79,8 @@ Rủi ro: luồng hoàn tiền (`receive`) nằm trong phần bị cắt. Giảm
 
 ## 6. Kết quả triển khai
 
-_Điền sau khi làm xong._
+- **File mới:** `return-query.service.ts` (187 dòng, 3 dependency), `return-active-quantities.util.ts`. **Sửa:** `return.service.ts` (450 → 266 dòng, 4 dependency), `return.controller.ts`, `admin-return.controller.ts`, `return.module.ts` (export `ReturnQueryService`), `PendingCountService`, `return.service.spec.ts`, allowlist kiến trúc (bỏ mục `return.service.ts`).
+- **Kiểm chứng di chuyển nguyên văn:** so mọi dòng của file cũ với ba file mới: chỉ khác import, `this.activeQuantities` → `activeReturnQuantities`, `this.getView/findOne/findOneAdmin` → `this.queryService.*` và `getView` thành public.
+- **Khác thiết kế:** không có.
+- **Kiểm chứng:** 829 unit (số ca không đổi so với trước phần này) và 883 flow đều xanh, độ phủ route 98/98 và 82/82, `nest build` qua; không sửa flow nào. Phá thử: thay `activeReturnQuantities` trong `create` bằng bản đồ rỗng → 1 unit đỏ (số lượng không được trừ).
+- **Docs:** `return.md` (4.6, 4.7, 4.9), `pending-count.md`, `common.md` (4.13).

@@ -11,7 +11,7 @@ Module nhỏ trả các con số "việc đang chờ admin xử lý" để hiệ
 | Thư mục | `src/modules/pending-count` |
 | Route prefix | `/api/admin/pending-counts` |
 | Bảng DB | không có (đọc `orders`, `payment_transactions`, `refunds`, `return_requests`, `reviews` qua service của từng module) |
-| Module phụ thuộc | `order` (`OrderQueryService.countNeedsAction`), `payment` (`PaymentQueryService.countNeedsReview`, `RefundService.countRequested`), `return` (`ReturnService.countRequested`), `review` (`ReviewQueryService.countAwaitingReply`) |
+| Module phụ thuộc | `order` (`OrderQueryService.countNeedsAction`), `payment` (`PaymentQueryService.countNeedsReview`, `RefundService.countRequested`), `return` (`ReturnQueryService.countRequested`), `review` (`ReviewQueryService.countAwaitingReply`) |
 | Export | không |
 
 ## 2. Mục đích & nghiệp vụ phục vụ
@@ -64,7 +64,7 @@ Không có bảng riêng. Các COUNT dùng index sẵn có: `IDX_orders_status`,
    - `OrderQueryService.countNeedsAction()` và `findAllAdmin({ needsAction })` cùng dùng `ORDER_NEEDS_ACTION_SQL` (`order-needs-action.util.ts`, alias `o`).
    - `PaymentQueryService.countNeedsReview()` và `findTransactionsAdmin({ needsReview })` cùng dùng `TRANSACTION_NEEDS_REVIEW_SQL` (`payment-needs-review.util.ts`, alias `t`, `a`, `o`).
    - `RefundService.countRequested()` đếm `status = REQUESTED`, cùng điều kiện với `findAdmin({ status: 'REQUESTED' })`.
-   - `ReturnService.countRequested()` đếm `status = REQUESTED`, cùng điều kiện với `findAllAdmin({ status: 'REQUESTED' })`.
+   - `ReturnQueryService.countRequested()` đếm `status = REQUESTED`, cùng điều kiện với `findAllAdmin({ status: 'REQUESTED' })`.
    - `ReviewQueryService.countAwaitingReply()` đếm `status = PUBLISHED` và `reply IS NULL`, cùng điều kiện với `findAllAdmin({ status: 'PUBLISHED', replied: false })`.
 3. Trả `{ data }` gồm đúng các key đã chạy.
 
@@ -76,7 +76,7 @@ Không có mã riêng. `401` (thiếu/sai JWT) và `403` `PERMISSION_DENIED (900
 
 ### 4.6 Phụ thuộc & cấu hình
 
-`PendingCountModule` import `OrderModule`, `PaymentModule`, `ReturnModule`, `ReviewModule` (các module này export `OrderQueryService`, `PaymentQueryService`/`RefundService`, `ReturnService`, `ReviewQueryService`). Không có biến môi trường.
+`PendingCountModule` import `OrderModule`, `PaymentModule`, `ReturnModule`, `ReviewModule` (các module này export `OrderQueryService`, `PaymentQueryService`/`RefundService`, `ReturnQueryService`, `ReviewQueryService`). Không có biến môi trường.
 
 ### 4.7 Test
 
