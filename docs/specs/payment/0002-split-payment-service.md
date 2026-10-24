@@ -1,6 +1,6 @@
 # 0002 — Tách `PaymentService` theo use case
 
-> Module: `payment` (+ `order`, `pending-count` đổi chỗ tiêm) · Trạng thái: Draft · Ngày: 2026-10-24
+> Module: `payment` (+ `order`, `pending-count` đổi chỗ tiêm) · Trạng thái: Implemented · Ngày: 2026-10-24
 
 ## 1. Bối cảnh & vấn đề
 
@@ -82,4 +82,8 @@ Rủi ro: đây là luồng tiền; lỡ tay đổi thứ tự khoá hoặc bỏ
 
 ## 6. Kết quả triển khai
 
-_Điền sau khi làm xong._
+- **File mới:** `payment-confirm.service.ts` (150 dòng, 1 dependency), `payment-query.service.ts` (263 dòng, 5 dependency), `payment-payable.util.ts` (+ `payment-payable.util.spec.ts`). **Sửa:** `payment.service.ts` (549 → 156 dòng, 3 dependency), `payment.module.ts` (export thêm `PaymentQueryService`), `payment.controller.ts`, `admin-payment.controller.ts`, `OrderQueryService`, `PendingCountService`, các spec (`payment.service`, `payment-confirm`, `payment-attempts-admin`, `payment-expiry`, `refund.service`, `order-checkout.service`, `pending-count`), allowlist kiến trúc (bỏ hai mục `payment.service.ts`).
+- **Kiểm chứng di chuyển nguyên văn:** so mọi dòng khác rỗng/import của file cũ với ba file mới: chỉ khác phần import, `assertPayable` → `assertOrderPayable` (3 chỗ gọi) và `this.expireOverdueAttempts()` → `this.paymentService.expireOverdueAttempts()`.
+- **Khác thiết kế:** các ca đọc (`getStatus`, `listAttemptsForCustomer`) ở lại `payment.service.spec.ts` (dùng chung `setup` với `createQr`) thay vì tách file riêng.
+- **Kiểm chứng:** 829 unit (825 + 4 ca `assertOrderPayable`), 883 flow giữ nguyên và xanh, độ phủ route 98/98 và 82/82, ratchet OK; không sửa flow nào. Phá thử: bỏ `assertOrderPayable` khỏi xác nhận thủ công → 4 unit đỏ.
+- **Docs:** `payment.md` (4.6, 4.9), `order.md`, `pending-count.md`, `common.md` (4.13), `test/README.md`.

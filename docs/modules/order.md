@@ -11,7 +11,7 @@ Module đơn hàng: khách checkout từ giỏ hàng, xem lịch sử/chi tiết
 | Thư mục | `src/modules/order` |
 | Route prefix | `/api/orders` (khách), `/api/admin/orders` (admin) |
 | Bảng DB | `orders`, `order_items` |
-| Module phụ thuộc | `cart` (entity `Cart`, `CartItem`), `address` (entity `Address`) — đọc trực tiếp qua `EntityManager` trong transaction; `product` (qua quan hệ của `CartItem`); `shipping` (`ShippingConfigService` — phí ship và ngưỡng miễn phí); `currency` (`CurrencyService.getVndPerUsd` — tỷ giá chốt lúc đặt và dùng cho báo giá, xem [currency](currency.md)); `payment` (`PaymentService.listAttemptsForCustomer`/`cancelPendingAttempts` — các phiên thanh toán của đơn; `RefundService.listForCustomer`/`createForCancelledOrder` — hoàn tiền) |
+| Module phụ thuộc | `cart` (entity `Cart`, `CartItem`), `address` (entity `Address`) — đọc trực tiếp qua `EntityManager` trong transaction; `product` (qua quan hệ của `CartItem`); `shipping` (`ShippingConfigService` — phí ship và ngưỡng miễn phí); `currency` (`CurrencyService.getVndPerUsd` — tỷ giá chốt lúc đặt và dùng cho báo giá, xem [currency](currency.md)); `payment` (`PaymentQueryService.listAttemptsForCustomer`/`cancelPendingAttempts` — các phiên thanh toán của đơn; `RefundService.listForCustomer`/`createForCancelledOrder` — hoàn tiền) |
 | Export | `OrderQueryService` (module [pending-count](pending-count.md) dùng `countNeedsAction`) |
 
 Thanh toán (VietQR/SePay) và hoàn tiền của đơn do module [payment](payment.md) xử lý; module này chỉ giữ hai cột `payment_status`, `paid_at` trên bảng `orders` và tạo yêu cầu hoàn tiền khi đơn đã trả bị huỷ.
@@ -52,7 +52,7 @@ Thanh toán (VietQR/SePay) và hoàn tiền của đơn do module [payment](paym
 
 **GET `/api/orders/:orderId`** → `{ data: Order(+items) + paymentAttempts + refunds }`; đơn không thuộc user hoặc không có → `404` / `1301` `Order not found` (khi đó không truy vấn phiên thanh toán).
 
-`data.paymentAttempts` là mọi nội dung chuyển khoản đã cấp cho đơn, **mới nhất trước**, kể cả mã đã hết hạn (`[]` nếu đơn chưa từng tạo QR). Do [payment](payment.md) (`PaymentService.listAttemptsForCustomer`) cung cấp:
+`data.paymentAttempts` là mọi nội dung chuyển khoản đã cấp cho đơn, **mới nhất trước**, kể cả mã đã hết hạn (`[]` nếu đơn chưa từng tạo QR). Do [payment](payment.md) (`PaymentQueryService.listAttemptsForCustomer`) cung cấp:
 
 ```json
 "paymentAttempts": [
