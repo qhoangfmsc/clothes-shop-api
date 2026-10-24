@@ -1,6 +1,6 @@
 # review (`src/modules/review`)
 
-> Cập nhật lần cuối: 2026-10-23
+> Cập nhật lần cuối: 2026-10-24
 
 ## 1. Tổng quan
 
@@ -172,7 +172,7 @@ Bảng `review_votes` (entity `ReviewVote extends BaseEntity`): `review_id` (NOT
 
 **Sửa (`update`)** — trong transaction khoá dòng đánh giá (`pessimistic_write`) của user (không có → `REVIEW_NOT_FOUND` 404) → `reviewEditBlock`: `HIDDEN` (đánh giá đã bị ẩn), `ALREADY_EDITED`, `EDIT_WINDOW_EXPIRED` → đều `REVIEW_EDIT_NOT_ALLOWED` kèm message → gộp field gửi lên (`images` được xác nhận như create), đặt `edited_at`; nếu `rating` được gửi thì khoá sản phẩm và tính lại điểm sản phẩm.
 
-**Điểm trên sản phẩm** — `products.rating_average` (làm tròn 1 chữ số, `null` khi chưa có) và `rating_count` được tính lại từ các đánh giá `PUBLISHED` của sản phẩm (`COUNT(*)`, `ROUND(AVG(rating), 1)`) bởi `refreshProductRating` trong cùng transaction với mọi thay đổi làm đổi tập hoặc điểm: tạo, sửa `rating`, ẩn, hiện lại. Trước mỗi lần tính, transaction khoá dòng sản phẩm (`pessimistic_write`), nên các thay đổi đồng thời trên cùng sản phẩm tuần tự và số liệu luôn tính trên dữ liệu đã commit; thứ tự khoá luôn là đánh giá → sản phẩm (create: sản phẩm → đánh giá mới). Vote và phản hồi không đổi điểm.
+**Điểm trên sản phẩm** — `products.rating_average` (làm tròn 1 chữ số, `null` khi chưa có) và `rating_count` được tính lại từ các đánh giá `PUBLISHED` của sản phẩm (`COUNT(*)`, `ROUND(AVG(rating), 1)`) bởi `refreshProductRating` (tính từ `reviews`, ghi qua `setProductRating` của module [product](product.md)) trong cùng transaction với mọi thay đổi làm đổi tập hoặc điểm: tạo, sửa `rating`, ẩn, hiện lại. Trước mỗi lần tính, transaction khoá dòng sản phẩm (`pessimistic_write`), nên các thay đổi đồng thời trên cùng sản phẩm tuần tự và số liệu luôn tính trên dữ liệu đã commit; thứ tự khoá luôn là đánh giá → sản phẩm (create: sản phẩm → đánh giá mới). Vote và phản hồi không đổi điểm.
 
 **Vote (`vote`/`unvote`)** — trong transaction khoá dòng đánh giá (`pessimistic_write`, nên các vote đồng thời tuần tự); đánh giá không có hoặc không `PUBLISHED` → `REVIEW_NOT_FOUND` 404; POST thêm dòng `review_votes` nếu chưa có (lặp lại không đổi gì), DELETE xoá dòng của user; `helpful_count` luôn được đặt lại bằng `COUNT(review_votes)` trong cùng transaction.
 

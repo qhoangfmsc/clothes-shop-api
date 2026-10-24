@@ -25,8 +25,8 @@ Báo cáo mỗi phần: đã đổi gì (file), số liệu trước/sau, patter
 | 8 | Trạng thái: `as const` + type union cho `orders.status`/`payment_status`/`products.status`/`users.status`; bảng chuyển trạng thái của đơn có kiểu chặt (không có helper chung: return kiểm theo hành động, xem spec order/0001) | Xong |
 | 9 | Gom khoá dòng: `findLocked` thay 25 literal (không có wrapper `withLock` chung vì các khung khác nhau, xem spec common/0004), hợp đồng khoá + flow song song | Xong |
 | 10 | Tách `OrderService` thành `OrderQueryService`, `OrderCheckoutService`, `OrderStatusService` (di chuyển nguyên văn, có flow đặc tả truy vấn viết trước) | Xong |
-| 11 | Ranh giới module: đo được 4 nhóm ghi chéo module (payment→order, payment→return, review→product, order→cart); thiết kế và 5 phương án ở spec common/0006 | Chờ quyết định (spec 0006 ở trạng thái Draft, chưa đổi code) |
+| 11 | Ranh giới module: đo được 4 nhóm ghi chéo module (payment→order, payment→return, review→product, order→cart); thiết kế và 5 phương án ở spec common/0006 | Xong 2026-10-24 (spec common/0006 Implemented: 4 nhóm ghi chéo → hàm của module chủ + luật máy) |
 | 12+ | Chiến dịch test toàn diện: 25 batch theo `test/PROGRESS.md` (nhóm theo module, mỗi lần một batch). Thứ tự đã đổi: làm trước Phần 11 để có lưới an toàn | Xong (25/25 batch; 98/98 route có ca thành công, 82/82 có ca lỗi, 16 route miễn ca lỗi kèm lý do) |
-| Cuối | Đối chiếu toàn bộ docs/spec/test matrix với code, chạy kiểm tra toàn bộ, báo cáo tổng kết | Xong 2026-10-23 (16 phát hiện đã xử lý; còn Phần 11) |
+| Cuối | Đối chiếu toàn bộ docs/spec/test matrix với code, chạy kiểm tra toàn bộ, báo cáo tổng kết | Xong 2026-10-23 (16 phát hiện đã xử lý; Phần 11 xong) |
 
 Thứ tự phần 5–11 có thể đổi theo ý người dùng. Phần 7–11 đụng code production nên mỗi phần có spec riêng ở `docs/specs/<module>/` và cần người dùng duyệt thiết kế trước khi code.

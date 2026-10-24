@@ -1,6 +1,6 @@
 # common & core (`src/common`, `src/core`, `src/main*.ts`, `src/migrations`)
 
-> Cập nhật lần cuối: 2026-10-23
+> Cập nhật lần cuối: 2026-10-24
 
 ## 1. Tổng quan
 
@@ -276,6 +276,7 @@ yarn migration:run              # chạy migration
   - `*.service.ts` không ném exception HTTP thô, dùng `throwAppError` (không còn ngoại lệ nào);
   - cột entity tên `status`/`paymentStatus` không khai báo `string` (dùng type union);
   - khoá dòng chỉ qua `findLocked` (không có `lock: { mode:` ngoài `lock.util.ts`);
+  - không ghi bảng của module khác (`update/delete/insert/remove/upsert/create(<Entity khác module>)` hoặc ghi qua `@InjectRepository(<Entity khác module>)`): module chủ viết hàm chuyển trạng thái (`*-state.util.ts`, `product-rating.util.ts`, `cart-checkout.util.ts`) và module khác gọi, trong cùng transaction. Ngoại lệ có lý do trong `CROSS_MODULE_WRITES`: `auth.service.ts` tạo/cập nhật `User` khi đăng nhập;
   - service tối đa 300 dòng và 5 dependency constructor.
   Thêm vi phạm mới hoặc để vi phạm cũ lớn thêm → đỏ; sửa xong mà chưa giảm allowlist → đỏ. `src/common/dto/list-query.dto.spec.ts` là guard chuẩn list cho mọi `*-query.dto.ts` (xem 4.5); `src/common/utils/money.util.spec.ts` cho helper tiền. Test của từng module: xem file module tương ứng.
 - **Flow** (`yarn test:flows`): `test/flows/<module>/*.flow.ts`, đi qua HTTP thật (`MainModule` + `configureApp`) trên Postgres thật. Config riêng `test/jest.flows.config.js` (rootDir repo, chỉ nhận `*.flow.ts`, chạy tuần tự).
@@ -292,6 +293,7 @@ yarn migration:run              # chạy migration
 
 ### 4.13 Lưu ý hiện trạng
 
+- Ranh giới ghi giữa các module (spec 0006): payment không còn `UPDATE` bảng `orders`/`return_requests`, review không còn `UPDATE products`, order không còn xoá `cart_items` — mỗi nơi gọi hàm của module chủ. Việc **đọc** chéo module (giỏ/yêu thích/collection/review đọc `Product`, return/review đọc `Order`/`OrderItem`, product đọc `Category`) được giữ có chủ đích.
 - Mọi service tạo bản ghi theo mẫu "kiểm tra rồi ghi" (`ensure*Unique`) vẫn giữ kiểm tra cho đường thường nhưng phải bắt thêm vi phạm ràng buộc khi hai request đồng thời (spec 0008): dùng `saveOrThrowOnConstraint` hoặc `isUniqueViolation` + đọc lại.
 - Quy ước `PATCH` (spec 0007): `Update*Dto` luôn là `PartialType(Create*Dto, { skipNullProperties: false })` — được ép bởi `src/common/dto/update-dto.spec.ts` (mọi cặp `Create<X>Dto`/`Update<X>Dto`: không khoá "ma", giữ mọi ràng buộc của create trên các field chung). `null` ở field bắt buộc → 400; field tuỳ chọn mang `@IsOptional()` coi `null` là "không gửi" nên service ghi entity qua `pickProvided(dto, nullableKeys)` (`common/base/provided-fields.util.ts`), chỉ giữ `null` ở field cố ý nhận null (`badge`, `heroImage`, `originalPriceVnd`).
 - Port đọc từ `PORT` (không có biến `APP_PORT`); `APP_ENV` còn trong `.env` cục bộ nhưng code không đọc.
@@ -302,6 +304,6 @@ yarn migration:run              # chạy migration
 - `@ApiEndpoint` (`decorator/api-endpoint.decorator.ts`) chưa module nào dùng; skill `.agent/skills/nest-best-practices` quy định dùng nó thay cho `@ApiOperation`.
 - `common/guards/permissions.guard.ts` import entity `User` từ `src/modules/user`; ngoài ra `common/` và `core/` không import `modules/` (được ép bởi `architecture.spec.ts`, ngoại lệ nằm trong allowlist).
 - `auth/jwt.strategy.ts` cố ý ném `UnauthorizedException` thô (401 của guard không có `errorCode`, khác với 401 nghiệp vụ có `errorCode`); mọi `*.service.ts` đều dùng `throwAppError`. `throwAppError` mặc định trả HTTP 400, nên một số chỗ admin dùng `ORDER_NOT_FOUND` mà không truyền 404 sẽ trả 400 (khác khách hàng: 404).
-- Service vượt 300 dòng: `review` (559), `payment` (549), `return` (450), `category` (376), `refund` (363), `product` (326), `media` (333); `PaymentService` có 6 dependency constructor. Trần hiện tại ghi trong allowlist, không được tăng. `OrderService` đã được tách thành `OrderQueryService`, `OrderCheckoutService`, `OrderStatusService` (xem `order.md` 4.9).
+- Service vượt 300 dòng: `review` (548), `payment` (549), `return` (450), `category` (376), `refund` (363), `product` (326), `media` (333); `PaymentService` có 6 dependency constructor. Trần hiện tại ghi trong allowlist, không được tăng. `OrderService` đã được tách thành `OrderQueryService`, `OrderCheckoutService`, `OrderStatusService` (xem `order.md` 4.9).
 - Trạng thái dùng type union cho mọi cột `status` (xem 4.5). Chuyển trạng thái chỉ có bảng tường minh cho đơn (`ORDER_TRANSITIONS`, cạnh do admin thực hiện); `return` kiểm theo hành động (`assertStatus` với danh sách trạng thái xuất phát từng hành động) và có thêm cạnh do hệ thống (`RECEIVED → APPROVED` khi khoản hoàn bị từ chối, `RECEIVED → REFUNDED` khi hoàn xong); `refund`, `payment attempt`, `review` kiểm trực tiếp trong service.
 - Entity `Order` được import và đăng ký `TypeOrmModule.forFeature` trực tiếp ở module `payment`, `return`, `review`; entity `Product` ở `cart`, `wishlist`, `collection` (bên cạnh module `product`). Các module này truy cập bảng của nhau không qua service.

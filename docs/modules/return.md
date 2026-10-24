@@ -1,6 +1,6 @@
 # return (`src/modules/return`)
 
-> Cập nhật lần cuối: 2026-10-22
+> Cập nhật lần cuối: 2026-10-24
 
 ## 1. Tổng quan
 
@@ -192,3 +192,11 @@ Sau đó admin chuyển khoản và ghi khoản hoàn ở `/api/admin/refunds` (
 - Chi phí gửi hàng trả về không được mô hình hoá; admin ghi hướng dẫn ở `adminNote` khi duyệt.
 - Không có tồn kho nên nhận hàng trả không cộng lại kho.
 - Không có thông báo (email/push) khi trạng thái yêu cầu đổi.
+
+### 4.9 Thiết kế & pattern
+
+Spec: `docs/specs/common/0006` (ranh giới ghi giữa các module).
+
+| Pattern / nguyên lý | Chỗ dùng | Vì sao |
+|---|---|---|
+| Module chủ viết chuyển trạng thái của mình | `return-refund-state.util.ts`: `markReturnRefunded` (`RECEIVED` → `REFUNDED`), `reopenReturnAfterRefundRejected` (`RECEIVED` → `APPROVED`, xoá `receivedAt`, `shippingRefunded`, `acceptedQuantity`) | Hai bước cuối của vòng đời yêu cầu trả hàng do payment kích hoạt nhưng quy tắc thuộc về return; điều kiện `status = 'RECEIVED'` nằm trong mệnh đề `WHERE` nên gọi lặp là no-op (unit test ghim) |

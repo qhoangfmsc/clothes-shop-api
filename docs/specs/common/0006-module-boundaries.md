@@ -1,6 +1,6 @@
 # 0006 — Ranh giới ghi giữa các module (Order, Return, Product, Cart)
 
-> Module: `common` (kiến trúc; chạm payment, return, review, order nếu được duyệt) · Trạng thái: Draft · Ngày: 2026-10-23
+> Module: `common` (kiến trúc; chạm payment, return, review, order nếu được duyệt) · Trạng thái: Implemented · Ngày: 2026-10-23
 
 ## 1. Bối cảnh & vấn đề
 
@@ -116,9 +116,8 @@ Không đổi: mỗi hàm chạy trong transaction của người gọi, sau khi
 
 ## 6. Kết quả triển khai
 
-_Chưa triển khai — chờ quyết định._
-
-**Cần người dùng quyết định**
-
-1. Chọn phương án: **B + luật** (đề xuất), **A** (chỉ ghi nhận + luật), hay giữ nguyên.
-2. Nếu chọn B: làm cả 4 nhóm hay chỉ nhóm `payment → return` (vòng đời trả hàng, rủi ro thay đổi cao nhất) trước.
+- **Quyết định:** chủ dự án uỷ quyền chọn hướng tốt nhất → phương án **B + luật máy**, làm cả 4 nhóm, mỗi nhóm một thay đổi nhỏ, chạy lại toàn bộ flow (876) sau khi xong.
+- **File:** `order/order-payment-state.util.ts` (`markOrderPaid`, `markOrderRefunded`), `return/return-refund-state.util.ts` (`markReturnRefunded`, `reopenReturnAfterRefundRejected`), `product/product-rating.util.ts` (`setProductRating`), `cart/cart-checkout.util.ts` (`removeOrderedCartItems`); `payment-paid.util.ts`, `refund.service.ts`, `review.service.ts`, `order-checkout.service.ts` gọi các hàm đó; luật `writes tables of other modules only through functions of the owner module` trong `architecture.spec.ts`, allowlist `CROSS_MODULE_WRITES`.
+- **Khác thiết kế:** (1) review vẫn tự tính trung bình từ `reviews` (dữ liệu của review) và chỉ **ghi** hai cột qua `setProductRating` của product (không đảo chiều phụ thuộc: product không import review); (2) `applyOrderPaid` vẫn ở payment vì còn huỷ các phiên `PENDING` (bảng của payment) và gọi `markOrderPaid`; (3) luật tìm ra đúng một ngoại lệ chính đáng ngoài 4 nhóm: `auth.service.ts` tạo/cập nhật `User` khi đăng nhập (3 chỗ ghi), ghi vào allowlist kèm lý do thay vì dựng đường đăng ký riêng ở module user.
+- **Docs:** `common.md` (4.12, 4.13), `order.md`, `payment.md`, `return.md`, `product.md`, `review.md`, `cart.md` (mục thiết kế/ghi chú).
+- **Test:** 4 unit test ghim điều kiện `WHERE` của các hàm trạng thái; 876 flow giữ xanh; phá thử 7 điểm (bỏ `pending → confirmed`, không đánh dấu refunded, return không sang `REFUNDED`, mở lại giữ `acceptedQuantity`, không ghi điểm sản phẩm, không xoá dòng giỏ, bỏ điều kiện trạng thái) đều bị bắt; thêm một ghi chéo module giả vào review → luật kiến trúc đỏ.

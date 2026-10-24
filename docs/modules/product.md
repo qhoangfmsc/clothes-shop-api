@@ -1,6 +1,6 @@
 # product (`src/modules/product`)
 
-> Cập nhật lần cuối: 2026-10-23
+> Cập nhật lần cuối: 2026-10-24
 
 ## 1. Tổng quan
 
@@ -164,7 +164,7 @@ Tham chiếu tới `products`: `reviews`, `wishlists`, `cart_items`, `collection
 
 **List admin**: dùng `findAndCount` với `where` dạng mảng OR cho search (mỗi nhánh kèm filter status/badge/category/`minRating`); sort theo `ratingAverage` dùng `nulls: 'LAST'`, thứ tự phụ `id` ASC.
 
-**Điểm đánh giá**: `ratingAverage`/`ratingCount` do [review](review.md) tính lại trong mỗi thao tác đánh giá (tạo, sửa sao, ẩn, hiện lại) và điền lại cho dữ liệu cũ bởi migration `AddReviewImagesAndProductRating`; module này chỉ đọc, sort và lọc theo chúng.
+**Điểm đánh giá**: `ratingAverage`/`ratingCount` do [review](review.md) tính lại (số liệu từ các đánh giá `PUBLISHED`) rồi ghi qua `setProductRating` (`product-rating.util.ts`, module product sở hữu hai cột) trong mỗi thao tác đánh giá (tạo, sửa sao, ẩn, hiện lại) và điền lại cho dữ liệu cũ bởi migration `AddReviewImagesAndProductRating`; module này chỉ đọc, sort và lọc theo chúng.
 
 ### 4.5 Error code
 

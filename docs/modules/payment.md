@@ -1,6 +1,6 @@
 # payment (`src/modules/payment`)
 
-> Cập nhật lần cuối: 2026-10-22
+> Cập nhật lần cuối: 2026-10-24
 
 ## 1. Tổng quan
 
@@ -255,7 +255,7 @@ Thứ tự đối chiếu (`reconcile`):
 | 9 | Phiên `EXPIRED`, hoặc `PENDING` nhưng quá `expires_at` (phiên được chuyển `EXPIRED`) | `LATE` |
 | 10 | Còn lại | `MATCHED` |
 
-`MATCHED`: phiên → `PAID` + `paid_at`; sau đó `applyOrderPaid` (`payment-paid.util.ts`, dùng chung với xác nhận thủ công): đơn → `payment_status = 'paid'` + `paid_at`; đơn đang `pending` (chờ cửa hàng xác nhận) được **tự chuyển `confirmed`** (đơn đã `confirmed`, `shipping`... giữ nguyên trạng thái); mọi phiên `PENDING` khác của đơn → `CANCELLED`. Webhook chỉ đổi đơn khi `MATCHED`; mọi trạng thái khác chỉ ghi giao dịch.
+`MATCHED`: phiên → `PAID` + `paid_at`; sau đó `applyOrderPaid` (`payment-paid.util.ts`, dùng chung với xác nhận thủ công; phần ghi lên đơn là `markOrderPaid` của module order): đơn → `payment_status = 'paid'` + `paid_at`; đơn đang `pending` (chờ cửa hàng xác nhận) được **tự chuyển `confirmed`** (đơn đã `confirmed`, `shipping`... giữ nguyên trạng thái); mọi phiên `PENDING` khác của đơn → `CANCELLED`. Webhook chỉ đổi đơn khi `MATCHED`; mọi trạng thái khác chỉ ghi giao dịch.
 
 **Xác nhận thủ công (`confirmPaymentAdmin`)** — trong một transaction, khoá theo thứ tự `orders` → `payment_transactions` (nếu dùng `transactionId`) → `payment_attempts` (cùng thứ tự với webhook):
 
@@ -360,3 +360,11 @@ Dùng mã giao dịch SePay làm `reference` (provider `sepay`) thì khi SePay g
 - `GET /api/admin/payments/attempts` đánh dấu `EXPIRED` vào DB trước khi liệt kê, nên nhánh SQL `CASE` tính trạng thái hiệu lực theo `expires_at` chỉ là lớp dự phòng.
 - `GET /api/admin/payments/transactions` trả `rawPayload` (body SePay nguyên văn, có `accountNumber` của tài khoản nhận) và `paymentAttempt.bankAccount`; danh sách phiên (`/attempts`) cố ý không trả hai thứ này. **Quyết định 2026-10-23: giữ có chủ đích** — số tài khoản nhận là của chính cửa hàng và khách đã thấy nó trên mã QR của phiên thanh toán; bản thô cần cho đối soát với sao kê; endpoint chỉ dành cho người có `PAYMENT_ADMIN_VIEW`. Hành vi được ghim bằng flow test.
 - Webhook kiểm số tiền trước khi kiểm hạn của phiên: chuyển thiếu tiền vào mã đã hết hạn được ghi `AMOUNT_MISMATCH` (không phải `LATE`).
+
+### 4.9 Thiết kế & pattern
+
+Spec: `docs/specs/payment/0001` (kế hoạch flow test), `docs/specs/common/0006` (ranh giới ghi giữa các module).
+
+| Pattern / nguyên lý | Chỗ dùng | Vì sao |
+|---|---|---|
+| Module chủ viết chuyển trạng thái của mình | `RefundService` không còn `UPDATE` trực tiếp bảng của module khác: hoàn xong → `markOrderRefunded` ([order](order.md)) và `markReturnRefunded` ([return](return.md)); khoản hoàn bị từ chối → `reopenReturnAfterRefundRejected` ([return](return.md)); thanh toán khớp → `markOrderPaid` ([order](order.md)) | State machine của đơn và của yêu cầu trả hàng nằm một chỗ, ở module chủ; payment chỉ quyết định *khi nào* gọi, trong cùng transaction và thứ tự khoá cũ (`orders` → bản ghi con) |

@@ -1,6 +1,6 @@
 # cart (`src/modules/cart`)
 
-> Cập nhật lần cuối: 2026-10-23
+> Cập nhật lần cuối: 2026-10-24
 
 ## 1. Tổng quan
 
@@ -139,3 +139,4 @@ Flow test (Postgres thật):
 - `size` và `color` là chuỗi tự do, không đối chiếu với `sizes`/`colors` của sản phẩm.
 - `updateItem` và `getCart` không kiểm tra lại `status`/badge của sản phẩm; việc đó chỉ thực hiện khi thêm và khi checkout.
 - Giá trong giỏ lấy theo giá hiện tại của sản phẩm (không lưu snapshot); snapshot chỉ được tạo khi tạo đơn hàng.
+- Module [order](order.md) bỏ các dòng giỏ đã đặt qua `removeOrderedCartItems` (`cart-checkout.util.ts`), không tự xoá `cart_items`.

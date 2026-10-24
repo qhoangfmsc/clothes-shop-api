@@ -1,6 +1,6 @@
 # order (`src/modules/order`)
 
-> Cập nhật lần cuối: 2026-10-22
+> Cập nhật lần cuối: 2026-10-24
 
 ## 1. Tổng quan
 
@@ -292,6 +292,9 @@ Spec: `docs/specs/order/0001` (trạng thái có kiểu), `0002` (tách service)
 | Tách theo use case (SRP) | `OrderQueryService` (đọc: list/detail khách và admin, `countNeedsAction`), `OrderCheckoutService` (`quote`, `checkout` + tính tiền), `OrderStatusService` (`cancel`, `updateStatus`) | Mỗi service một lý do đổi và tối đa 4 dependency; thay cho `OrderService` 391 dòng / 6 dependency |
 | State machine dạng bảng, kiểu chặt | `ORDER_TRANSITIONS` (`order.constant.ts`) | Một nguồn cho cạnh do admin thực hiện; thiếu trạng thái là lỗi biên dịch |
 | Unit of Work + khoá dòng | `checkout`, `cancel`, `updateStatus` (`dataSource.transaction`, `findLocked`) | Không đua với webhook thanh toán; hợp đồng khoá được kiểm bằng `lock-contract.flow.ts` |
+| Module chủ viết chuyển trạng thái của mình (spec common/0006) | `order-payment-state.util.ts`: `markOrderPaid` (`paid` + `paid_at`, `pending` → `confirmed`), `markOrderRefunded` (`refunded`) — payment gọi trong transaction đã khoá đơn, không tự `UPDATE orders` | Quy tắc chuyển trạng thái của đơn nằm một chỗ, ở chủ bảng |
 | Presenter | `presentOrder` | Mọi response đơn có cặp `Vnd`/`Usd` theo tỷ giá chốt trên đơn |
 
 `OrderStatusService` phụ thuộc `OrderQueryService` một chiều để trả chi tiết đơn sau khi ghi.
+
+Sau khi đặt hàng, checkout bỏ đúng các dòng giỏ đã đặt qua `removeOrderedCartItems` của module [cart](cart.md) (`cart/cart-checkout.util.ts`) thay vì tự xoá `cart_items`.

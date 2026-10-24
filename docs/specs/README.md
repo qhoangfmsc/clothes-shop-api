@@ -21,7 +21,7 @@ Cấu trúc: `docs/specs/<module>/NNNN-slug.md` (số tăng dần theo từng mo
 | pending-count | [0001 — Kế hoạch flow test cho module pending-count](pending-count/0001-flow-test-plan.md) | Implemented | Số việc chờ theo quyền, khớp danh sách |
 | common | [0008 — Lỗi toàn vẹn của DB trả mã lỗi đúng](common/0008-db-integrity-errors.md) | Implemented | Ánh xạ theo tên constraint, idempotent khi thua cuộc đua, lưới an toàn ở filter |
 | common | [0007 — Cập nhật một phần an toàn (`PATCH`)](common/0007-safe-partial-update.md) | Implemented | `useDefineForClassFields: false`, `Update*Dto` = `PartialType(Create*Dto)`, quy ước `null` |
-| common | [0006 — Ranh giới ghi giữa các module](common/0006-module-boundaries.md) | Draft | 4 nhóm ghi chéo module đo được, 5 phương án, đề xuất B (hàm của module chủ nhận `EntityManager`) + luật máy; chờ quyết định |
+| common | [0006 — Ranh giới ghi giữa các module](common/0006-module-boundaries.md) | Implemented | 4 nhóm ghi chéo module → hàm của module chủ nhận `EntityManager` + luật máy chặn ghi chéo mới |
 | common | [0005 — Kế hoạch flow test cho health](common/0005-health-flow-test-plan.md) | Implemented | `GET /` và `GET /health` |
 | site-config | [0001 — Kế hoạch flow test cho module site-config](site-config/0001-flow-test-plan.md) | Implemented | Registry key, đặt/xoá cấu hình, chuẩn hoá và hiệu lực tức thời: 5/5 route đủ ca |
 | shipping | [0001 — Kế hoạch flow test cho module shipping](shipping/0001-flow-test-plan.md) | Implemented | `GET /api/shipping` theo cấu hình admin, kiểm chéo với báo giá và hạn đổi trả |
