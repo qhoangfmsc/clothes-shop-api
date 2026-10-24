@@ -4,7 +4,7 @@ import { OrderQueryService } from '../order/order-query.service';
 import { PaymentService } from '../payment/payment.service';
 import { RefundService } from '../payment/refund.service';
 import { ReturnService } from '../return/return.service';
-import { ReviewService } from '../review/review.service';
+import { ReviewQueryService } from '../review/review-query.service';
 import { User } from '../user/user.entity';
 
 export type PendingCounts = Partial<Record<'orders' | 'payments' | 'refunds' | 'returns' | 'reviews', number>>;
@@ -20,7 +20,7 @@ export class PendingCountService {
     private readonly paymentService: PaymentService,
     private readonly refundService: RefundService,
     private readonly returnService: ReturnService,
-    private readonly reviewService: ReviewService,
+    private readonly reviewService: ReviewQueryService,
   ) {}
 
   async get(user: Pick<User, 'role' | 'permissions'>): Promise<{ data: PendingCounts }> {

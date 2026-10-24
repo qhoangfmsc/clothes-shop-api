@@ -12,11 +12,15 @@ import { CreateReviewDto } from './dtos/create-review.dto';
 import { PublicReviewQueryDto } from './dtos/public-review-query.dto';
 import { UpdateReviewDto } from './dtos/update-review.dto';
 import { ReviewService } from './review.service';
+import { ReviewQueryService } from './review-query.service';
 
 @ApiTags('Reviews')
 @Controller('api/reviews')
 export class ReviewController {
-  constructor(private readonly reviewService: ReviewService) {}
+  constructor(
+    private readonly reviewService: ReviewService,
+    private readonly queryService: ReviewQueryService,
+  ) {}
 
   @Get(':productId')
   @Public()
@@ -24,14 +28,14 @@ export class ReviewController {
     summary: 'Đánh giá đang hiển thị của một sản phẩm (filter rating/fit/hasImages, sort rating/createdAt/helpfulCount, pagination)',
   })
   findByProduct(@Param('productId') productId: string, @Query() query: PublicReviewQueryDto) {
-    return this.reviewService.findByProductId(productId, query);
+    return this.queryService.findByProductId(productId, query);
   }
 
   @Get(':productId/summary')
   @Public()
   @ApiOperation({ summary: 'Điểm trung bình, số đánh giá, số đánh giá có ảnh, phân bố 1–5 sao và phân bố fit của một sản phẩm' })
   getSummary(@Param('productId') productId: string) {
-    return this.reviewService.getSummary(productId);
+    return this.queryService.getSummary(productId);
   }
 
   @Post('images')

@@ -8,12 +8,16 @@ import { AdminReviewQueryDto } from './dtos/admin-review-query.dto';
 import { HideReviewDto } from './dtos/hide-review.dto';
 import { ReplyReviewDto } from './dtos/reply-review.dto';
 import { ReviewService } from './review.service';
+import { ReviewQueryService } from './review-query.service';
 
 @ApiTags('Admin — Reviews')
 @Controller('api/admin/reviews')
 @ApiBearerAuth()
 export class AdminReviewController {
-  constructor(private readonly reviewService: ReviewService) {}
+  constructor(
+    private readonly reviewService: ReviewService,
+    private readonly queryService: ReviewQueryService,
+  ) {}
 
   @Get()
   @ApiOperation({
@@ -21,14 +25,14 @@ export class AdminReviewController {
   })
   @Permissions(Permission.REVIEW_ADMIN_VIEW)
   findAll(@Query() query: AdminReviewQueryDto) {
-    return this.reviewService.findAllAdmin(query);
+    return this.queryService.findAllAdmin(query);
   }
 
   @Get(':reviewId')
   @ApiOperation({ summary: '[Admin] Chi tiết một đánh giá (kèm người viết, kiểm duyệt, phản hồi, sản phẩm)' })
   @Permissions(Permission.REVIEW_ADMIN_VIEW)
   findOne(@Param('reviewId') reviewId: string) {
-    return this.reviewService.findOneAdmin(reviewId);
+    return this.queryService.findOneAdmin(reviewId);
   }
 
   @Post(':reviewId/hide')

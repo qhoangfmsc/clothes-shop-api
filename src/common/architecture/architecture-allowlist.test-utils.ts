@@ -24,7 +24,6 @@ export const OVERSIZED_SERVICES: Record<string, number> = {
   'src/modules/payment/refund.service.ts': 363,
   'src/modules/product/product.service.ts': 326,
   'src/modules/return/return.service.ts': 450,
-  'src/modules/review/review.service.ts': 548,
 };
 
 // Service đang có quá nhiều dependency: số hiện tại là trần

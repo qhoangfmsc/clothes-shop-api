@@ -1,6 +1,6 @@
 # pending-count (`src/modules/pending-count`)
 
-> Cập nhật lần cuối: 2026-10-23
+> Cập nhật lần cuối: 2026-10-24
 
 ## 1. Tổng quan
 
@@ -65,7 +65,7 @@ Không có bảng riêng. Các COUNT dùng index sẵn có: `IDX_orders_status`,
    - `PaymentService.countNeedsReview()` và `findTransactionsAdmin({ needsReview })` cùng dùng `TRANSACTION_NEEDS_REVIEW_SQL` (`payment-needs-review.util.ts`, alias `t`, `a`, `o`).
    - `RefundService.countRequested()` đếm `status = REQUESTED`, cùng điều kiện với `findAdmin({ status: 'REQUESTED' })`.
    - `ReturnService.countRequested()` đếm `status = REQUESTED`, cùng điều kiện với `findAllAdmin({ status: 'REQUESTED' })`.
-   - `ReviewService.countAwaitingReply()` đếm `status = PUBLISHED` và `reply IS NULL`, cùng điều kiện với `findAllAdmin({ status: 'PUBLISHED', replied: false })`.
+   - `ReviewQueryService.countAwaitingReply()` đếm `status = PUBLISHED` và `reply IS NULL`, cùng điều kiện với `findAllAdmin({ status: 'PUBLISHED', replied: false })`.
 3. Trả `{ data }` gồm đúng các key đã chạy.
 
 Đơn `pending` chưa thanh toán được tính là "khách đang chuyển khoản" (không đếm) chỉ khi phiên QR còn hạn theo `expires_at`; đơn tự quay lại số đếm ngay khi quá hạn, không cần chờ bộ đếm giờ đổi phiên sang `EXPIRED`.

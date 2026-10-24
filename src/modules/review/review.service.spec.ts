@@ -8,6 +8,7 @@ import { UpdateReviewDto } from './dtos/update-review.dto';
 import { MS_PER_DAY } from './review.constant';
 import { Review } from './review.entity';
 import { ReviewService } from './review.service';
+import { ReviewQueryService } from './review-query.service';
 import { ReviewVote } from './review-vote.entity';
 
 type Row = Record<string, any>;
@@ -163,9 +164,10 @@ function setup(seed: { orders?: Row[]; orderItems?: Row[]; reviews?: Row[]; vote
     ),
     upload: jest.fn(async () => ({ data: { url: 'https://cdn.test/x.jpg', mimeType: 'image/jpeg', sizeOriginal: 10 } })),
   };
-  const service = new ReviewService(dataSource, reviewRepo, mediaService);
+  const queries = new ReviewQueryService(dataSource, reviewRepo);
+  const service = new ReviewService(dataSource, mediaService, queries);
   const rows = (entity: any) => tables.get(entity)!;
-  return { service, manager, rows, calls, result, mediaService };
+  return { service, queries, manager, rows, calls, result, mediaService };
 }
 
 const rejects = (promise: Promise<unknown>, expected: { errorCode?: number; status: number }) =>
@@ -367,7 +369,7 @@ describe('ReviewService admin moderation', () => {
     const ctx = setup();
     await rejects(ctx.service.hide('admin1', 'nope', { note: 'x' }), { errorCode: 1901, status: 404 });
     await rejects(ctx.service.reply('admin1', 'nope', { content: 'x' }), { errorCode: 1901, status: 404 });
-    await rejects(ctx.service.findOneAdmin('nope'), { errorCode: 1901, status: 404 });
+    await rejects(ctx.queries.findOneAdmin('nope'), { errorCode: 1901, status: 404 });
   });
 });
 
@@ -388,7 +390,7 @@ describe('ReviewService public list and summary', () => {
     ];
     ctx.result.total = 1;
 
-    const res = await ctx.service.findByProductId('p1', { rating: 5, fit: 'large', sort: '-helpfulCount', page: 2, limit: 10 });
+    const res = await ctx.queries.findByProductId('p1', { rating: 5, fit: 'large', sort: '-helpfulCount', page: 2, limit: 10 });
 
     expect(ctx.calls.where).toEqual(
       expect.arrayContaining([
@@ -407,7 +409,7 @@ describe('ReviewService public list and summary', () => {
 
   it('defaults to newest first and does not filter rating/fit when not given', async () => {
     const ctx = setup();
-    await ctx.service.findByProductId('p1');
+    await ctx.queries.findByProductId('p1');
     expect(ctx.calls.orderBy).toEqual(['r.createdAt', 'DESC']);
     expect(ctx.calls.where.map(([sql]) => sql)).toEqual(['r.productId = :productId', 'r.status = :status']);
   });
@@ -425,7 +427,7 @@ describe('ReviewService public list and summary', () => {
         { fit: 'small', count: '1' },
       ],
     ];
-    const { data } = await ctx.service.getSummary('p1');
+    const { data } = await ctx.queries.getSummary('p1');
     expect(data).toEqual({
       productId: 'p1',
       ratingCount: 5,
@@ -445,9 +447,9 @@ describe('ReviewService public list and summary', () => {
       ],
       [],
     ];
-    expect((await ctx.service.getSummary('p1')).data.ratingAverage).toBe(4.3);
+    expect((await ctx.queries.getSummary('p1')).data.ratingAverage).toBe(4.3);
 
-    const empty = await setup().service.getSummary('p1');
+    const empty = await setup().queries.getSummary('p1');
     expect(empty.data).toMatchObject({ ratingCount: 0, ratingAverage: null, fit: { total: 0 } });
   });
 });
@@ -549,20 +551,20 @@ describe('ReviewService images', () => {
 
   it('hasImages filters the public list, the summary counts photo reviews, and both sides use the same SQL', async () => {
     const ctx = setup();
-    await ctx.service.findByProductId('p1', { hasImages: true });
+    await ctx.queries.findByProductId('p1', { hasImages: true });
     expect(ctx.calls.where.map(([sql]) => sql)).toContain('jsonb_array_length(r.images) > 0');
 
     const none = setup();
-    await none.service.findByProductId('p1', { hasImages: false });
+    await none.queries.findByProductId('p1', { hasImages: false });
     expect(none.calls.where.map(([sql]) => sql)).toContain('jsonb_array_length(r.images) = 0');
 
     const admin = setup();
-    await admin.service.findAllAdmin({ hasImages: true });
+    await admin.queries.findAllAdmin({ hasImages: true });
     expect(admin.calls.where.map(([sql]) => sql)).toContain('jsonb_array_length(r.images) > 0');
 
     const summary = setup();
     summary.result.total = 3;
-    expect((await summary.service.getSummary('p1')).data.withImages).toBe(3);
+    expect((await summary.queries.getSummary('p1')).data.withImages).toBe(3);
   });
 });
 
@@ -630,7 +632,7 @@ describe('ReviewService keeps products.rating_* in sync', () => {
       ],
       [],
     ];
-    expect((await ctx.service.getSummary('p1')).data.ratingAverage).toBe(4.4);
+    expect((await ctx.queries.getSummary('p1')).data.ratingAverage).toBe(4.4);
   });
 });
 
@@ -638,11 +640,11 @@ describe('ReviewService.countAwaitingReply', () => {
   it('counts published reviews without a shop reply — the same condition as the admin list', async () => {
     const ctx = setup();
     ctx.result.total = 9;
-    expect(await ctx.service.countAwaitingReply()).toBe(9);
+    expect(await ctx.queries.countAwaitingReply()).toBe(9);
     expect(ctx.calls.where.map(([sql]) => sql)).toEqual(['r.status = :status', 'r.reply IS NULL']);
 
     const list = setup();
-    await list.service.findAllAdmin({ status: 'PUBLISHED', replied: false });
+    await list.queries.findAllAdmin({ status: 'PUBLISHED', replied: false });
     expect(list.calls.where.map(([sql]) => sql)).toEqual(expect.arrayContaining(['r.status = :status', 'r.reply IS NULL']));
   });
 });
@@ -672,12 +674,12 @@ describe('ReviewService product summary', () => {
     const own = setup();
     own.result.many = [review({ product })];
     own.result.total = 1;
-    expect((await own.service.findMine('u1', {})).data[0].product).toEqual(summary);
+    expect((await own.queries.findMine('u1', {})).data[0].product).toEqual(summary);
 
     const admin = setup();
     admin.result.many = [review({ product })];
     admin.result.total = 1;
-    expect((await admin.service.findAllAdmin({})).data[0].product).toEqual(summary);
+    expect((await admin.queries.findAllAdmin({})).data[0].product).toEqual(summary);
   });
 });
 
@@ -708,7 +710,7 @@ describe('ReviewService.findPending', () => {
       },
     ];
     ctx.result.total = 1;
-    const { data } = await ctx.service.findPending('u1', {});
+    const { data } = await ctx.queries.findPending('u1', {});
     expect(data[0]).toMatchObject({ productName: 'Tên lúc đặt', productImage: 'old.jpg' });
     expect(data[0].product).toEqual({
       id: 'p1',

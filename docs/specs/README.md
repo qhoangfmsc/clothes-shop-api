@@ -38,6 +38,7 @@ Cấu trúc: `docs/specs/<module>/NNNN-slug.md` (số tăng dần theo từng mo
 | category | [0001 — Kế hoạch flow test cho module category](category/0001-flow-test-plan.md) | Implemented | Đọc công khai/admin, tạo, sửa, xoá, reorder và bất biến thứ hạng: 6/6 route đủ ca; 1 phát hiện chờ quyết định |
 | product | [0001 — Kế hoạch flow test cho module product](product/0001-flow-test-plan.md) | Implemented | Đọc công khai, autocomplete, danh sách/tạo/sửa/xoá admin: 7/7 route đủ ca; 5 phát hiện chờ quyết định |
 | review | [0001 — Kế hoạch flow test cho module review](review/0001-flow-test-plan.md) | Implemented | Đọc công khai, viết, sửa, vote, upload ảnh, kiểm duyệt, phản hồi: 16/16 route đủ ca |
+| review | [0002 — Tách `ReviewService` thành đọc và ghi](review/0002-split-review-service.md) | Implemented | ReviewQueryService + ReviewService + review-view.util |
 | order | [0002 — Tách `OrderService` theo use case](order/0002-split-order-service.md) | Implemented | OrderQueryService, OrderCheckoutService, OrderStatusService; di chuyển nguyên văn, có flow đặc tả truy vấn |
 | order | [0001 — Trạng thái có kiểu và bảng chuyển trạng thái của đơn](order/0001-typed-statuses-and-order-transitions.md) | Implemented | Type union cho Order/Product/User status, ORDER_TRANSITIONS có kiểu chặt, luật kiến trúc cho cột status |
 | common | [0004 — Một chỗ duy nhất cho khoá dòng (`findLocked`)](common/0004-locked-row-helper.md) | Implemented | Thay 25 literal khoá, luật kiến trúc, hợp đồng khoá và flow song song |
