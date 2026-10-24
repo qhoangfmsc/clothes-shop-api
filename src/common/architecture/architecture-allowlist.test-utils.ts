@@ -20,7 +20,6 @@ export const UNUSED_EXPORTS: Record<string, string[]> = {
 export const OVERSIZED_SERVICES: Record<string, number> = {
   'src/modules/category/category.service.ts': 376,
   'src/modules/media/media.service.ts': 333,
-  'src/modules/payment/refund.service.ts': 363,
   'src/modules/product/product.service.ts': 326,
 };
 

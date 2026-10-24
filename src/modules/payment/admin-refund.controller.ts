@@ -9,12 +9,16 @@ import { CompleteRefundDto } from './dtos/complete-refund.dto';
 import { CreateRefundDto } from './dtos/create-refund.dto';
 import { RejectRefundDto } from './dtos/reject-refund.dto';
 import { RefundService } from './refund.service';
+import { RefundQueryService } from './refund-query.service';
 
 @ApiTags('Admin — Refunds')
 @Controller('api/admin/refunds')
 @ApiBearerAuth()
 export class AdminRefundController {
-  constructor(private readonly refundService: RefundService) {}
+  constructor(
+    private readonly refundService: RefundService,
+    private readonly queryService: RefundQueryService,
+  ) {}
 
   @Get()
   @ApiOperation({
@@ -24,7 +28,7 @@ export class AdminRefundController {
   })
   @Permissions(Permission.PAYMENT_ADMIN_VIEW)
   findAll(@Query() query: AdminRefundQueryDto) {
-    return this.refundService.findAdmin(query);
+    return this.queryService.findAdmin(query);
   }
 
   @Post()

@@ -6,7 +6,7 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, SelectQueryBuilder } from 'typeorm';
 import { PaymentQueryService } from '../payment/payment-query.service';
-import { RefundService } from '../payment/refund.service';
+import { RefundQueryService } from '../payment/refund-query.service';
 import { AdminOrderQueryDto } from './dtos/admin-order-query.dto';
 import { PublicOrderQueryDto } from './dtos/public-order-query.dto';
 import { ORDER_RELATIONS } from './order.constant';
@@ -28,7 +28,7 @@ export class OrderQueryService {
     @InjectRepository(Order)
     private readonly orderRepo: Repository<Order>,
     private readonly paymentService: PaymentQueryService,
-    private readonly refundService: RefundService,
+    private readonly refundService: RefundQueryService,
   ) {}
 
   async findAll(userId: string, query: PublicOrderQueryDto = {}) {

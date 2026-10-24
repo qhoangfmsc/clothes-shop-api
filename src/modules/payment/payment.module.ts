@@ -15,6 +15,7 @@ import { PaymentQueryService } from './payment-query.service';
 import { PaymentTransaction } from './payment-transaction.entity';
 import { Refund } from './refund.entity';
 import { RefundService } from './refund.service';
+import { RefundQueryService } from './refund-query.service';
 import { SepayWebhookController } from './sepay-webhook.controller';
 import { SepayWebhookService } from './sepay-webhook.service';
 
@@ -26,10 +27,11 @@ import { SepayWebhookService } from './sepay-webhook.service';
     PaymentConfirmService,
     PaymentQueryService,
     RefundService,
+    RefundQueryService,
     SepayWebhookService,
     PaymentConfigService,
     PaymentExpiryScheduler,
   ],
-  exports: [PaymentConfigService, PaymentService, PaymentQueryService, RefundService],
+  exports: [PaymentConfigService, PaymentService, PaymentQueryService, RefundService, RefundQueryService],
 })
 export class PaymentModule {}

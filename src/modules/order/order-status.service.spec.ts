@@ -2,6 +2,7 @@ import { createFakeManager } from '../payment/payment.test-utils';
 import { PaymentAttempt } from '../payment/payment-attempt.entity';
 import { Refund } from '../payment/refund.entity';
 import { RefundService } from '../payment/refund.service';
+import { RefundQueryService } from '../payment/refund-query.service';
 import { Order } from './order.entity';
 import { OrderQueryService } from './order-query.service';
 import { OrderStatusService } from './order-status.service';
@@ -36,12 +37,13 @@ describe('OrderStatusService cancel rules with payments and refunds', () => {
       ),
     };
     const refundRepo: any = { find: (opts: any) => manager.find(Refund, opts) };
-    const refundService = new RefundService(dataSource, refundRepo, {} as any);
+    const refundQueries = new RefundQueryService(refundRepo, {} as any);
+    const refundService = new RefundService(dataSource, refundRepo, refundQueries);
     const service = new OrderStatusService(
       dataSource,
       paymentService,
       refundService,
-      new OrderQueryService(orderRepo, paymentService, refundService),
+      new OrderQueryService(orderRepo, paymentService, refundQueries),
     );
     const row = () => manager.tables.get(Order)![0];
     const refunds = () => manager.tables.get(Refund)!;

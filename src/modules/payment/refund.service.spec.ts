@@ -13,6 +13,7 @@ import { PaymentQueryService } from './payment-query.service';
 import { PaymentTransaction } from './payment-transaction.entity';
 import { Refund } from './refund.entity';
 import { prorateRefundAmount, RefundService } from './refund.service';
+import { RefundQueryService } from './refund-query.service';
 
 const AMOUNT = 4_625_000;
 const ORDER_REF = { id: 'o1', exchangeRate: 25_000 };
@@ -111,8 +112,9 @@ function setup(seed: Parameters<typeof createFakeManager>[0]) {
     createQueryBuilder: () => qb,
   };
   const transactionRepo: any = { find: (opts: any) => manager.find(PaymentTransaction, opts) };
-  const service = new RefundService(dataSource, refundRepo, transactionRepo);
-  return { manager, service, rows, calls, dataSource };
+  const queries = new RefundQueryService(refundRepo, transactionRepo);
+  const service = new RefundService(dataSource, refundRepo, queries);
+  return { manager, service, queries, rows, calls, dataSource };
 }
 
 const pipe = new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true });
@@ -312,7 +314,7 @@ describe('RefundService.listForCustomer / findAdmin', () => {
         refund({ id: 'new', createdAt: new Date('2026-02-01') }),
       ],
     });
-    const list = await h.service.listForCustomer(ORDER_REF);
+    const list = await h.queries.listForCustomer(ORDER_REF);
     expect(list.map((r) => r.status)).toEqual(['REQUESTED', 'REJECTED']);
     expect(Object.keys(list[0]).sort()).toEqual([
       'amountUsd',
@@ -326,12 +328,12 @@ describe('RefundService.listForCustomer / findAdmin', () => {
     ]);
     expect(JSON.stringify(list)).not.toContain('internal note');
     expect(JSON.stringify(list)).not.toContain('secret-admin');
-    expect(await h.service.listForCustomer({ id: 'other-order', exchangeRate: 25_000 })).toEqual([]);
+    expect(await h.queries.listForCustomer({ id: 'other-order', exchangeRate: 25_000 })).toEqual([]);
   });
 
   it('admin list applies filters, search, sort and paging, and shows how to refund', async () => {
     const h = setup({ refunds: [refund()] });
-    const result = await h.service.findAdmin({ orderId: 'o1', status: 'REQUESTED', search: 'DH8K', sort: '-amount', page: 2, limit: 10 });
+    const result = await h.queries.findAdmin({ orderId: 'o1', status: 'REQUESTED', search: 'DH8K', sort: '-amount', page: 2, limit: 10 });
     expect(h.calls.andWhere.map(([sql]) => sql)).toEqual([
       'r.order_id = :orderId',
       'r.status = :status',
@@ -349,7 +351,7 @@ describe('RefundService.listForCustomer / findAdmin', () => {
 
   it('defaults to newest first', async () => {
     const h = setup({ refunds: [refund()] });
-    await h.service.findAdmin({});
+    await h.queries.findAdmin({});
     expect(h.calls.orderBy).toEqual(['r.createdAt', 'DESC']);
   });
 });
@@ -481,14 +483,14 @@ describe('refunds that come from a return request', () => {
 
   it('customer and admin views link the refund to its return', async () => {
     const h = setup(returnSeed());
-    expect((await h.service.listForCustomer(ORDER_REF))[0]).toMatchObject({ reason: 'RETURN', returnId: 'ret1' });
+    expect((await h.queries.listForCustomer(ORDER_REF))[0]).toMatchObject({ reason: 'RETURN', returnId: 'ret1' });
     const { data } = await h.service.rejectAdmin('admin-1', 'r1', { note: 'n' });
     expect(data).toMatchObject({ reason: 'RETURN', returnRequestId: 'ret1' });
   });
 
   it('cancel-type refunds have no return link', async () => {
     const h = setup({ refunds: [refund()] });
-    expect((await h.service.listForCustomer(ORDER_REF))[0].returnId).toBeNull();
+    expect((await h.queries.listForCustomer(ORDER_REF))[0].returnId).toBeNull();
   });
 });
 
