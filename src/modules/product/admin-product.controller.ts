@@ -5,18 +5,22 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AdminProductQueryDto } from './dtos/admin-product-query.dto';
 import { CreateProductDto, UpdateProductDto } from './dtos/product.dto';
 import { ProductService } from './product.service';
+import { ProductQueryService } from './product-query.service';
 
 @ApiTags('Admin — Products')
 @Controller('api/admin/products')
 @ApiBearerAuth()
 export class AdminProductController {
-  constructor(private readonly productService: ProductService) {}
+  constructor(
+    private readonly productService: ProductService,
+    private readonly queryService: ProductQueryService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: '[Admin] Danh sách sản phẩm (search, filter, sort, pagination)' })
   @Permissions(Permission.PRODUCT_VIEW)
   findAll(@Query() query: AdminProductQueryDto) {
-    return this.productService.findAllAdmin(query);
+    return this.queryService.findAllAdmin(query);
   }
 
   @Post()

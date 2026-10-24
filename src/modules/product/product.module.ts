@@ -7,11 +7,12 @@ import { AdminProductController } from './admin-product.controller';
 import { ProductController } from './product.controller';
 import { Product } from './product.entity';
 import { ProductService } from './product.service';
+import { ProductQueryService } from './product-query.service';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Product, Category, SubCategory]), CurrencyModule],
   controllers: [ProductController, AdminProductController],
-  providers: [ProductService],
-  exports: [ProductService],
+  providers: [ProductService, ProductQueryService],
+  exports: [ProductQueryService],
 })
 export class ProductModule {}

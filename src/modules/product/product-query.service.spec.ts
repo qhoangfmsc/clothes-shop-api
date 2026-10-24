@@ -2,7 +2,7 @@ import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { MoreThanOrEqual } from 'typeorm';
 import { ProductDetailQueryDto, RELATED_MAX_LIMIT } from './dtos/product-detail-query.dto';
-import { ProductService } from './product.service';
+import { ProductQueryService } from './product-query.service';
 
 function setup() {
   const calls: { where: [string, any?][]; orderBy?: unknown[]; addOrderBy?: unknown[] } = { where: [] };
@@ -29,10 +29,10 @@ function setup() {
     getManyAndCount: async () => [[], 0],
   };
   const productRepo: any = { createQueryBuilder: () => qb, findAndCount: jest.fn(async () => [[], 0]) };
-  return { service: new ProductService(productRepo, {} as any, {} as any, { getVndPerUsd: async () => 25000 } as any), calls, productRepo };
+  return { service: new ProductQueryService(productRepo, {} as any, { getVndPerUsd: async () => 25000 } as any), calls, productRepo };
 }
 
-describe('ProductService rating filter and sort', () => {
+describe('ProductQueryService rating filter and sort', () => {
   it('public list: minRating keeps products whose average rating reaches the threshold', async () => {
     const { service, calls } = setup();
     await service.findAllPublic({ minRating: 4 });
@@ -73,14 +73,14 @@ describe('ProductService rating filter and sort', () => {
   });
 });
 
-describe('ProductService.findById related products', () => {
+describe('ProductQueryService.findById related products', () => {
   const product = { id: 'p1', category: { id: 'c1' } };
   function setupDetail() {
     const productRepo: any = {
       findOne: jest.fn(async () => product),
       find: jest.fn(async () => []),
     };
-    const service = new ProductService(productRepo, {} as any, {} as any, { getVndPerUsd: async () => 25000 } as any);
+    const service = new ProductQueryService(productRepo, {} as any, { getVndPerUsd: async () => 25000 } as any);
     return { service, productRepo };
   }
 
@@ -116,7 +116,7 @@ describe('ProductDetailQueryDto', () => {
   });
 });
 
-describe('ProductService.autocomplete', () => {
+describe('ProductQueryService.autocomplete', () => {
   it('returns the product summary (with category/subcategory links) plus price', async () => {
     const joins: string[] = [];
     const qb: any = {
@@ -145,12 +145,7 @@ describe('ProductService.autocomplete', () => {
         },
       ],
     };
-    const service = new ProductService(
-      { createQueryBuilder: () => qb } as any,
-      {} as any,
-      {} as any,
-      { getVndPerUsd: async () => 25000 } as any,
-    );
+    const service = new ProductQueryService({ createQueryBuilder: () => qb } as any, {} as any, { getVndPerUsd: async () => 25000 } as any);
 
     const { data } = await service.autocomplete({ q: 'ao' });
 

@@ -4,13 +4,13 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ProductAutocompleteQueryDto } from './dtos/product-autocomplete-query.dto';
 import { ProductDetailQueryDto } from './dtos/product-detail-query.dto';
 import { PublicProductQueryDto } from './dtos/public-product-query.dto';
-import { ProductService } from './product.service';
+import { ProductQueryService } from './product-query.service';
 
 @ApiTags('Products')
 @Controller('api/products')
 @Public()
 export class ProductController {
-  constructor(private readonly productService: ProductService) {}
+  constructor(private readonly productService: ProductQueryService) {}
 
   @Get()
   @ApiOperation({ summary: 'List products with search, filters, sorting, and pagination' })

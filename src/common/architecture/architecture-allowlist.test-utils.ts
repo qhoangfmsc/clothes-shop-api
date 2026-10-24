@@ -17,9 +17,7 @@ export const UNUSED_EXPORTS: Record<string, string[]> = {
 };
 
 // Service đang quá dài: số dòng hiện tại là trần, không được dài thêm
-export const OVERSIZED_SERVICES: Record<string, number> = {
-  'src/modules/product/product.service.ts': 326,
-};
+export const OVERSIZED_SERVICES: Record<string, number> = {};
 
 // Service đang có quá nhiều dependency: số hiện tại là trần
 export const MANY_DEPENDENCIES_SERVICES: Record<string, number> = {};
