@@ -1,6 +1,6 @@
 # 0002 — Tách `ProductService` thành đọc và ghi
 
-> Module: `product` · Trạng thái: Draft · Ngày: 2026-10-24 · Cỡ: rút gọn (không đổi hành vi)
+> Module: `product` · Trạng thái: Implemented · Ngày: 2026-10-24 · Cỡ: rút gọn (không đổi hành vi)
 
 ## 1. Bối cảnh & vấn đề
 
@@ -70,4 +70,8 @@ Rủi ro thấp. Rollback: `git revert`.
 
 ## 6. Kết quả triển khai
 
-_Điền sau khi làm xong._
+- **File mới:** `product-query.service.ts` (205 dòng, 3 dependency). **Sửa:** `product.service.ts` (326 → 140 dòng, 4 dependency), `product.controller.ts`, `admin-product.controller.ts`, `product.module.ts` (export `ProductQueryService`), allowlist kiến trúc (`OVERSIZED_SERVICES` về `{}`). **Đổi tên:** `product.service.spec.ts` → `product-query.service.spec.ts` (toàn bộ ca của file đó là ca đọc).
+- **Kiểm chứng di chuyển nguyên văn:** so mọi dòng của file cũ với hai file mới: không có dòng nào khác ngoài import.
+- **Khác thiết kế:** không có.
+- **Kiểm chứng:** 841 unit và 883 flow đều xanh, độ phủ route 98/98 và 82/82, `nest build` qua. Phá thử: bỏ `validateSubcategoryBelongsToCategory` trong `create` → 1 flow đỏ.
+- **Docs:** `product.md` (4.6, 4.7, mục 4.9 mới), `common.md` (4.13), `test/README.md`.

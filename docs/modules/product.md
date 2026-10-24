@@ -12,7 +12,7 @@ Module sản phẩm: API công khai để duyệt/tìm/xem chi tiết sản ph�
 | Route prefix | `/api/products` (public), `/api/admin/products` (admin) |
 | Bảng DB | `products` |
 | Module phụ thuộc | `category` (entity `Category`, `SubCategory`); `currency` (`CurrencyService.getVndPerUsd` — USD của giá, xem [currency](currency.md)) |
-| Export | `ProductService` |
+| Export | `ProductQueryService` |
 
 ## 2. Mục đích & nghiệp vụ phục vụ
 
@@ -184,11 +184,11 @@ Sizes/colors/images rỗng không có error code riêng: bị chặn ở DTO (`A
 - `TypeOrmModule.forFeature([Product, Category, SubCategory])`; `CurrencyModule` (`CurrencyService`).
 - `product.presenter.ts` (`presentProduct`) đổi `price`/`originalPrice` của entity thành cặp `...Vnd`/`...Usd`; module cart, wishlist, collection dùng lại hàm này.
 - Không có biến môi trường riêng.
-- `ProductService` được export nhưng chưa module nào inject.
+- `ProductQueryService` inject `Repository<Product>`, `Repository<Category>`, `CurrencyService`; `ProductService` inject `Repository<Product>`, `Repository<Category>`, `Repository<SubCategory>`, `CurrencyService`. Module export `ProductQueryService` nhưng chưa module nào inject.
 
 ### 4.7 Test
 
-`product.presenter.spec.ts` — `presentProduct` (thay field giá bằng cặp Vnd/Usd, giá gốc `null`, không đổi entity gốc; `category`/`subcategory` cùng hình dạng dù nạp kiểu nào, vắng mặt khi chưa nạp). `product.service.spec.ts` — lọc `minRating` và sort theo `ratingAverage`/`ratingCount` (public: điều kiện, `NULLS LAST`, thứ tự phụ; admin: `where`/`order`, kết hợp với search). Các phần còn lại của service chưa có unit spec riêng. `PublicProductQueryDto` và `AdminProductQueryDto` được `list-query.dto.spec.ts` kiểm tra tự động; `ProductAutocompleteQueryDto` và `ProductDetailQueryDto` nằm trong danh sách DTO không phải list. `presentProductSummary`: giữ đúng các key của `ProductSummary`, `null` khi thiếu ảnh/badge/quan hệ; autocomplete trả summary kèm `priceVnd`/`priceUsd` và join `category`, `subcategory`. `presentProduct`: bỏ `category.subcategories` và `subcategory.category`, không đụng entity gốc, không thêm field khi quan hệ chưa nạp. `findById`: `related` dùng `take` mặc định 4 và theo `relatedLimit`; `ProductDetailQueryDto`: mặc định 4, ép kiểu số, từ chối 0, âm, > 20, chữ, số thập phân.
+`product.presenter.spec.ts` — `presentProduct` (thay field giá bằng cặp Vnd/Usd, giá gốc `null`, không đổi entity gốc; `category`/`subcategory` cùng hình dạng dù nạp kiểu nào, vắng mặt khi chưa nạp). `product-query.service.spec.ts` (`ProductQueryService`) — lọc `minRating` và sort theo `ratingAverage`/`ratingCount` (public: điều kiện, `NULLS LAST`, thứ tự phụ; admin: `where`/`order`, kết hợp với search). Các phần còn lại của service chưa có unit spec riêng. `PublicProductQueryDto` và `AdminProductQueryDto` được `list-query.dto.spec.ts` kiểm tra tự động; `ProductAutocompleteQueryDto` và `ProductDetailQueryDto` nằm trong danh sách DTO không phải list. `presentProductSummary`: giữ đúng các key của `ProductSummary`, `null` khi thiếu ảnh/badge/quan hệ; autocomplete trả summary kèm `priceVnd`/`priceUsd` và join `category`, `subcategory`. `presentProduct`: bỏ `category.subcategories` và `subcategory.category`, không đụng entity gốc, không thêm field khi quan hệ chưa nạp. `findById`: `related` dùng `take` mặc định 4 và theo `relatedLimit`; `ProductDetailQueryDto`: mặc định 4, ép kiểu số, từ chối 0, âm, > 20, chữ, số thập phân.
 
 Flow test trên Postgres thật (`test/flows/product/`; builder `b.product()` nhận `category`/`subcategory`/`createdAt`/`ratingAverage` để dựng dữ liệu):
 
@@ -204,3 +204,12 @@ Flow test trên Postgres thật (`test/flows/product/`; builder `b.product()` nh
 - Khi sửa `slug`/`categoryId`/`subcategoryId` mà không gửi `sku`, `sku` được sinh lại theo công thức mặc định, kể cả khi sản phẩm đang dùng `sku` tuỳ chỉnh.
 - Xoá sản phẩm không có `try/catch` riêng vì mọi FK trỏ tới `products` đều là `CASCADE` hoặc `SET NULL` (`order_items` giữ lại snapshot tên/giá/ảnh).
 - Giá trị `size`/`color` ở giỏ hàng không được đối chiếu với `sizes`/`colors` của sản phẩm (xem [cart](cart.md)).
+
+### 4.9 Thiết kế & pattern
+
+Spec: `docs/specs/product/0001` (kế hoạch flow test), `docs/specs/product/0002` (tách đọc/ghi).
+
+| Pattern / nguyên lý | Chỗ dùng | Vì sao |
+|---|---|---|
+| Tách command/query theo use case | `ProductQueryService` (`findAllPublic`, `autocomplete`, `findById`, `findAllAdmin`) và `ProductService` (`create`, `update`, `delete`) | Luật validate khi ghi (slug/SKU duy nhất, giá gốc ≥ giá, subcategory thuộc category) tách khỏi bộ lọc/sort khi đọc; hai nhóm không gọi nhau |
+| Presenter | `presentProduct`, `presentProductSummary` (`product.presenter.ts`) | Entity không bao giờ trả thẳng ra API; cặp `Vnd`/`Usd` tính một chỗ |

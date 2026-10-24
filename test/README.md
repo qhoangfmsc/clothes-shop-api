@@ -129,7 +129,7 @@ Trạng thái: **Có** = đã có test cover luồng · **Unit** = chỉ có uni
 | order | `modules/order/order-checkout.service.spec.ts`, `order-query.service.spec.ts`, `order-status.service.spec.ts`, `order.presenter.spec.ts`, `order.constant.spec.ts` (bảng chuyển trạng thái), `dtos/order.dto.spec.ts` |
 | payment | `modules/payment/payment.service.spec.ts`, `payment-payable.util.spec.ts`, `payment-confirm.spec.ts`, `payment-expiry.spec.ts`, `payment-attempts-admin.spec.ts`, `refund.service.spec.ts`, `sepay-webhook.service.spec.ts`, `sepay-payload.util.spec.ts`, `sepay-signature.util.spec.ts` |
 | pending-count | `modules/pending-count/pending-count.spec.ts` |
-| product | `modules/product/product.service.spec.ts`, `product.presenter.spec.ts` |
+| product | `modules/product/product-query.service.spec.ts`, `product.presenter.spec.ts` |
 | return | `modules/return/return.service.spec.ts`, `return-eligibility.util.spec.ts` |
 | review | `modules/review/review.service.spec.ts`, `review-eligibility.util.spec.ts` |
 | shipping | `modules/shipping/shipping-config.service.spec.ts`, `shipping-config.spec.ts` |
