@@ -8,6 +8,8 @@ import { RejectRefundDto } from './dtos/reject-refund.dto';
 import { PaymentService } from './payment.service';
 import { createFakeManager } from './payment.test-utils';
 import { PaymentAttempt } from './payment-attempt.entity';
+import { PaymentConfirmService } from './payment-confirm.service';
+import { PaymentQueryService } from './payment-query.service';
 import { PaymentTransaction } from './payment-transaction.entity';
 import { Refund } from './refund.entity';
 import { prorateRefundAmount, RefundService } from './refund.service';
@@ -359,7 +361,14 @@ describe('a refunded order is never payable again', () => {
     const config: any = {
       getQrConfig: () => ({ prefix: 'DH', account: '1', bankCode: 'VCB', bankName: 'VCB', accountName: 'N' }),
     };
-    return new PaymentService(h.dataSource, orderRepo, {} as any, {} as any, config, { getVndPerUsd: async () => 25000 } as any);
+    const payments = new PaymentService(h.dataSource, {} as any, config);
+    const confirms = new PaymentConfirmService(h.dataSource);
+    const queries = new PaymentQueryService(orderRepo, {} as any, {} as any, { getVndPerUsd: async () => 25000 } as any, payments);
+    return {
+      createQr: payments.createQr.bind(payments),
+      confirmPaymentAdmin: confirms.confirmPaymentAdmin.bind(confirms),
+      getStatus: queries.getStatus.bind(queries),
+    };
   };
 
   it('createQr → 1702', async () => {

@@ -6,12 +6,16 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { User } from '../user/user.entity';
 import { CreateQrPaymentDto } from './dtos/create-qr-payment.dto';
 import { PaymentService } from './payment.service';
+import { PaymentQueryService } from './payment-query.service';
 
 @ApiTags('Payments')
 @Controller('api/payments')
 @ApiBearerAuth()
 export class PaymentController {
-  constructor(private readonly paymentService: PaymentService) {}
+  constructor(
+    private readonly paymentService: PaymentService,
+    private readonly queryService: PaymentQueryService,
+  ) {}
 
   @Post('qr')
   @ApiOperation({
@@ -27,6 +31,6 @@ export class PaymentController {
   @ApiOperation({ summary: 'Payment status of an order (PENDING | PAID | EXPIRED | CANCELLED) — reads the database only' })
   @Permissions(Permission.PAYMENT_VIEW)
   getStatus(@CurrentUser() user: User, @Param('orderId') orderId: string) {
-    return this.paymentService.getStatus(user.id, orderId);
+    return this.queryService.getStatus(user.id, orderId);
   }
 }

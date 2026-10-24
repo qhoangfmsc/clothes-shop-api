@@ -8,18 +8,24 @@ import { AdminPaymentAttemptQueryDto } from './dtos/admin-payment-attempt-query.
 import { AdminPaymentTransactionQueryDto } from './dtos/admin-payment-transaction-query.dto';
 import { ConfirmPaymentDto } from './dtos/confirm-payment.dto';
 import { PaymentService } from './payment.service';
+import { PaymentConfirmService } from './payment-confirm.service';
+import { PaymentQueryService } from './payment-query.service';
 
 @ApiTags('Admin — Payments')
 @Controller('api/admin/payments')
 @ApiBearerAuth()
 export class AdminPaymentController {
-  constructor(private readonly paymentService: PaymentService) {}
+  constructor(
+    private readonly paymentService: PaymentService,
+    private readonly confirmService: PaymentConfirmService,
+    private readonly queryService: PaymentQueryService,
+  ) {}
 
   @Get('transactions')
   @ApiOperation({ summary: '[Admin] Giao dịch ngân hàng đã nhận qua SePay, kể cả chưa khớp đơn (đối soát)' })
   @Permissions(Permission.PAYMENT_ADMIN_VIEW)
   findTransactions(@Query() query: AdminPaymentTransactionQueryDto) {
-    return this.paymentService.findTransactionsAdmin(query);
+    return this.queryService.findTransactionsAdmin(query);
   }
 
   @Get('attempts')
@@ -30,14 +36,14 @@ export class AdminPaymentController {
   })
   @Permissions(Permission.PAYMENT_ADMIN_VIEW)
   findAttempts(@Query() query: AdminPaymentAttemptQueryDto) {
-    return this.paymentService.findAttemptsAdmin(query);
+    return this.queryService.findAttemptsAdmin(query);
   }
 
   @Get('orders/:orderId')
   @ApiOperation({ summary: '[Admin] Toàn cảnh thanh toán của một đơn: tóm tắt đơn, các phiên QR, các giao dịch ngân hàng' })
   @Permissions(Permission.PAYMENT_ADMIN_VIEW)
   getOrderPayments(@Param('orderId') orderId: string) {
-    return this.paymentService.getOrderPaymentsAdmin(orderId);
+    return this.queryService.getOrderPaymentsAdmin(orderId);
   }
 
   @Post('orders/:orderId/qr')
@@ -59,6 +65,6 @@ export class AdminPaymentController {
   })
   @Permissions(Permission.PAYMENT_ADMIN_CONFIRM)
   confirmPayment(@CurrentUser() admin: User, @Param('orderId') orderId: string, @Body() dto: ConfirmPaymentDto) {
-    return this.paymentService.confirmPaymentAdmin(admin.id, orderId, dto);
+    return this.confirmService.confirmPaymentAdmin(admin.id, orderId, dto);
   }
 }

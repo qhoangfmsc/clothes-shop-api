@@ -2,6 +2,7 @@ import { Order } from '../order/order.entity';
 import { PaymentService } from './payment.service';
 import { createFakeManager, futureDate, pastDate } from './payment.test-utils';
 import { PaymentAttempt } from './payment-attempt.entity';
+import { PaymentQueryService } from './payment-query.service';
 
 const qrConfig = {
   bankCode: 'Vietcombank',
@@ -47,15 +48,15 @@ function setup(seed: Parameters<typeof createFakeManager>[0], config = qrConfig)
     }),
   };
   const paymentConfig = { getQrConfig: jest.fn(() => config) };
-  const service = new PaymentService(
-    dataSource as any,
+  const service = new PaymentService(dataSource as any, attemptRepo as any, paymentConfig as any);
+  const queries = new PaymentQueryService(
     orderRepo as any,
     attemptRepo as any,
     {} as any,
-    paymentConfig as any,
     { getVndPerUsd: async () => 25000 } as any,
+    service,
   );
-  return { manager, service, attempts: () => manager.tables.get(PaymentAttempt)! };
+  return { manager, service, queries, attempts: () => manager.tables.get(PaymentAttempt)! };
 }
 
 describe('PaymentService.createQr', () => {
@@ -177,43 +178,43 @@ describe('PaymentService.createQr', () => {
 
 describe('PaymentService.getStatus', () => {
   it('PAID when the order is paid', async () => {
-    const { service } = setup({ orders: [order({ paymentStatus: 'paid' })], attempts: [attempt({ status: 'PAID' })] });
-    await expect(service.getStatus('u1', 'o1')).resolves.toEqual({
+    const { queries } = setup({ orders: [order({ paymentStatus: 'paid' })], attempts: [attempt({ status: 'PAID' })] });
+    await expect(queries.getStatus('u1', 'o1')).resolves.toEqual({
       data: { orderId: 'o1', status: 'PAID', amountVnd: 4_625_000, amountUsd: 185, exchangeRate: 25_000 },
     });
   });
 
   it('PENDING while the QR is valid', async () => {
-    const { service } = setup({ orders: [order()], attempts: [attempt()] });
-    await expect(service.getStatus('u1', 'o1')).resolves.toEqual({
+    const { queries } = setup({ orders: [order()], attempts: [attempt()] });
+    await expect(queries.getStatus('u1', 'o1')).resolves.toEqual({
       data: { orderId: 'o1', status: 'PENDING', amountVnd: 4_625_000, amountUsd: 185, exchangeRate: 25_000 },
     });
   });
 
   it('EXPIRED when the QR deadline has passed even if the row is still PENDING', async () => {
-    const { service } = setup({ orders: [order()], attempts: [attempt({ expiresAt: pastDate() })] });
-    await expect(service.getStatus('u1', 'o1')).resolves.toEqual({
+    const { queries } = setup({ orders: [order()], attempts: [attempt({ expiresAt: pastDate() })] });
+    await expect(queries.getStatus('u1', 'o1')).resolves.toEqual({
       data: { orderId: 'o1', status: 'EXPIRED', amountVnd: 4_625_000, amountUsd: 185, exchangeRate: 25_000 },
     });
   });
 
   it('CANCELLED when the order was cancelled while a session was pending', async () => {
-    const { service } = setup({ orders: [order({ status: 'cancelled' })], attempts: [attempt()] });
-    await expect(service.getStatus('u1', 'o1')).resolves.toEqual({
+    const { queries } = setup({ orders: [order({ status: 'cancelled' })], attempts: [attempt()] });
+    await expect(queries.getStatus('u1', 'o1')).resolves.toEqual({
       data: { orderId: 'o1', status: 'CANCELLED', amountVnd: 4_625_000, amountUsd: 185, exchangeRate: 25_000 },
     });
   });
 
   it('404 for another user, and 404 (1703) when no payment session exists yet', async () => {
-    const { service } = setup({ orders: [order()] });
-    await expect(service.getStatus('u2', 'o1')).rejects.toMatchObject({ status: 404 });
-    await expect(service.getStatus('u1', 'o1')).rejects.toMatchObject({ status: 404, response: { errorCode: 1703 } });
+    const { queries } = setup({ orders: [order()] });
+    await expect(queries.getStatus('u2', 'o1')).rejects.toMatchObject({ status: 404 });
+    await expect(queries.getStatus('u1', 'o1')).rejects.toMatchObject({ status: 404, response: { errorCode: 1703 } });
   });
 
   it('only reads the database (never calls SePay)', async () => {
     const fetchSpy = jest.spyOn(globalThis, 'fetch');
-    const { service } = setup({ orders: [order()], attempts: [attempt()] });
-    await service.getStatus('u1', 'o1');
+    const { queries } = setup({ orders: [order()], attempts: [attempt()] });
+    await queries.getStatus('u1', 'o1');
     expect(fetchSpy).not.toHaveBeenCalled();
     fetchSpy.mockRestore();
   });
@@ -246,14 +247,7 @@ describe('PaymentService.listAttemptsForCustomer', () => {
     const attemptRepo: any = { find: jest.fn(async () => [...attempts].sort((a, b) => b.createdAt - a.createdAt)) };
     const transactionRepo: any = { find: jest.fn(async () => transactions) };
     return {
-      service: new PaymentService(
-        {} as any,
-        {} as any,
-        attemptRepo,
-        transactionRepo,
-        {} as any,
-        { getVndPerUsd: async () => 25000 } as any,
-      ),
+      service: new PaymentQueryService({} as any, attemptRepo, transactionRepo, { getVndPerUsd: async () => 25000 } as any, {} as any),
       attemptRepo,
       transactionRepo,
     };
@@ -342,14 +336,7 @@ describe('PaymentService.listAttemptsForCustomer', () => {
     const fromList = (await service.listAttemptsForCustomer(order))[0].status;
     const orderRepo: any = { findOne: jest.fn(async () => ({ id: 'o1', userId: 'u1', status: 'pending', paymentStatus: 'unpaid' })) };
     const attemptRepo: any = { findOne: jest.fn(async () => attempt) };
-    const statusService = new PaymentService(
-      {} as any,
-      orderRepo,
-      attemptRepo,
-      {} as any,
-      {} as any,
-      { getVndPerUsd: async () => 25000 } as any,
-    );
+    const statusService = new PaymentQueryService(orderRepo, attemptRepo, {} as any, { getVndPerUsd: async () => 25000 } as any, {} as any);
     expect((await statusService.getStatus('u1', 'o1')).data.status).toBe(fromList);
   });
 });

@@ -366,12 +366,9 @@ describe('OrderCheckoutService.checkout', () => {
       const paymentService = new PaymentService(
         { transaction: async (fn: any) => fn(createFakeManager({ orders: [order] })) } as any,
         {} as any,
-        {} as any,
-        {} as any,
         {
           getQrConfig: () => ({ bankCode: 'VCB', bankName: 'V', account: '1', accountName: 'D', prefix: 'DH' }),
         } as any,
-        {} as any,
       );
       const { data } = await paymentService.createQr('u1', { orderId: 'o1' });
       expect(q.totalVnd).toBe(1_250_000);
@@ -413,8 +410,6 @@ describe('OrderCheckoutService.checkout', () => {
     const paymentService = new PaymentService(
       { transaction: async (fn: any) => fn(manager) } as any,
       {} as any,
-      {} as any,
-      {} as any,
       {
         getQrConfig: () => ({
           bankCode: 'VCB',
@@ -424,7 +419,6 @@ describe('OrderCheckoutService.checkout', () => {
           prefix: 'DH',
         }),
       } as any,
-      {} as any,
     );
     const { data } = await paymentService.createQr('u1', { orderId: 'o1' });
     expect(data.amountVnd).toBe(1_250_000);

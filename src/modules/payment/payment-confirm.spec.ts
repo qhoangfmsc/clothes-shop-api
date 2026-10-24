@@ -1,9 +1,10 @@
 import { ValidationPipe } from '@nestjs/common';
 import { Order } from '../order/order.entity';
 import { ConfirmPaymentDto } from './dtos/confirm-payment.dto';
-import { PaymentService } from './payment.service';
 import { createFakeManager, futureDate, pastDate } from './payment.test-utils';
 import { PaymentAttempt } from './payment-attempt.entity';
+import { PaymentConfirmService } from './payment-confirm.service';
+import { PaymentQueryService } from './payment-query.service';
 import { PaymentTransaction } from './payment-transaction.entity';
 
 const order = (over: Record<string, any> = {}) => ({
@@ -45,20 +46,13 @@ const tx = (over: Record<string, any> = {}) => ({
 function setup(seed: Parameters<typeof createFakeManager>[0]) {
   const manager = createFakeManager(seed);
   const dataSource = { transaction: jest.fn(async (fn: any) => fn(manager)) };
-  const service = new PaymentService(
-    dataSource as any,
-    {} as any,
-    {} as any,
-    {} as any,
-    {} as any,
-    { getVndPerUsd: async () => 25000 } as any,
-  );
+  const service = new PaymentConfirmService(dataSource as any);
   const row = (entity: any, index = 0) => manager.tables.get(entity)![index];
   return { manager, service, row, rows: (entity: any) => manager.tables.get(entity)! };
 }
 const note = 'Doi chieu sao ke VCB, SePay loi webhook';
 
-describe('PaymentService.confirmPaymentAdmin — with an existing transaction', () => {
+describe('PaymentConfirmService.confirmPaymentAdmin — with an existing transaction', () => {
   it.each([
     'UNMATCHED',
     'AMOUNT_MISMATCH',
@@ -184,7 +178,7 @@ describe('PaymentService.confirmPaymentAdmin — with an existing transaction', 
   });
 });
 
-describe('PaymentService.confirmPaymentAdmin — recording a new transaction (webhook never arrived)', () => {
+describe('PaymentConfirmService.confirmPaymentAdmin — recording a new transaction (webhook never arrived)', () => {
   const base = { reference: '92704', amountVnd: 4_625_000, note };
 
   it('creates a sepay transaction identical in key to what the webhook would have stored, marked MANUALLY_CONFIRMED', async () => {
@@ -269,7 +263,7 @@ describe('PaymentService.confirmPaymentAdmin — recording a new transaction (we
   });
 });
 
-describe('PaymentService.confirmPaymentAdmin — guards', () => {
+describe('PaymentConfirmService.confirmPaymentAdmin — guards', () => {
   it.each([
     ['neither transactionId nor reference+amount', {}],
     ['both transactionId and reference+amount', { transactionId: 't1', reference: 'x', amountVnd: 1 }],
@@ -326,7 +320,7 @@ describe('PaymentService.confirmPaymentAdmin — guards', () => {
   });
 });
 
-describe('PaymentService.getOrderPaymentsAdmin', () => {
+describe('PaymentQueryService.getOrderPaymentsAdmin', () => {
   it('returns the order summary, attempts (newest first) and their transactions', async () => {
     const attempts = [attempt({ id: 'a2', createdAt: new Date('2026-02-01') }), attempt({ id: 'a1', createdAt: new Date('2026-01-01') })];
     const transactions = [tx({ id: 't1', paymentAttemptId: 'a1' })];
@@ -335,14 +329,7 @@ describe('PaymentService.getOrderPaymentsAdmin', () => {
     };
     const attemptRepo: any = { find: jest.fn(async () => attempts) };
     const transactionRepo: any = { find: jest.fn(async () => transactions) };
-    const service = new PaymentService(
-      {} as any,
-      orderRepo,
-      attemptRepo,
-      transactionRepo,
-      {} as any,
-      { getVndPerUsd: async () => 25000 } as any,
-    );
+    const service = new PaymentQueryService(orderRepo, attemptRepo, transactionRepo, { getVndPerUsd: async () => 25000 } as any, {} as any);
 
     const { data } = await service.getOrderPaymentsAdmin('o1');
 
@@ -357,13 +344,12 @@ describe('PaymentService.getOrderPaymentsAdmin', () => {
   it('works for a pickup order whose snapshot has no address, and for an order with no attempts', async () => {
     const orderRepo: any = { findOne: jest.fn(async () => order({ shippingAddress: {} })) };
     const transactionRepo: any = { find: jest.fn() };
-    const service = new PaymentService(
-      {} as any,
+    const service = new PaymentQueryService(
       orderRepo,
       { find: jest.fn(async () => []) } as any,
       transactionRepo,
-      {} as any,
       { getVndPerUsd: async () => 25000 } as any,
+      {} as any,
     );
     const { data } = await service.getOrderPaymentsAdmin('o1');
     expect(data.order.customer).toEqual({ fullName: null, phone: null });
@@ -372,13 +358,12 @@ describe('PaymentService.getOrderPaymentsAdmin', () => {
   });
 
   it('404 / 1301 for an unknown order', async () => {
-    const service = new PaymentService(
-      {} as any,
+    const service = new PaymentQueryService(
       { findOne: jest.fn(async () => null) } as any,
       {} as any,
       {} as any,
-      {} as any,
       { getVndPerUsd: async () => 25000 } as any,
+      {} as any,
     );
     await expect(service.getOrderPaymentsAdmin('nope')).rejects.toMatchObject({ status: 404, response: { errorCode: 1301 } });
   });
@@ -412,7 +397,7 @@ describe('ConfirmPaymentDto', () => {
   });
 });
 
-describe('PaymentService.confirmPaymentAdmin — by the transfer content the customer used', () => {
+describe('PaymentConfirmService.confirmPaymentAdmin — by the transfer content the customer used', () => {
   // Đơn có hai phiên: DHG29JR5A8 (cũ, đã hết hạn — khách chuyển tiền theo mã này) và DHS75TYVN3 (mới nhất, đang chờ)
   const twoSessions = (extra: Parameters<typeof createFakeManager>[0] = {}) =>
     setup({
@@ -524,19 +509,18 @@ describe('PaymentService.confirmPaymentAdmin — by the transfer content the cus
   });
 });
 
-describe('PaymentService.getOrderPaymentsAdmin — effective status', () => {
+describe('PaymentQueryService.getOrderPaymentsAdmin — effective status', () => {
   it('shows an overdue PENDING session as EXPIRED and keeps every code', async () => {
     const attempts = [
       { id: 'new', transferCode: 'DHS75TYVN3', status: 'PENDING', expiresAt: futureDate(), createdAt: new Date('2026-02-01') },
       { id: 'old', transferCode: 'DHG29JR5A8', status: 'PENDING', expiresAt: pastDate(), createdAt: new Date('2026-01-01') },
     ];
-    const service = new PaymentService(
-      {} as any,
+    const service = new PaymentQueryService(
       { findOne: jest.fn(async () => order({ shippingAddress: {} })) } as any,
       { find: jest.fn(async () => attempts) } as any,
       { find: jest.fn(async () => []) } as any,
-      {} as any,
       { getVndPerUsd: async () => 25000 } as any,
+      {} as any,
     );
     const { data } = await service.getOrderPaymentsAdmin('o1');
     expect(data.attempts.map((a) => [a.transferCode, a.status])).toEqual([

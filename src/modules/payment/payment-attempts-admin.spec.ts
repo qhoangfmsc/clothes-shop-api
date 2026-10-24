@@ -1,5 +1,6 @@
 import { PaymentService } from './payment.service';
 import { futureDate, pastDate } from './payment.test-utils';
+import { PaymentQueryService } from './payment-query.service';
 
 /** Query builder giả: ghi lại các điều kiện và trả danh sách cho trước */
 function setup(attempts: any[], transactions: any[] = []) {
@@ -28,13 +29,12 @@ function setup(attempts: any[], transactions: any[] = []) {
   const dataSource: any = { query: jest.fn(async () => undefined) };
   const attemptRepo: any = { createQueryBuilder: jest.fn(() => qb) };
   const transactionRepo: any = { find: jest.fn(async () => transactions) };
-  const service = new PaymentService(
-    dataSource,
+  const service = new PaymentQueryService(
     {} as any,
     attemptRepo,
     transactionRepo,
-    {} as any,
     { getVndPerUsd: async () => 25000 } as any,
+    new PaymentService(dataSource, attemptRepo, {} as any),
   );
   return { service, qb, calls, dataSource, transactionRepo };
 }
@@ -61,7 +61,7 @@ const attempt = (over: Record<string, any> = {}) => ({
   ...over,
 });
 
-describe('PaymentService.findAttemptsAdmin — look a transfer content up', () => {
+describe('PaymentQueryService.findAttemptsAdmin — look a transfer content up', () => {
   it('returns the code with its order, customer, effective status and linked transactions', async () => {
     const { service } = setup(
       [attempt({ expiresAt: pastDate() })],

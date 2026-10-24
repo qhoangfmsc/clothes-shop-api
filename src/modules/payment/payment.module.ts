@@ -9,7 +9,9 @@ import { PaymentController } from './payment.controller';
 import { PaymentService } from './payment.service';
 import { PaymentAttempt } from './payment-attempt.entity';
 import { PaymentConfigService } from './payment-config.service';
+import { PaymentConfirmService } from './payment-confirm.service';
 import { PaymentExpiryScheduler } from './payment-expiry.scheduler';
+import { PaymentQueryService } from './payment-query.service';
 import { PaymentTransaction } from './payment-transaction.entity';
 import { Refund } from './refund.entity';
 import { RefundService } from './refund.service';
@@ -19,7 +21,15 @@ import { SepayWebhookService } from './sepay-webhook.service';
 @Module({
   imports: [ScheduleModule.forRoot(), TypeOrmModule.forFeature([Order, PaymentAttempt, PaymentTransaction, Refund]), CurrencyModule],
   controllers: [PaymentController, AdminPaymentController, AdminRefundController, SepayWebhookController],
-  providers: [PaymentService, RefundService, SepayWebhookService, PaymentConfigService, PaymentExpiryScheduler],
-  exports: [PaymentConfigService, PaymentService, RefundService],
+  providers: [
+    PaymentService,
+    PaymentConfirmService,
+    PaymentQueryService,
+    RefundService,
+    SepayWebhookService,
+    PaymentConfigService,
+    PaymentExpiryScheduler,
+  ],
+  exports: [PaymentConfigService, PaymentService, PaymentQueryService, RefundService],
 })
 export class PaymentModule {}

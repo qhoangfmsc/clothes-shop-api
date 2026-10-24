@@ -20,13 +20,10 @@ export const UNUSED_EXPORTS: Record<string, string[]> = {
 export const OVERSIZED_SERVICES: Record<string, number> = {
   'src/modules/category/category.service.ts': 376,
   'src/modules/media/media.service.ts': 333,
-  'src/modules/payment/payment.service.ts': 549,
   'src/modules/payment/refund.service.ts': 363,
   'src/modules/product/product.service.ts': 326,
   'src/modules/return/return.service.ts': 450,
 };
 
 // Service đang có quá nhiều dependency: số hiện tại là trần
-export const MANY_DEPENDENCIES_SERVICES: Record<string, number> = {
-  'src/modules/payment/payment.service.ts': 6,
-};
+export const MANY_DEPENDENCIES_SERVICES: Record<string, number> = {};
