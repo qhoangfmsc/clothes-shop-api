@@ -1,6 +1,6 @@
 # category (`src/modules/category`)
 
-> Cập nhật lần cuối: 2026-10-23
+> Cập nhật lần cuối: 2026-10-24
 
 ## 1. Tổng quan
 
@@ -12,7 +12,7 @@ Module danh mục: quản lý `Category` và các `SubCategory` con, có thứ h
 | Route prefix | `/api/categories` (public), `/api/admin/categories` (admin) |
 | Bảng DB | `categories`, `subcategories` |
 | Module phụ thuộc | không (module `product` phụ thuộc vào module này) |
-| Export | `CategoryService` |
+| Export | `CategoryQueryService` |
 
 ## 2. Mục đích & nghiệp vụ phục vụ
 
@@ -152,7 +152,7 @@ Quan hệ: `Category.subcategories` là `OneToMany` với `eager: true, cascade:
 
 ### 4.6 Phụ thuộc & cấu hình
 
-- `TypeOrmModule.forFeature([Category, SubCategory])`.
+- `TypeOrmModule.forFeature([Category, SubCategory])`; `CategoryQueryService` và `CategoryService` đều chỉ inject `Repository<Category>`. Module export `CategoryQueryService`.
 - Dùng `pg_advisory_xact_lock` của PostgreSQL.
 - Không có biến môi trường riêng.
 
@@ -166,6 +166,14 @@ Flow test trên Postgres thật: `test/flows/category/category.flow.ts` (batch 1
 
 - `PATCH` dùng `Update*Dto = PartialType(Create*Dto, { skipNullProperties: false })`: mọi ràng buộc của create được kế thừa (chuỗi rỗng ở field bắt buộc → 400), `null` ở field bắt buộc → 400, `null` ở field tuỳ chọn được coi như không gửi (trừ `heroImage`, nơi `null` xoá ảnh). Response là bản ghi đầy đủ, không thiếu field chưa gửi (xem [common](common.md) 4.13).
 - `subcategories.count` là giá trị admin nhập, không được tự tính từ số sản phẩm.
-- `CategoryService.findAll()` (trả `{ data, total }` không phân trang) còn trong service nhưng không có nơi nào gọi.
 - `PublicCategoryQueryDto` có field `slug` nhưng controller đọc `slug` riêng bằng `@Query('slug')` để phân nhánh.
 - Subcategory được trả kèm trong cả list public lẫn admin; subcategory không có endpoint riêng.
+
+### 4.9 Thiết kế & pattern
+
+Spec: `docs/specs/category/0001` (kế hoạch flow test), `docs/specs/category/0002` (tách đọc/ghi).
+
+| Pattern / nguyên lý | Chỗ dùng | Vì sao |
+|---|---|---|
+| Tách command/query theo use case | `CategoryQueryService` (`findAllPublic`, `findBySlug`, `findAllAdmin`) và `CategoryService` (`create`, `update`, `reorder`, `delete`) | Luật ghi khó (priority UNIQUE DEFERRABLE, advisory lock, đồng bộ subcategory theo slug) tách khỏi truy vấn và map response; hai nhóm không gọi nhau |
+| Thứ tự khoá cố định | `lockPriorities` (advisory lock) trước mọi thay đổi `priority` | Tạo, sửa, xoá, reorder đồng thời luôn tuần tự, `priority` luôn là dãy 1..N |

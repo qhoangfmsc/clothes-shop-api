@@ -16,30 +16,6 @@ export class CategoryQueryService {
     private readonly categoryRepo: Repository<Category>,
   ) {}
 
-  async findAll() {
-    const categories = await this.categoryRepo.find({
-      order: { priority: 'ASC' },
-    });
-
-    const data = categories.map((cat) => ({
-      id: cat.id,
-      slug: cat.slug,
-      title: cat.title,
-      description: cat.description,
-      heroImage: cat.heroImage,
-      priority: cat.priority,
-      subcategories: (cat.subcategories || []).map((sub) => ({
-        id: sub.id,
-        slug: sub.slug,
-        label: sub.label,
-        description: sub.description,
-        count: sub.count,
-      })),
-    }));
-
-    return { data, total: data.length };
-  }
-
   async findAllPublic(query: PublicCategoryQueryDto) {
     const { search, sort } = query;
     const { page, limit } = getPaging(query);

@@ -38,6 +38,7 @@ Cấu trúc: `docs/specs/<module>/NNNN-slug.md` (số tăng dần theo từng mo
 | category | [0001 — Kế hoạch flow test cho module category](category/0001-flow-test-plan.md) | Implemented | Đọc công khai/admin, tạo, sửa, xoá, reorder và bất biến thứ hạng: 6/6 route đủ ca; 1 phát hiện chờ quyết định |
 | product | [0001 — Kế hoạch flow test cho module product](product/0001-flow-test-plan.md) | Implemented | Đọc công khai, autocomplete, danh sách/tạo/sửa/xoá admin: 7/7 route đủ ca; 5 phát hiện chờ quyết định |
 | review | [0001 — Kế hoạch flow test cho module review](review/0001-flow-test-plan.md) | Implemented | Đọc công khai, viết, sửa, vote, upload ảnh, kiểm duyệt, phản hồi: 16/16 route đủ ca |
+| category | [0002 — Tách `CategoryService` thành đọc và ghi](category/0002-split-category-service.md) | Implemented | CategoryQueryService + CategoryService |
 | media | [0002 — Tách logic thuần của ảnh khỏi `MediaService`](media/0002-extract-media-file-util.md) | Implemented | media-file.util: sniff mime, tên key, tên hiển thị |
 | payment | [0003 — Tách `RefundService` thành đọc và ghi](payment/0003-split-refund-service.md) | Implemented | RefundQueryService + RefundService |
 | return | [0002 — Tách `ReturnService` thành đọc và ghi](return/0002-split-return-service.md) | Implemented | ReturnQueryService + ReturnService + activeReturnQuantities |
