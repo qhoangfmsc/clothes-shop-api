@@ -11,7 +11,7 @@ Module nhỏ trả các con số "việc đang chờ admin xử lý" để hiệ
 | Thư mục | `src/modules/pending-count` |
 | Route prefix | `/api/admin/pending-counts` |
 | Bảng DB | không có (đọc `orders`, `payment_transactions`, `refunds`, `return_requests`, `reviews` qua service của từng module) |
-| Module phụ thuộc | `order` (`OrderQueryService.countNeedsAction`), `payment` (`PaymentService.countNeedsReview`, `RefundService.countRequested`), `return` (`ReturnService.countRequested`), `review` (`ReviewService.countAwaitingReply`) |
+| Module phụ thuộc | `order` (`OrderQueryService.countNeedsAction`), `payment` (`PaymentService.countNeedsReview`, `RefundService.countRequested`), `return` (`ReturnService.countRequested`), `review` (`ReviewQueryService.countAwaitingReply`) |
 | Export | không |
 
 ## 2. Mục đích & nghiệp vụ phục vụ
@@ -76,7 +76,7 @@ Không có mã riêng. `401` (thiếu/sai JWT) và `403` `PERMISSION_DENIED (900
 
 ### 4.6 Phụ thuộc & cấu hình
 
-`PendingCountModule` import `OrderModule`, `PaymentModule`, `ReturnModule`, `ReviewModule` (các module này export `OrderQueryService`, `PaymentService`/`RefundService`, `ReturnService`, `ReviewService`). Không có biến môi trường.
+`PendingCountModule` import `OrderModule`, `PaymentModule`, `ReturnModule`, `ReviewModule` (các module này export `OrderQueryService`, `PaymentService`/`RefundService`, `ReturnService`, `ReviewQueryService`). Không có biến môi trường.
 
 ### 4.7 Test
 
