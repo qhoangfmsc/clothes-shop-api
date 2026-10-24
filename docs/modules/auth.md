@@ -1,6 +1,6 @@
 # auth (`src/modules/auth`)
 
-> Cập nhật lần cuối: 2026-10-23
+> Cập nhật lần cuối: 2026-10-24
 
 ## 1. Tổng quan
 
@@ -90,6 +90,8 @@ Claim `type` (định nghĩa ở `auth.constant.ts`: `JwtTokenType`, `JwtPayload
 **Xác thực mỗi request (`JwtStrategy.validate`)**: lấy Bearer token, verify (không bỏ qua hết hạn), yêu cầu `payload.type === 'access'` (refresh token hoặc token không có `type` → `401 Invalid access token`), tìm user theo `payload.sub`; không có hoặc `status !== 'active'` → `401 User not found or disabled`; trả entity `User` (có `role`, `permissions`) làm `request.user`.
 
 **Refresh (`refreshToken`)**: verify bằng `JWT_SECRET`, yêu cầu `payload.type === 'refresh'` (access token hoặc token không có `type` bị từ chối), tìm user theo `sub`, yêu cầu `status === 'active'`, ký access token mới.
+
+Giới hạn tần suất: `POST /api/auth/google` và `POST /api/auth/refresh` bị giới hạn chặt (`RATE_LIMIT_AUTH_PER_MINUTE`, mặc định 10/phút/IP); vượt → 429 / 9201 (xem [common](common.md) 4.3).
 
 ### 4.5 Error code
 

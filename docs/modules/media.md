@@ -1,6 +1,6 @@
 # media (`src/modules/media`)
 
-> Cập nhật lần cuối: 2026-10-23
+> Cập nhật lần cuối: 2026-10-24
 
 ## 1. Tổng quan
 
@@ -126,3 +126,4 @@ Flow test trên Postgres thật: `test/flows/media/media.flow.ts` (batch 24; Sup
 - File lớn hơn giới hạn `FileInterceptor` (10 MB thư viện, 5 MB ảnh đánh giá) bị chặn trước service với `413 File too large` thô (không có `errorCode`).
 - Xoá file không kiểm tra file có đang được tham chiếu bởi URL ở product/collection/category/site-config hay không.
 - Tên file ASCII hoá cho storage key, còn `name` hiển thị giữ tên gốc (Unicode).
+- `POST /api/admin/media` bị giới hạn tần suất chặt (`RATE_LIMIT_UPLOAD_PER_MINUTE`, mặc định 20/phút/IP); vượt → 429 / 9201.

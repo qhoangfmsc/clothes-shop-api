@@ -98,6 +98,8 @@ Decorators:
 | `@CurrentUser(field?)` | Lấy `request.user` (entity `User` do `JwtStrategy.validate` trả về) hoặc 1 field của nó |
 | `@ApiEndpoint(summary, { method, auth })` | Gộp `ApiOperation` + `ApiOk/CreatedResponse` (+ `ApiBearerAuth`); hiện chưa module nào dùng |
 
+**Rate limit** (`RateLimitGuard`, spec common/0010): `APP_GUARD` **đầu tiên**, trước `JwtAuthGuard`, nên request chưa xác thực cũng bị đếm. Mỗi cặp (route, IP) có một bộ đếm trong cửa sổ 60 giây (kho in-memory của `@nestjs/throttler`, mỗi instance đếm riêng). Mặc định 120 request/phút; `@RateLimit('auth')` (10/phút) cho `POST /api/auth/google` và `/api/auth/refresh`; `@RateLimit('upload')` (20/phút) cho `POST /api/admin/media` và `POST /api/reviews/images`; `@SkipRateLimit()` cho `POST /api/webhooks/sepay`, `GET /`, `GET /health`. Vượt giới hạn → HTTP 429, `errorCode 9201`, header `Retry-After`, không chạm DB. IP lấy từ `req.ip` với `trust proxy = TRUST_PROXY`: sau Render phải ≥ 1, nếu không mọi client chung một bộ đếm; không có proxy thì phải là 0, nếu không client giả `X-Forwarded-For` để né giới hạn.
+
 ### 4.4 Permission (`Permission` enum)
 
 Format `[MM][SS]`, nhóm theo module.
@@ -175,6 +177,7 @@ Format `[MM][EE]` (4 chữ số). `throwAppError(errorCode, message?, statusCode
 | 21xx | Address | `EAddressErrorCode` | 2101 |
 | 22xx | Auth | `EAuthErrorCode` | 2201–2203, 2210–2212 |
 | 90xx | Permission | `EPermissionErrorCode` | 9001 `PERMISSION_DENIED`, 9002 `NO_PERMISSION_DEFINED` |
+| 92xx | Rate limit | `ERateLimitErrorCode` | 9201 `RATE_LIMITED` (HTTP 429) |
 | 91xx | Toàn vẹn DB (lưới an toàn của filter) | `EDatabaseErrorCode` | 9101 `DB_NOT_NULL_VIOLATION`, 9102 `DB_CHECK_VIOLATION` (HTTP 400), 9103 `DB_UNIQUE_VIOLATION`, 9104 `DB_FOREIGN_KEY_VIOLATION` (HTTP 409) |
 
 Chi tiết từng mã nằm ở mục Error code của module tương ứng.
@@ -243,6 +246,8 @@ Entity **không** extends `BaseEntity` (tự khai báo id nanoid16): `Wishlist` 
 | Biến | Nơi dùng |
 |---|---|
 | `PORT` | `main.ts` (mặc định 7001) |
+| `RATE_LIMIT_DEFAULT_PER_MINUTE` (120), `RATE_LIMIT_AUTH_PER_MINUTE` (10), `RATE_LIMIT_UPLOAD_PER_MINUTE` (20) | `common/utils/rate-limit.config.ts`; số nguyên dương, đọc mỗi request |
+| `TRUST_PROXY` | `core/app.setup.ts`: số tầng reverse proxy tin cậy (mặc định 1 ở production, 0 nơi khác) |
 | `CORS_ORIGINS` | `main.ts` |
 | `POSTGRES_HOST/PORT/USERNAME/PASSWORD/DATABASE` | `core.module.ts`, `data-source.ts` |
 | `JWT_SECRET`, `JWT_EXPIRES_IN`, `JWT_REFRESH_EXPIRES_IN` | module auth |
@@ -250,7 +255,7 @@ Entity **không** extends `BaseEntity` (tự khai báo id nanoid16): `Wishlist` 
 | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET` | module media |
 | `SEPAY_RECEIVING_BANK_CODE`, `SEPAY_RECEIVING_BANK_NAME`, `SEPAY_RECEIVING_ACCOUNT`, `SEPAY_RECEIVING_ACCOUNT_NAME`, `SEPAY_WEBHOOK_SECRET`, `PAYMENT_TRANSFER_PREFIX` | module payment |
 
-**Kiểm tra khi khởi động** (`src/core/env.validation.ts`, `validateEnvForConfigModule` truyền vào `ConfigModule.forRoot({ validate })`, chạy ngay khi module được nạp; spec common/0009). Mọi môi trường: `PORT`, `POSTGRES_PORT` nếu có phải là số nguyên 1–65535. Chỉ khi `NODE_ENV=production`: bắt buộc `JWT_SECRET` (≥ 32 ký tự và khác `DEFAULT_JWT_SECRET`, hằng số nay ở `common/constants/security.constant.ts`), `POSTGRES_HOST/USERNAME/PASSWORD/DATABASE`, `GOOGLE_CLIENT_ID`, `SEPAY_WEBHOOK_SECRET`, `SEPAY_RECEIVING_ACCOUNT`, và `CORS_ORIGINS` (mọi origin là URL http(s)). Sai thì app không khởi động (tiến trình thoát với lỗi), thông báo liệt kê mọi lỗi theo tên biến và lý do, không in giá trị. `SUPABASE_*`, `GOOGLE_CLIENT_SECRET`, `PAYMENT_TRANSFER_PREFIX`, `SEPAY_RECEIVING_BANK_*` không bắt buộc (tính năng tự trả 503 khi thiếu). Hàm chỉ trả phần cấu hình đến từ file `.env`: `ConfigService` ưu tiên bản đã validate hơn `process.env`, trả cả `process.env` sẽ đóng băng mọi biến lúc nạp. `render.yaml` không khai báo biến nào nên chúng nằm ở dashboard của dịch vụ: kiểm đủ trước khi deploy.
+**Kiểm tra khi khởi động** (`src/core/env.validation.ts`, `validateEnvForConfigModule` truyền vào `ConfigModule.forRoot({ validate })`, chạy ngay khi module được nạp; spec common/0009). Mọi môi trường: `PORT`, `POSTGRES_PORT` nếu có phải là số nguyên 1–65535; `RATE_LIMIT_*` số nguyên dương; `TRUST_PROXY` số nguyên không âm. Chỉ khi `NODE_ENV=production`: bắt buộc `JWT_SECRET` (≥ 32 ký tự và khác `DEFAULT_JWT_SECRET`, hằng số nay ở `common/constants/security.constant.ts`), `POSTGRES_HOST/USERNAME/PASSWORD/DATABASE`, `GOOGLE_CLIENT_ID`, `SEPAY_WEBHOOK_SECRET`, `SEPAY_RECEIVING_ACCOUNT`, và `CORS_ORIGINS` (mọi origin là URL http(s)). Sai thì app không khởi động (tiến trình thoát với lỗi), thông báo liệt kê mọi lỗi theo tên biến và lý do, không in giá trị. `SUPABASE_*`, `GOOGLE_CLIENT_SECRET`, `PAYMENT_TRANSFER_PREFIX`, `SEPAY_RECEIVING_BANK_*` không bắt buộc (tính năng tự trả 503 khi thiếu). Hàm chỉ trả phần cấu hình đến từ file `.env`: `ConfigService` ưu tiên bản đã validate hơn `process.env`, trả cả `process.env` sẽ đóng băng mọi biến lúc nạp. `render.yaml` không khai báo biến nào nên chúng nằm ở dashboard của dịch vụ: kiểm đủ trước khi deploy.
 
 ### 4.11 Lệnh
 

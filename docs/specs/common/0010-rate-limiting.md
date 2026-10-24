@@ -1,6 +1,6 @@
 # 0010 — Giới hạn tần suất request (rate limit)
 
-> Module: `common` (+ auth, media, review, payment, main chỉ gắn decorator) · Trạng thái: Approved · Ngày: 2026-10-24 · Cỡ: đầy đủ
+> Module: `common` (+ auth, media, review, payment, main chỉ gắn decorator) · Trạng thái: Implemented · Ngày: 2026-10-24 · Cỡ: đầy đủ
 
 ## 1. Bối cảnh & vấn đề
 
@@ -89,4 +89,8 @@ Request → `RateLimitGuard` (đếm theo `(controller, handler, IP)` trong cử
 - Rollback: `git revert`, hoặc đặt các biến `RATE_LIMIT_*` rất cao.
 
 ## 6. Kết quả triển khai
-_Điền sau khi làm xong._
+- **File:** `common/utils/rate-limit.config.ts`, `common/decorator/rate-limit.decorator.ts`, `common/guards/rate-limit.guard.ts`, `main.module.ts` (`ThrottlerModule`, `RateLimitGuard` đầu danh sách `APP_GUARD`), `core/app.setup.ts` (`trust proxy`), `core/env.validation.ts` (kiểm `RATE_LIMIT_*`, `TRUST_PROXY`), decorator gắn vào auth, admin media, review images, webhook SePay, `MainController`; thêm dependency `@nestjs/throttler`; `test/support/test-env.ts` đặt giới hạn rất cao cho 876 flow cũ.
+- **Khác thiết kế:** không có; mặc định của thư viện tính theo (controller, handler, IP) nên "mỗi route một bộ đếm" đúng như mô tả.
+- **Docs:** `common.md` (4.3, 4.6, 4.10), `auth.md`, `media.md`, `review.md`, `payment.md`, `test/README.md`.
+- **Test:** 9 unit mới (cấu hình, guard) + 7 flow (app riêng giới hạn thấp, IP riêng cho từng ca). Phá thử 8 điểm (bỏ giới hạn ở refresh/review/admin upload, giới hạn nhầm webhook/health, guard sau JWT, luôn tin proxy, bỏ đọc env) đều bị bắt.
+- **Giới hạn đã biết:** kho đếm in-memory, mỗi instance đếm riêng; cần kho dùng chung (Redis) nếu chạy nhiều instance.

@@ -111,6 +111,7 @@ Trạng thái: **Có** = đã có test cover luồng · **Unit** = chỉ có uni
 | media (admin) | Ping, danh sách thư viện (chỉ `LIBRARY`), upload (key an toàn, loại theo byte, lỗi storage 1601/1605/1606, 413), xoá (storage trước rồi mới dòng DB, 1604) | Flow | `flows/media/media.flow.ts` | Có (batch 24) |
 | pending-count | Số việc chờ theo quyền, khớp `total` của các danh sách, giảm khi xử lý xong | Flow | `flows/pending-count/pending-count.flow.ts` | Có (batch 24) |
 | health | `GET /` và `GET /health` (cả khi DB lỗi) | Flow | `flows/health/health.flow.ts` | Có (batch 25) |
+| rate limit | Giới hạn mặc định, chặt hơn cho đăng nhập/refresh/upload, đếm theo route và theo IP (`TRUST_PROXY`), 429 trước xác thực, webhook và health không bị chặn | Flow | `flows/rate-limit/rate-limit.flow.ts` (app riêng, giới hạn thấp) | Có |
 | site-config | Danh sách key, tạo/thay/xoá cấu hình (1501/1502/1503), chuẩn hoá `SHIPPING_CONFIG`, `EXCHANGE_RATE` có hiệu lực ngay, đọc công khai | Flow | `flows/site-config/site-config.flow.ts` | Có (batch 22) |
 | shipping | `GET /api/shipping` theo cấu hình admin (mặc định, ngưỡng, USD), cùng nguồn với báo giá và hạn đổi trả | Flow | `flows/shipping/shipping.flow.ts` | Có (batch 23) |
 | size-guide | Bảng size theo nhóm, nhóm lạ → `data: null` | Flow | `flows/size-guide/size-guide.flow.ts` | Có (batch 23) |
@@ -119,7 +120,7 @@ Trạng thái: **Có** = đã có test cover luồng · **Unit** = chỉ có uni
 
 | Module | File spec |
 |---|---|
-| common | `common/dto/list-query.dto.spec.ts` (ép chuẩn list cho mọi `*-query.dto.ts`), `common/dto/update-dto.spec.ts` (mọi cặp `Create<X>Dto`/`Update<X>Dto`: không khoá "ma", giữ ràng buộc của create), `common/base/provided-fields.util.spec.ts`, `common/base/db-error.util.spec.ts`, `core/env.validation.spec.ts` + `core/core.module.spec.ts` (app từ chối khởi động khi cấu hình production sai), `common/filter/exception.filter.spec.ts` (lưới an toàn lỗi toàn vẹn DB), `common/utils/money.util.spec.ts`, `common/base/lock.util.spec.ts`, `common/architecture/architecture.spec.ts` (luật kiến trúc: hướng phụ thuộc, vòng module, export thừa, exception thô, kích thước service) |
+| common | `common/dto/list-query.dto.spec.ts` (ép chuẩn list cho mọi `*-query.dto.ts`), `common/dto/update-dto.spec.ts` (mọi cặp `Create<X>Dto`/`Update<X>Dto`: không khoá "ma", giữ ràng buộc của create), `common/base/provided-fields.util.spec.ts`, `common/base/db-error.util.spec.ts`, `common/utils/rate-limit.config.spec.ts` + `common/guards/rate-limit.guard.spec.ts`, `core/env.validation.spec.ts` + `core/core.module.spec.ts` (app từ chối khởi động khi cấu hình production sai), `common/filter/exception.filter.spec.ts` (lưới an toàn lỗi toàn vẹn DB), `common/utils/money.util.spec.ts`, `common/base/lock.util.spec.ts`, `common/architecture/architecture.spec.ts` (luật kiến trúc: hướng phụ thuộc, vòng module, export thừa, exception thô, kích thước service) |
 | auth | `modules/auth/auth.service.spec.ts`, `modules/auth/google-auth.service.spec.ts` |
 | cart | `modules/cart/cart.service.spec.ts` |
 | collection | `modules/collection/collection.service.spec.ts` |

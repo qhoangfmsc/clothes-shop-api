@@ -368,3 +368,4 @@ Spec: `docs/specs/payment/0001` (kế hoạch flow test), `docs/specs/common/000
 | Pattern / nguyên lý | Chỗ dùng | Vì sao |
 |---|---|---|
 | Module chủ viết chuyển trạng thái của mình | `RefundService` không còn `UPDATE` trực tiếp bảng của module khác: hoàn xong → `markOrderRefunded` ([order](order.md)) và `markReturnRefunded` ([return](return.md)); khoản hoàn bị từ chối → `reopenReturnAfterRefundRejected` ([return](return.md)); thanh toán khớp → `markOrderPaid` ([order](order.md)) | State machine của đơn và của yêu cầu trả hàng nằm một chỗ, ở module chủ; payment chỉ quyết định *khi nào* gọi, trong cùng transaction và thứ tự khoá cũ (`orders` → bản ghi con) |
+- `POST /api/webhooks/sepay` không bao giờ bị giới hạn tần suất (`@SkipRateLimit()`): SePay thử lại theo lịch của họ và danh tính đã được chứng minh bằng chữ ký HMAC.

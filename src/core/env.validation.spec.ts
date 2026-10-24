@@ -89,6 +89,23 @@ describe('validateEnv', () => {
   });
 });
 
+describe('validateEnv rate limit settings', () => {
+  it.each([
+    'RATE_LIMIT_DEFAULT_PER_MINUTE',
+    'RATE_LIMIT_AUTH_PER_MINUTE',
+    'RATE_LIMIT_UPLOAD_PER_MINUTE',
+  ])('refuses a %s that is not a positive integer', (key) => {
+    for (const value of ['0', '-1', '1.5', 'abc']) expect(message({ [key]: value })).toContain(`${key}: phải là số nguyên dương`);
+    expect(message({ [key]: '30' })).toBeNull();
+  });
+
+  it('refuses a TRUST_PROXY that is not a non-negative integer, and accepts 0 and 1', () => {
+    for (const value of ['-1', '1.5', 'yes']) expect(message({ TRUST_PROXY: value })).toContain('TRUST_PROXY: phải là số nguyên không âm');
+    expect(message({ TRUST_PROXY: '0' })).toBeNull();
+    expect(message({ TRUST_PROXY: '1' })).toBeNull();
+  });
+});
+
 describe('validateEnvForConfigModule', () => {
   afterEach(() => {
     delete process.env.ONLY_IN_PROCESS_ENV;
