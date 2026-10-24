@@ -19,6 +19,7 @@ Cấu trúc: `docs/specs/<module>/NNNN-slug.md` (số tăng dần theo từng mo
 | cart | [0001 — Kế hoạch flow test cho module cart](cart/0001-flow-test-plan.md) | Implemented | Xem, thêm, đổi số lượng, xoá dòng, xoá sạch: 5/5 route đủ ca; 2 phát hiện 500 chờ quyết định |
 | media | [0001 — Kế hoạch flow test cho module media](media/0001-flow-test-plan.md) | Implemented | Ping, danh sách, upload, xoá với Storage giả ở biên: 4/4 route đủ ca |
 | pending-count | [0001 — Kế hoạch flow test cho module pending-count](pending-count/0001-flow-test-plan.md) | Implemented | Số việc chờ theo quyền, khớp danh sách |
+| common | [0009 — Từ chối khởi động khi cấu hình production sai](common/0009-fail-fast-env-validation.md) | Implemented | `validateEnv` cho `ConfigModule`: JWT secret, DB, CORS, Google, SePay |
 | common | [0008 — Lỗi toàn vẹn của DB trả mã lỗi đúng](common/0008-db-integrity-errors.md) | Implemented | Ánh xạ theo tên constraint, idempotent khi thua cuộc đua, lưới an toàn ở filter |
 | common | [0007 — Cập nhật một phần an toàn (`PATCH`)](common/0007-safe-partial-update.md) | Implemented | `useDefineForClassFields: false`, `Update*Dto` = `PartialType(Create*Dto)`, quy ước `null` |
 | common | [0006 — Ranh giới ghi giữa các module](common/0006-module-boundaries.md) | Implemented | 4 nhóm ghi chéo module → hàm của module chủ nhận `EntityManager` + luật máy chặn ghi chéo mới |

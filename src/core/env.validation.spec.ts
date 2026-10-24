@@ -1,5 +1,5 @@
 import { DEFAULT_JWT_SECRET } from '../common/constants/security.constant';
-import { validateEnv } from './env.validation';
+import { validateEnv, validateEnvForConfigModule } from './env.validation';
 
 const STRONG_SECRET = 'x'.repeat(40);
 const production = (overrides: Record<string, unknown> = {}) => ({
@@ -86,5 +86,23 @@ describe('validateEnv', () => {
     for (const value of ['abc', '0', '65536', '80.5', '-1']) expect(message({ [key]: value })).toContain(`${key}: phải là số nguyên`);
     expect(message({ [key]: '7001' })).toBeNull();
     expect(message({ [key]: undefined })).toBeNull();
+  });
+});
+
+describe('validateEnvForConfigModule', () => {
+  afterEach(() => {
+    delete process.env.ONLY_IN_PROCESS_ENV;
+  });
+
+  it('returns only what comes from the .env file so that process.env stays live for ConfigService', () => {
+    process.env.ONLY_IN_PROCESS_ENV = 'live';
+
+    const kept = validateEnvForConfigModule({ ONLY_IN_PROCESS_ENV: 'live', FROM_ENV_FILE: 'x' });
+
+    expect(kept).toEqual({ FROM_ENV_FILE: 'x' });
+  });
+
+  it('still validates the whole configuration', () => {
+    expect(() => validateEnvForConfigModule({ NODE_ENV: 'production' })).toThrow(/JWT_SECRET/);
   });
 });

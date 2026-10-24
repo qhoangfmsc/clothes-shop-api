@@ -2,14 +2,14 @@ import { Global, Logger, Module, OnModuleInit } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { InjectDataSource, TypeOrmModule } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import { validateEnv } from './env.validation';
+import { validateEnvForConfigModule } from './env.validation';
 
 @Global()
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      validate: validateEnv,
+      validate: validateEnvForConfigModule,
     }),
 
     TypeOrmModule.forRootAsync({

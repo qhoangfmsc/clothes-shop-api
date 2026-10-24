@@ -250,6 +250,8 @@ Entity **không** extends `BaseEntity` (tự khai báo id nanoid16): `Wishlist` 
 | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET` | module media |
 | `SEPAY_RECEIVING_BANK_CODE`, `SEPAY_RECEIVING_BANK_NAME`, `SEPAY_RECEIVING_ACCOUNT`, `SEPAY_RECEIVING_ACCOUNT_NAME`, `SEPAY_WEBHOOK_SECRET`, `PAYMENT_TRANSFER_PREFIX` | module payment |
 
+**Kiểm tra khi khởi động** (`src/core/env.validation.ts`, `validateEnvForConfigModule` truyền vào `ConfigModule.forRoot({ validate })`, chạy ngay khi module được nạp; spec common/0009). Mọi môi trường: `PORT`, `POSTGRES_PORT` nếu có phải là số nguyên 1–65535. Chỉ khi `NODE_ENV=production`: bắt buộc `JWT_SECRET` (≥ 32 ký tự và khác `DEFAULT_JWT_SECRET`, hằng số nay ở `common/constants/security.constant.ts`), `POSTGRES_HOST/USERNAME/PASSWORD/DATABASE`, `GOOGLE_CLIENT_ID`, `SEPAY_WEBHOOK_SECRET`, `SEPAY_RECEIVING_ACCOUNT`, và `CORS_ORIGINS` (mọi origin là URL http(s)). Sai thì app không khởi động (tiến trình thoát với lỗi), thông báo liệt kê mọi lỗi theo tên biến và lý do, không in giá trị. `SUPABASE_*`, `GOOGLE_CLIENT_SECRET`, `PAYMENT_TRANSFER_PREFIX`, `SEPAY_RECEIVING_BANK_*` không bắt buộc (tính năng tự trả 503 khi thiếu). Hàm chỉ trả phần cấu hình đến từ file `.env`: `ConfigService` ưu tiên bản đã validate hơn `process.env`, trả cả `process.env` sẽ đóng băng mọi biến lúc nạp. `render.yaml` không khai báo biến nào nên chúng nằm ở dashboard của dịch vụ: kiểm đủ trước khi deploy.
+
 ### 4.11 Lệnh
 
 ```bash

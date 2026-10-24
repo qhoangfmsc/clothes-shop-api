@@ -1,6 +1,6 @@
 # 0009 — Từ chối khởi động khi cấu hình production sai
 
-> Module: `common` (core) · Trạng thái: Approved · Ngày: 2026-10-24 · Cỡ: rút gọn
+> Module: `common` (core) · Trạng thái: Implemented · Ngày: 2026-10-24 · Cỡ: rút gọn
 
 ## 1. Bối cảnh & vấn đề
 
@@ -67,4 +67,7 @@ Rủi ro: deploy production hiện tại thiếu biến bắt buộc sẽ **khô
 
 ## 6. Kết quả triển khai
 
-_Điền sau khi làm xong._
+- **File:** `core/env.validation.ts` (`validateEnv`, `validateEnvForConfigModule`, + spec), `core/core.module.ts` (`validate`), `core/core.module.spec.ts`; `DEFAULT_JWT_SECRET` chuyển sang `common/constants/security.constant.ts` vì `core/` không được import `modules/` (luật kiến trúc bắt ngay lần đầu).
+- **Khác thiết kế:** (1) `ConfigModule.forRoot` là hàm async chạy `validate` lúc nạp module nên test nối dây chạy `core.module` trong tiến trình con thật (kiểm cả mã thoát); đổi `NODE_ENV` ngay trong jest làm sập worker. (2) Lần chạy flow đầu tiên có 27 test hỏng: `ConfigService` ưu tiên bản đã validate (ảnh chụp lúc nạp) hơn `process.env`, làm mất việc đọc env mỗi lần gọi mà `MediaService` và test dựa vào. Sửa bằng `validateEnvForConfigModule` chỉ trả phần từ file `.env`.
+- **Docs:** `common.md` (4.10), `test/README.md`.
+- **Test:** 26 unit (từng quy tắc, nhiều lỗi cùng lúc, không in giá trị bí mật, bộ lọc `.env`) + 2 test tiến trình con. Phá thử bỏ `validate` khỏi `ConfigModule` → test đỏ.

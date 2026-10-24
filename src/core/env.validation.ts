@@ -51,3 +51,13 @@ export function validateEnv(config: Record<string, unknown>): Record<string, unk
   if (problems.length) throw new Error(`Cấu hình môi trường không hợp lệ:\n- ${problems.join('\n- ')}`);
   return config;
 }
+
+/**
+ * Dạng truyền vào `ConfigModule.forRoot({ validate })`. `ConfigService` ưu tiên bản đã validate hơn `process.env`, nên trả cả `process.env`
+ * sẽ "đóng băng" mọi biến lúc nạp (mất việc đọc env mỗi lần gọi, vd `MediaService`). Chỉ trả phần đến từ file `.env`, chính là phần
+ * ConfigModule cần nạp vào `process.env`.
+ */
+export function validateEnvForConfigModule(config: Record<string, unknown>): Record<string, unknown> {
+  validateEnv(config);
+  return Object.fromEntries(Object.entries(config).filter(([key]) => !(key in process.env)));
+}
