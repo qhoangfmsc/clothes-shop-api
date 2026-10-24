@@ -267,6 +267,8 @@ yarn test:db:down               # tắt Postgres test
 yarn migration:run              # chạy migration
 ```
 
+**CI** (`.github/workflows/ci.yml`, GitHub Actions, chạy khi push lên `main` và ở mọi pull request): hai job song song. `check` — `tsc --noEmit`, `yarn lint`, `yarn build`, `yarn test`. `flows` — Postgres 16 làm service container khớp `.env.test` (cổng 55432, DB `clothes_shop_test`), rồi `yarn test:flows:run` và `yarn test:coverage` (ratchet độ phủ endpoint). Đỏ ở bất kỳ bước nào thì PR không nên merge.
+
 ### 4.12 Test
 
 - **Unit** (`yarn test`): `src/**/*.spec.ts` cạnh code, dùng mock. `src/common/architecture/architecture.spec.ts` ép các luật kiến trúc (xem 4.13) với allowlist ở `architecture-allowlist.test-utils.ts` chỉ được co lại:

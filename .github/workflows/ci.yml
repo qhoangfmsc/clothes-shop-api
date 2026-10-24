@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Type check, lint, build, unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: yarn
+      - run: yarn install --frozen-lockfile
+      - run: npx tsc --noEmit
+      - run: yarn lint
+      - run: yarn build
+      - run: yarn test
+
+  flows:
+    name: Flow tests (real Postgres)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Khớp .env.test (cổng 55432, DB clothes_shop_test); runner dùng service container thay cho docker compose
+    services:
+      postgres:
+        image: postgres:16-alpine
+        ports:
+          - 55432:5432
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: clothes_shop_test
+        options: >-
+          --health-cmd "pg_isready -U test -d clothes_shop_test"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: yarn
+      - run: yarn install --frozen-lockfile
+      - run: yarn test:flows:run
+      - run: yarn test:coverage
