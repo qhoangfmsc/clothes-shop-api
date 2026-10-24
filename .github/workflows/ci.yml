@@ -24,6 +24,11 @@ jobs:
           node-version: 22
           cache: yarn
       - run: yarn install --frozen-lockfile
+      # exit code của `yarn audit` là bitmask: bit 16 = có lỗ hổng critical (high/moderate chỉ báo, không chặn)
+      - name: Dependency audit (fail on critical)
+        run: |
+          yarn audit --groups dependencies || code=$?
+          [ $(( ${code:-0} & 16 )) -eq 0 ]
       - run: npx tsc --noEmit
       - run: yarn lint
       - run: yarn build

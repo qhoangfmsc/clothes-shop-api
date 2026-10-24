@@ -103,5 +103,12 @@
   },
   "lint-staged": {
     "*.ts": "biome check --fix --no-errors-on-unmatched"
+  },
+  "resolutions": {
+    "proxy-addr": "^2.0.8",
+    "body-parser": "^2.4.0",
+    "qs": "^6.16.0",
+    "multer": "2.5.0",
+    "js-yaml": "^4.3.2"
   }
 }
