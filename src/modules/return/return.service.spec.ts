@@ -7,6 +7,7 @@ import { CreateReturnDto } from './dtos/create-return.dto';
 import { ReceiveReturnDto } from './dtos/receive-return.dto';
 import { RejectReturnDto } from './dtos/reject-return.dto';
 import { ReturnService } from './return.service';
+import { ReturnQueryService } from './return-query.service';
 import { ReturnRequest } from './return-request.entity';
 import { ReturnRequestItem } from './return-request-item.entity';
 
@@ -106,8 +107,9 @@ function setup(seed: Parameters<typeof createFakeManager>[0] = {}, policyDays = 
   };
   const shipping: any = { get: jest.fn(async () => ({ returnPolicy: { days: policyDays, description: '', conditions: [] } })) };
   const refundService = new RefundService(dataSource, {} as any, {} as any);
-  const service = new ReturnService(dataSource, returnRepo, shipping, refundService);
-  return { service, manager, rows, calls, shipping, returnRepo };
+  const queries = new ReturnQueryService(dataSource, returnRepo, shipping);
+  const service = new ReturnService(dataSource, shipping, refundService, queries);
+  return { service, queries, manager, rows, calls, shipping, returnRepo };
 }
 
 const items = (...pairs: [string, number][]) => pairs.map(([orderItemId, quantity]) => ({ orderItemId, quantity }));
@@ -115,7 +117,7 @@ const items = (...pairs: [string, number][]) => pairs.map(([orderItemId, quantit
 describe('ReturnService.getEligibility', () => {
   it('shows the deadline from the configured policy and what can still be returned per item', async () => {
     const h = setup({ returns: [returnRow()], returnItems: [returnItem({ quantity: 1 })] });
-    const { data } = await h.service.getEligibility('u1', 'o1');
+    const { data } = await h.queries.getEligibility('u1', 'o1');
     expect(data).toMatchObject({ orderId: 'o1', eligible: true, reason: null, returnWindowDays: 30 });
     expect(data.items).toEqual([
       { orderItemId: 'i1', quantity: 2, returnableQuantity: 1 },
@@ -126,7 +128,7 @@ describe('ReturnService.getEligibility', () => {
 
   it('a shorter policy closes the window', async () => {
     const h = setup({}, 3);
-    expect((await h.service.getEligibility('u1', 'o1')).data).toMatchObject({
+    expect((await h.queries.getEligibility('u1', 'o1')).data).toMatchObject({
       eligible: false,
       reason: 'RETURN_WINDOW_EXPIRED',
       returnWindowDays: 3,
@@ -135,8 +137,8 @@ describe('ReturnService.getEligibility', () => {
 
   it("another user's or unknown order → 404 / 1301", async () => {
     const h = setup();
-    await expect(h.service.getEligibility('someone-else', 'o1')).rejects.toMatchObject({ status: 404, response: { errorCode: 1301 } });
-    await expect(h.service.getEligibility('u1', 'nope')).rejects.toMatchObject({ status: 404 });
+    await expect(h.queries.getEligibility('someone-else', 'o1')).rejects.toMatchObject({ status: 404, response: { errorCode: 1301 } });
+    await expect(h.queries.getEligibility('u1', 'nope')).rejects.toMatchObject({ status: 404 });
   });
 });
 
@@ -236,12 +238,12 @@ describe('ReturnService customer read / cancel', () => {
 
   it('findOne returns the customer view; other customers get 404 / 1801', async () => {
     const h = setup(seed);
-    expect((await h.service.findOne('u1', 'r1')).data).toMatchObject({
+    expect((await h.queries.findOne('u1', 'r1')).data).toMatchObject({
       id: 'r1',
       items: [expect.objectContaining({ productName: 'Linen Shirt' })],
     });
-    await expect(h.service.findOne('someone-else', 'r1')).rejects.toMatchObject({ status: 404, response: { errorCode: 1801 } });
-    await expect(h.service.findOne('u1', 'nope')).rejects.toMatchObject({ status: 404, response: { errorCode: 1801 } });
+    await expect(h.queries.findOne('someone-else', 'r1')).rejects.toMatchObject({ status: 404, response: { errorCode: 1801 } });
+    await expect(h.queries.findOne('u1', 'nope')).rejects.toMatchObject({ status: 404, response: { errorCode: 1801 } });
   });
 
   it('findAll is limited to my orders, supports filters and the standard paging shape', async () => {
@@ -251,7 +253,7 @@ describe('ReturnService customer read / cancel', () => {
       returns: [returnRow(), returnRow({ id: 'r2', orderId: 'o2' })],
       returnItems: [returnItem(), returnItem({ id: 'ri2', returnRequestId: 'r2' })],
     });
-    const result = await h.service.findAll('u1', { page: 1, limit: 10, status: 'REQUESTED', orderId: 'o1' });
+    const result = await h.queries.findAll('u1', { page: 1, limit: 10, status: 'REQUESTED', orderId: 'o1' });
     expect(result).toMatchObject({ total: 1, page: 1, limit: 10, totalPages: 1 });
     expect(result.data.map((r: any) => r.id)).toEqual(['r1']);
     expect(h.calls.findAndCount).toMatchObject({
@@ -314,7 +316,7 @@ describe('ReturnService admin approve / reject', () => {
 
   it('admin list applies filters, search, sort and paging and includes order/customer', async () => {
     const h = setup({ returns: [returnRow()], returnItems: [returnItem()] });
-    const result = await h.service.findAllAdmin({
+    const result = await h.queries.findAllAdmin({
       status: 'REQUESTED',
       orderId: 'o1',
       search: '0900',

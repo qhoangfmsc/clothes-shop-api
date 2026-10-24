@@ -3,7 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { OrderQueryService } from '../order/order-query.service';
 import { PaymentQueryService } from '../payment/payment-query.service';
 import { RefundService } from '../payment/refund.service';
-import { ReturnService } from '../return/return.service';
+import { ReturnQueryService } from '../return/return-query.service';
 import { ReviewQueryService } from '../review/review-query.service';
 import { User } from '../user/user.entity';
 
@@ -19,7 +19,7 @@ export class PendingCountService {
     private readonly orderQueryService: OrderQueryService,
     private readonly paymentService: PaymentQueryService,
     private readonly refundService: RefundService,
-    private readonly returnService: ReturnService,
+    private readonly returnService: ReturnQueryService,
     private readonly reviewService: ReviewQueryService,
   ) {}
 

@@ -7,12 +7,16 @@ import { User } from '../user/user.entity';
 import { CreateReturnDto } from './dtos/create-return.dto';
 import { PublicReturnQueryDto } from './dtos/public-return-query.dto';
 import { ReturnService } from './return.service';
+import { ReturnQueryService } from './return-query.service';
 
 @ApiTags('Returns')
 @Controller('api/returns')
 @ApiBearerAuth()
 export class ReturnController {
-  constructor(private readonly returnService: ReturnService) {}
+  constructor(
+    private readonly returnService: ReturnService,
+    private readonly queryService: ReturnQueryService,
+  ) {}
 
   @Get('eligibility/:orderId')
   @ApiOperation({
@@ -21,7 +25,7 @@ export class ReturnController {
   })
   @Permissions(Permission.RETURN_VIEW)
   getEligibility(@CurrentUser() user: User, @Param('orderId') orderId: string) {
-    return this.returnService.getEligibility(user.id, orderId);
+    return this.queryService.getEligibility(user.id, orderId);
   }
 
   @Post()
@@ -35,14 +39,14 @@ export class ReturnController {
   @ApiOperation({ summary: 'Các yêu cầu trả hàng của tôi (pagination, filter status/orderId)' })
   @Permissions(Permission.RETURN_VIEW)
   findAll(@CurrentUser() user: User, @Query() query: PublicReturnQueryDto) {
-    return this.returnService.findAll(user.id, query);
+    return this.queryService.findAll(user.id, query);
   }
 
   @Get(':returnId')
   @ApiOperation({ summary: 'Chi tiết một yêu cầu trả hàng của tôi' })
   @Permissions(Permission.RETURN_VIEW)
   findOne(@CurrentUser() user: User, @Param('returnId') returnId: string) {
-    return this.returnService.findOne(user.id, returnId);
+    return this.queryService.findOne(user.id, returnId);
   }
 
   @Patch(':returnId/cancel')

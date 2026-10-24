@@ -7,13 +7,14 @@ import { ShippingModule } from '../shipping/shipping.module';
 import { AdminReturnController } from './admin-return.controller';
 import { ReturnController } from './return.controller';
 import { ReturnService } from './return.service';
+import { ReturnQueryService } from './return-query.service';
 import { ReturnRequest } from './return-request.entity';
 import { ReturnRequestItem } from './return-request-item.entity';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Order, OrderItem, ReturnRequest, ReturnRequestItem]), PaymentModule, ShippingModule],
   controllers: [ReturnController, AdminReturnController],
-  providers: [ReturnService],
-  exports: [ReturnService],
+  providers: [ReturnService, ReturnQueryService],
+  exports: [ReturnQueryService],
 })
 export class ReturnModule {}

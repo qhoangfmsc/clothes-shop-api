@@ -9,25 +9,29 @@ import { ApproveReturnDto } from './dtos/approve-return.dto';
 import { ReceiveReturnDto } from './dtos/receive-return.dto';
 import { RejectReturnDto } from './dtos/reject-return.dto';
 import { ReturnService } from './return.service';
+import { ReturnQueryService } from './return-query.service';
 
 @ApiTags('Admin — Returns')
 @Controller('api/admin/returns')
 @ApiBearerAuth()
 export class AdminReturnController {
-  constructor(private readonly returnService: ReturnService) {}
+  constructor(
+    private readonly returnService: ReturnService,
+    private readonly queryService: ReturnQueryService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: '[Admin] Danh sách yêu cầu trả hàng (search, filter status/orderId, sort, pagination)' })
   @Permissions(Permission.RETURN_ADMIN_VIEW)
   findAll(@Query() query: AdminReturnQueryDto) {
-    return this.returnService.findAllAdmin(query);
+    return this.queryService.findAllAdmin(query);
   }
 
   @Get(':returnId')
   @ApiOperation({ summary: '[Admin] Chi tiết yêu cầu trả hàng (đơn, khách, dòng hàng, khoản hoàn)' })
   @Permissions(Permission.RETURN_ADMIN_VIEW)
   findOne(@Param('returnId') returnId: string) {
-    return this.returnService.findOneAdmin(returnId);
+    return this.queryService.findOneAdmin(returnId);
   }
 
   @Post(':returnId/approve')

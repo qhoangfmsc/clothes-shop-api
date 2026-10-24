@@ -1,31 +1,21 @@
 import { findLocked } from '@common/base/lock.util';
-import { getPaging, paginated } from '@common/base/pagination.util';
-import { parseSort } from '@common/base/sort.util';
 import { throwAppError } from '@common/exceptions/app.exception';
 import { EOrderErrorCode, EReturnErrorCode } from '@common/exceptions/error-codes';
-import { money, moneyOrNull } from '@common/utils/money.util';
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, In, Repository } from 'typeorm';
+import { InjectDataSource } from '@nestjs/typeorm';
+import { DataSource, EntityManager, In } from 'typeorm';
 import { Order } from '../order/order.entity';
 import { OrderItem } from '../order/order-item.entity';
-import { Refund } from '../payment/refund.entity';
 import { RefundService } from '../payment/refund.service';
 import { ShippingConfigService } from '../shipping/shipping-config.service';
-import { AdminReturnQueryDto } from './dtos/admin-return-query.dto';
 import { ApproveReturnDto } from './dtos/approve-return.dto';
 import { CreateReturnDto } from './dtos/create-return.dto';
-import { PublicReturnQueryDto } from './dtos/public-return-query.dto';
 import { ReceiveReturnDto } from './dtos/receive-return.dto';
 import { RejectReturnDto } from './dtos/reject-return.dto';
-import {
-  ACTIVE_RETURN_STATUSES,
-  CUSTOMER_CANCELLABLE_RETURN_STATUSES,
-  REJECTABLE_RETURN_STATUSES,
-  ReturnReason,
-  ReturnStatus,
-} from './return.constant';
+import { CUSTOMER_CANCELLABLE_RETURN_STATUSES, REJECTABLE_RETURN_STATUSES, ReturnReason, ReturnStatus } from './return.constant';
+import { activeReturnQuantities } from './return-active-quantities.util';
 import { computeReturnEligibility, RETURN_INELIGIBLE_MESSAGES } from './return-eligibility.util';
+import { ReturnQueryService } from './return-query.service';
 import { ReturnRequest } from './return-request.entity';
 import { ReturnRequestItem } from './return-request-item.entity';
 
@@ -41,27 +31,10 @@ export class ReturnService {
   constructor(
     @InjectDataSource()
     private readonly dataSource: DataSource,
-    @InjectRepository(ReturnRequest)
-    private readonly returnRepo: Repository<ReturnRequest>,
     private readonly shippingConfigService: ShippingConfigService,
     private readonly refundService: RefundService,
+    private readonly queryService: ReturnQueryService,
   ) {}
-
-  // ============================================
-  // CUSTOMER
-  // ============================================
-
-  /** Đơn có trả hàng được không và từng dòng còn trả được bao nhiêu (để FE hiện/ẩn nút và giới hạn số lượng) */
-  async getEligibility(userId: string, orderId: string) {
-    const manager = this.dataSource.manager;
-    const order = await manager.findOne(Order, { where: { id: orderId, userId } });
-    if (!order) throwAppError(EOrderErrorCode.ORDER_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
-
-    const returnWindowDays = (await this.shippingConfigService.get()).returnPolicy.days;
-    const items = await manager.find(OrderItem, { where: { orderId } });
-    const activeQuantities = await this.activeQuantities(manager, orderId);
-    return { data: { orderId, ...computeReturnEligibility({ order, items, activeQuantities, returnWindowDays }) } };
-  }
 
   async create(userId: string, dto: CreateReturnDto) {
     const returnWindowDays = (await this.shippingConfigService.get()).returnPolicy.days;
@@ -75,7 +48,7 @@ export class ReturnService {
       const eligibility = computeReturnEligibility({
         order,
         items,
-        activeQuantities: await this.activeQuantities(manager, order.id),
+        activeQuantities: await activeReturnQuantities(manager, order.id),
         returnWindowDays,
       });
       if (!eligibility.eligible) {
@@ -129,28 +102,7 @@ export class ReturnService {
       return request;
     });
 
-    return { data: await this.getView(created.id, false) };
-  }
-
-  async findAll(userId: string, query: PublicReturnQueryDto) {
-    const { status, orderId, sort } = query;
-    const { page, limit } = getPaging(query);
-    const { field, direction } = parseSort(sort, '-createdAt');
-
-    const [requests, total] = await this.returnRepo.findAndCount({
-      where: { order: { userId }, ...(status ? { status: status as ReturnStatus } : {}), ...(orderId ? { orderId } : {}) },
-      order: { [field]: direction },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
-    return paginated(await this.toViews(requests, false), total, page, limit);
-  }
-
-  async findOne(userId: string, returnId: string) {
-    const request = await this.dataSource.manager.findOne(ReturnRequest, { where: { id: returnId } });
-    const owned = request && (await this.dataSource.manager.exists(Order, { where: { id: request.orderId, userId } }));
-    if (!request || !owned) throwAppError(EReturnErrorCode.RETURN_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
-    return { data: (await this.toViews([request], false))[0] };
+    return { data: await this.queryService.getView(created.id, false) };
   }
 
   /** Khách huỷ yêu cầu của mình khi chưa gửi hàng tới cửa hàng (REQUESTED hoặc APPROVED) */
@@ -164,46 +116,12 @@ export class ReturnService {
       request.status = 'CANCELLED';
       await manager.save(request);
     });
-    return this.findOne(userId, returnId);
+    return this.queryService.findOne(userId, returnId);
   }
 
   // ============================================
   // ADMIN
   // ============================================
-
-  async findAllAdmin(query: AdminReturnQueryDto) {
-    const { status, orderId, search, sort } = query;
-    const { page, limit } = getPaging(query);
-
-    const qb = this.returnRepo.createQueryBuilder('r').innerJoin('r.order', 'o').addSelect(['o.id', 'o.shippingAddress']);
-    if (status) qb.andWhere('r.status = :status', { status });
-    if (orderId) qb.andWhere('r.order_id = :orderId', { orderId });
-    if (search) {
-      qb.andWhere(
-        "(r.id ILIKE :search OR r.order_id ILIKE :search OR o.shipping_address->>'phone' ILIKE :search OR o.shipping_address->>'fullName' ILIKE :search)",
-        {
-          search: `%${search}%`,
-        },
-      );
-    }
-
-    // Sort: `field` = ASC, `-field` = DESC
-    const { field, direction } = parseSort(sort, '-createdAt');
-    qb.orderBy(`r.${field}`, direction);
-    qb.skip((page - 1) * limit).take(limit);
-
-    const [requests, total] = await qb.getManyAndCount();
-    return paginated(await this.toViews(requests, true), total, page, limit);
-  }
-
-  /** Số yêu cầu chờ duyệt (`status = REQUESTED`) — bằng `total` của `findAllAdmin({ status: 'REQUESTED' })`; `APPROVED` đang chờ khách gửi hàng nên không tính */
-  async countRequested(): Promise<number> {
-    return this.returnRepo.count({ where: { status: 'REQUESTED' } });
-  }
-
-  async findOneAdmin(returnId: string) {
-    return { data: await this.getView(returnId, true) };
-  }
 
   /** Duyệt: khách được phép gửi hàng về. `note` (hướng dẫn gửi hàng) khách thấy */
   async approve(adminId: string, returnId: string, dto: ApproveReturnDto) {
@@ -215,7 +133,7 @@ export class ReturnService {
       request.adminNote = dto.note ?? null;
       await manager.save(request);
     });
-    return this.findOneAdmin(returnId);
+    return this.queryService.findOneAdmin(returnId);
   }
 
   /** Từ chối (REQUESTED hoặc APPROVED, tức chưa nhận hàng); `note` là lý do khách thấy */
@@ -227,7 +145,7 @@ export class ReturnService {
       request.adminNote = dto.note;
       await manager.save(request);
     });
-    return this.findOneAdmin(returnId);
+    return this.queryService.findOneAdmin(returnId);
   }
 
   /**
@@ -292,7 +210,7 @@ export class ReturnService {
       if (dto.note !== undefined) request.adminNote = dto.note;
       await manager.save(request);
     });
-    return this.findOneAdmin(returnId);
+    return this.queryService.findOneAdmin(returnId);
   }
 
   // ============================================
@@ -344,106 +262,5 @@ export class ReturnService {
       accepted.set(entry.returnItemId, entry.acceptedQuantity);
     }
     return accepted;
-  }
-
-  /** Số lượng từng dòng đơn đã nằm trong các yêu cầu còn hiệu lực */
-  private async activeQuantities(manager: EntityManager, orderId: string): Promise<Map<string, number>> {
-    const requests = await manager.find(ReturnRequest, { where: { orderId, status: In([...ACTIVE_RETURN_STATUSES]) } });
-    const items = requests.length
-      ? await manager.find(ReturnRequestItem, { where: { returnRequestId: In(requests.map((request) => request.id)) } })
-      : [];
-    const quantities = new Map<string, number>();
-    for (const item of items) quantities.set(item.orderItemId, (quantities.get(item.orderItemId) ?? 0) + item.quantity);
-    return quantities;
-  }
-
-  private async getView(returnId: string, admin: boolean) {
-    const request = await this.dataSource.manager.findOne(ReturnRequest, { where: { id: returnId } });
-    if (!request) throwAppError(EReturnErrorCode.RETURN_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
-    return (await this.toViews([request], admin))[0];
-  }
-
-  /**
-   * Khách và admin cùng một shape; admin có thêm người xử lý, đơn và khách. Khoản hoàn gắn với yêu cầu: khoản mới nhất
-   * (yêu cầu có thể có nhiều khoản nếu khoản trước bị từ chối rồi nhận lại).
-   */
-  private async toViews(requests: ReturnRequest[], admin: boolean) {
-    if (!requests.length) return [];
-    const manager = this.dataSource.manager;
-    const ids = requests.map((request) => request.id);
-    const items = await manager.find(ReturnRequestItem, { where: { returnRequestId: In(ids) } });
-    const orderItems = items.length
-      ? await manager.find(OrderItem, { where: { id: In([...new Set(items.map((item) => item.orderItemId))]) } })
-      : [];
-    const orderItemById = new Map(orderItems.map((orderItem) => [orderItem.id, orderItem]));
-    const refunds = await manager.find(Refund, { where: { returnRequestId: In(ids) }, order: { createdAt: 'DESC' } });
-    // Đơn cần cho cả khách (tỷ giá chốt trên đơn để suy ra USD) lẫn admin (tóm tắt đơn)
-    const orders = await manager.find(Order, { where: { id: In([...new Set(requests.map((request) => request.orderId))]) } });
-    const orderById = new Map(orders.map((order) => [order.id, order]));
-
-    return requests.map((request) => {
-      const refund = refunds.find((candidate) => candidate.returnRequestId === request.id) ?? null;
-      const order = orderById.get(request.orderId);
-      // Đơn luôn tồn tại (FK RESTRICT); tỷ giá chốt trên đơn để USD của yêu cầu không đổi khi admin đổi tỷ giá
-      const rate = order?.exchangeRate ?? 1;
-      const view = {
-        id: request.id,
-        orderId: request.orderId,
-        status: request.status,
-        reason: request.reason,
-        note: request.note,
-        adminNote: request.adminNote,
-        createdAt: request.createdAt,
-        approvedAt: request.approvedAt,
-        receivedAt: request.receivedAt,
-        items: items
-          .filter((item) => item.returnRequestId === request.id)
-          .map((item) => {
-            const orderItem = orderItemById.get(item.orderItemId);
-            return {
-              id: item.id,
-              orderItemId: item.orderItemId,
-              productName: orderItem?.productName ?? null,
-              productImage: orderItem?.productImage ?? null,
-              size: orderItem?.size ?? null,
-              color: orderItem?.color ?? null,
-              ...moneyOrNull('price', orderItem?.price, rate),
-              quantity: item.quantity,
-              acceptedQuantity: item.acceptedQuantity,
-            };
-          }),
-        refund: refund
-          ? {
-              ...(admin ? { id: refund.id } : {}),
-              ...money('amount', refund.amount, rate),
-              status: refund.status,
-              bankReference: refund.bankReference,
-              processedAt: refund.processedAt,
-            }
-          : null,
-      };
-      if (!admin) return view;
-
-      return {
-        ...view,
-        requestedBy: request.requestedBy,
-        processedBy: request.processedBy,
-        shippingRefunded: request.shippingRefunded,
-        updatedAt: request.updatedAt,
-        order: order
-          ? {
-              id: order.id,
-              status: order.status,
-              paymentStatus: order.paymentStatus,
-              ...money('total', order.total, rate),
-              ...money('shippingFee', order.shippingFee, rate),
-              exchangeRate: order.exchangeRate,
-              deliveredAt: order.deliveredAt,
-              userId: order.userId,
-              customer: { fullName: order.shippingAddress?.fullName ?? null, phone: order.shippingAddress?.phone ?? null },
-            }
-          : null,
-      };
-    });
   }
 }
