@@ -1,10 +1,10 @@
+import { DEFAULT_JWT_SECRET } from '@common/constants/security.constant';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { User } from '../user/user.entity';
-import { DEFAULT_JWT_SECRET } from './auth.constant';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { GoogleAuthService } from './google-auth.service';

@@ -1,4 +1,5 @@
 import { isUniqueViolation } from '@common/base/db-error.util';
+import { DEFAULT_JWT_SECRET } from '@common/constants/security.constant';
 import { throwAppError } from '@common/exceptions/app.exception';
 import { EAuthErrorCode } from '@common/exceptions/error-codes';
 import { DEFAULT_USER_PERMISSIONS } from '@common/permissions/permissions.constant';
@@ -8,7 +9,7 @@ import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../user/user.entity';
-import { DEFAULT_JWT_SECRET, JwtPayload, JwtTokenType } from './auth.constant';
+import { JwtPayload, JwtTokenType } from './auth.constant';
 import { GoogleAuthService, GoogleUserPayload } from './google-auth.service';
 
 @Injectable()

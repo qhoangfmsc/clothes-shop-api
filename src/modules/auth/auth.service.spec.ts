@@ -1,6 +1,7 @@
+import { DEFAULT_JWT_SECRET } from '@common/constants/security.constant';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { DEFAULT_JWT_SECRET, JwtPayload } from './auth.constant';
+import { JwtPayload } from './auth.constant';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
 
