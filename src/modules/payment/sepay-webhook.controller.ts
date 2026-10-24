@@ -1,4 +1,5 @@
 import { Public } from '@common/decorator/public.decorator';
+import { SkipRateLimit } from '@common/decorator/rate-limit.decorator';
 import { Controller, Headers, HttpCode, HttpStatus, Post, RawBodyRequest, Req } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { Request } from 'express';
@@ -6,6 +7,7 @@ import { SepayWebhookService } from './sepay-webhook.service';
 
 /** Route công khai: danh tính được chứng minh bằng chữ ký HMAC của SePay, không bằng JWT */
 @Public()
+@SkipRateLimit()
 @ApiExcludeController()
 @Controller('api/webhooks')
 export class SepayWebhookController {

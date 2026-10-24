@@ -1,4 +1,5 @@
 import { Permissions } from '@common/decorator/permissions.decorator';
+import { RateLimit } from '@common/decorator/rate-limit.decorator';
 import { Permission } from '@common/permissions/permissions.constant';
 import { Controller, Delete, Get, Param, Post, Query, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -32,6 +33,7 @@ export class AdminMediaController {
   @ApiConsumes('multipart/form-data')
   @ApiBody({ schema: { type: 'object', required: ['file'], properties: { file: { type: 'string', format: 'binary' } } } })
   @Permissions(Permission.MEDIA_UPLOAD)
+  @RateLimit('upload')
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MEDIA_MAX_FILE_SIZE, files: 1 }, defParamCharset: 'utf8' }))
   upload(@UploadedFile() file?: Express.Multer.File) {
     return this.mediaService.upload(file);

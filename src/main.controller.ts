@@ -1,4 +1,5 @@
 import { Public } from '@common/decorator/public.decorator';
+import { SkipRateLimit } from '@common/decorator/rate-limit.decorator';
 import { Controller, Get } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { InjectDataSource } from '@nestjs/typeorm';
@@ -7,6 +8,7 @@ import { DataSource } from 'typeorm';
 @ApiExcludeController()
 @Controller()
 @Public()
+@SkipRateLimit()
 export class MainController {
   constructor(@InjectDataSource() private readonly dataSource: DataSource) {}
 

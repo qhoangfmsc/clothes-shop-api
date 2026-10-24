@@ -2,6 +2,9 @@ import { JwtAuthGuard } from '@common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '@common/guards/permissions.guard';
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { RateLimitGuard } from './common/guards/rate-limit.guard';
+import { RATE_LIMIT_WINDOW_MS, rateLimitPerMinute } from './common/utils/rate-limit.config';
 import { CoreModule } from './core/core.module';
 import { MainController } from './main.controller';
 import { AddressModule } from './modules/address/address.module';
@@ -25,6 +28,7 @@ import { WishlistModule } from './modules/wishlist/wishlist.module';
 
 @Module({
   imports: [
+    ThrottlerModule.forRoot([{ name: 'default', ttl: RATE_LIMIT_WINDOW_MS, limit: () => rateLimitPerMinute('default') }]),
     CoreModule,
     AuthModule,
     UserModule,
@@ -47,6 +51,11 @@ import { WishlistModule } from './modules/wishlist/wishlist.module';
   ],
   controllers: [MainController],
   providers: [
+    // Đầu tiên: chặn cả request chưa xác thực (dò đăng nhập) trước khi tốn JWT/DB
+    {
+      provide: APP_GUARD,
+      useClass: RateLimitGuard,
+    },
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,

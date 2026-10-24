@@ -1,6 +1,7 @@
 import { CurrentUser } from '@common/decorator/current-user.decorator';
 import { Permissions } from '@common/decorator/permissions.decorator';
 import { Public } from '@common/decorator/public.decorator';
+import { RateLimit } from '@common/decorator/rate-limit.decorator';
 import { Permission } from '@common/permissions/permissions.constant';
 import { Body, Controller, Get, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -14,6 +15,7 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Public()
+  @RateLimit('auth')
   @Post('google')
   @ApiOperation({ summary: 'Login with Google ID token' })
   async googleLogin(@Body() dto: GoogleLoginDto) {
@@ -29,6 +31,7 @@ export class AuthController {
   }
 
   @Public()
+  @RateLimit('auth')
   @Post('refresh')
   @ApiOperation({ summary: 'Refresh access token' })
   async refresh(@Body() dto: RefreshTokenDto) {

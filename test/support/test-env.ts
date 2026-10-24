@@ -22,6 +22,10 @@ const FIXED = {
   SEPAY_RECEIVING_ACCOUNT_NAME: 'DOOVAN TEST',
   SEPAY_WEBHOOK_SECRET: 'flow-test-sepay-secret',
   PAYMENT_TRANSFER_PREFIX: 'DH',
+  // Rate limit rất cao: ma trận auth gửi hàng nghìn request từ một IP; flow riêng bật giới hạn thấp (flows/rate-limit)
+  RATE_LIMIT_DEFAULT_PER_MINUTE: '1000000',
+  RATE_LIMIT_AUTH_PER_MINUTE: '1000000',
+  RATE_LIMIT_UPLOAD_PER_MINUTE: '1000000',
 };
 
 // Luôn rỗng: `.env` của máy dev có thể chứa khoá thật

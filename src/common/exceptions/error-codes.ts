@@ -173,6 +173,13 @@ export enum EPermissionErrorCode {
 }
 
 // ============================================
+// RATE LIMIT ERRORS (92xx)
+// ============================================
+export enum ERateLimitErrorCode {
+  RATE_LIMITED = 9201,
+}
+
+// ============================================
 // DATABASE INTEGRITY ERRORS (91xx) — lưới an toàn của AllExceptionFilter cho vi phạm ràng buộc chưa được ánh xạ riêng
 // ============================================
 export enum EDatabaseErrorCode {
@@ -186,6 +193,7 @@ export enum EDatabaseErrorCode {
 // ERROR MESSAGES - Map error code to message
 // ============================================
 export const ErrorMessages: Record<number, string> = {
+  [ERateLimitErrorCode.RATE_LIMITED]: 'Too many requests, please try again later',
   [EDatabaseErrorCode.DB_NOT_NULL_VIOLATION]: 'A required value is missing',
   [EDatabaseErrorCode.DB_CHECK_VIOLATION]: 'A value is outside the allowed range',
   [EDatabaseErrorCode.DB_UNIQUE_VIOLATION]: 'This value already exists',

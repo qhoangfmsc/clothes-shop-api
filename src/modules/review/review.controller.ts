@@ -1,6 +1,7 @@
 import { CurrentUser } from '@common/decorator/current-user.decorator';
 import { Permissions } from '@common/decorator/permissions.decorator';
 import { Public } from '@common/decorator/public.decorator';
+import { RateLimit } from '@common/decorator/rate-limit.decorator';
 import { Permission } from '@common/permissions/permissions.constant';
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -41,6 +42,7 @@ export class ReviewController {
   @ApiConsumes('multipart/form-data')
   @ApiBody({ schema: { type: 'object', required: ['file'], properties: { file: { type: 'string', format: 'binary' } } } })
   @Permissions(Permission.REVIEW_CREATE)
+  @RateLimit('upload')
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: REVIEW_IMAGE_MAX_FILE_SIZE, files: 1 }, defParamCharset: 'utf8' }))
   uploadImage(@CurrentUser() user: User, @UploadedFile() file?: Express.Multer.File) {
     return this.reviewService.uploadImage(user.id, file);
