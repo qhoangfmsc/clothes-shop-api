@@ -11,7 +11,7 @@ Module đơn hàng: khách checkout từ giỏ hàng, xem lịch sử/chi tiết
 | Thư mục | `src/modules/order` |
 | Route prefix | `/api/orders` (khách), `/api/admin/orders` (admin) |
 | Bảng DB | `orders`, `order_items` |
-| Module phụ thuộc | `cart` (entity `Cart`, `CartItem`), `address` (entity `Address`) — đọc trực tiếp qua `EntityManager` trong transaction; `product` (qua quan hệ của `CartItem`); `shipping` (`ShippingConfigService` — phí ship và ngưỡng miễn phí); `currency` (`CurrencyService.getVndPerUsd` — tỷ giá chốt lúc đặt và dùng cho báo giá, xem [currency](currency.md)); `payment` (`PaymentQueryService.listAttemptsForCustomer`/`cancelPendingAttempts` — các phiên thanh toán của đơn; `RefundService.listForCustomer`/`createForCancelledOrder` — hoàn tiền) |
+| Module phụ thuộc | `cart` (entity `Cart`, `CartItem`), `address` (entity `Address`) — đọc trực tiếp qua `EntityManager` trong transaction; `product` (qua quan hệ của `CartItem`); `shipping` (`ShippingConfigService` — phí ship và ngưỡng miễn phí); `currency` (`CurrencyService.getVndPerUsd` — tỷ giá chốt lúc đặt và dùng cho báo giá, xem [currency](currency.md)); `payment` (`PaymentQueryService.listAttemptsForCustomer`/`cancelPendingAttempts` — các phiên thanh toán của đơn; `RefundQueryService.listForCustomer`/`createForCancelledOrder` — hoàn tiền) |
 | Export | `OrderQueryService` (module [pending-count](pending-count.md) dùng `countNeedsAction`) |
 
 Thanh toán (VietQR/SePay) và hoàn tiền của đơn do module [payment](payment.md) xử lý; module này chỉ giữ hai cột `payment_status`, `paid_at` trên bảng `orders` và tạo yêu cầu hoàn tiền khi đơn đã trả bị huỷ.
@@ -70,7 +70,7 @@ Thanh toán (VietQR/SePay) và hoàn tiền của đơn do module [payment](paym
 
 Không trả số tài khoản nhận, `raw_payload`, id nội bộ hay id đơn trong từng phiên. Danh sách đơn `GET /api/orders` không có field này.
 
-`data.refunds` là các khoản hoàn tiền của đơn, mới nhất trước (`[]` nếu chưa có). Do [payment](payment.md) (`RefundService.listForCustomer`) cung cấp:
+`data.refunds` là các khoản hoàn tiền của đơn, mới nhất trước (`[]` nếu chưa có). Do [payment](payment.md) (`RefundQueryService.listForCustomer`) cung cấp:
 
 ```json
 "refunds": [

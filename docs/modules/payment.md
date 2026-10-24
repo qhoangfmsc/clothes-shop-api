@@ -12,7 +12,7 @@ Module thanh toán chuyển khoản VietQR qua SePay: tạo phiên thanh toán Q
 | Route prefix | `/api/payments` (khách), `/api/webhooks/sepay` (SePay gọi), `/api/admin/payments`, `/api/admin/refunds` (admin) |
 | Bảng DB | `payment_attempts`, `payment_transactions`, `refunds`; thêm cột `payment_status`, `paid_at` vào `orders` (entity thuộc [order](order.md)) |
 | Module phụ thuộc | `order` (entity `Order`, đọc/khoá/cập nhật qua `EntityManager`); `return` (chỉ entity `ReturnRequest`, `ReturnRequestItem`: cập nhật trạng thái khi khoản hoàn từ trả hàng xong/bị từ chối); `currency` ([currency](currency.md): tỷ giá hiện tại cho USD của giao dịch chưa khớp đơn nào); dịch vụ ngoài: SePay (chỉ nhận webhook, không gọi API SePay) |
-| Export | `PaymentConfigService`, `PaymentService`, `PaymentQueryService`, `RefundService` (module [order](order.md) và [return](return.md) dùng) |
+| Export | `PaymentConfigService`, `PaymentService`, `PaymentQueryService`, `RefundService`, `RefundQueryService` (module [order](order.md) và [return](return.md) dùng) |
 
 ## 2. Mục đích & nghiệp vụ phục vụ
 
@@ -304,11 +304,11 @@ Dùng mã giao dịch SePay làm `reference` (provider `sepay`) thì khi SePay g
 
 ### 4.6 Phụ thuộc & cấu hình
 
-- Ba service (xem 4.9): `PaymentService` inject `DataSource`, `Repository<PaymentAttempt>`, `PaymentConfigService`; `PaymentConfirmService` inject `DataSource`; `PaymentQueryService` inject `Repository<Order>`, `Repository<PaymentAttempt>`, `Repository<PaymentTransaction>`, `CurrencyService`, `PaymentService`. `PaymentModule` export `PaymentConfigService`, `PaymentService`, `PaymentQueryService`, `RefundService` (module order và pending-count dùng); `TypeOrmModule.forFeature([Order, PaymentAttempt, PaymentTransaction, Refund])`; `CurrencyModule` (`CurrencyService`); `ConfigService` (qua `PaymentConfigService`) đọc env; `DataSource` cho transaction.
+- Ba service (xem 4.9): `PaymentService` inject `DataSource`, `Repository<PaymentAttempt>`, `PaymentConfigService`; `PaymentConfirmService` inject `DataSource`; `PaymentQueryService` inject `Repository<Order>`, `Repository<PaymentAttempt>`, `Repository<PaymentTransaction>`, `CurrencyService`, `PaymentService`. `RefundService` inject `DataSource`, `Repository<Refund>`, `RefundQueryService`; `RefundQueryService` inject `Repository<Refund>`, `Repository<PaymentTransaction>`. `PaymentModule` export `PaymentConfigService`, `PaymentService`, `PaymentQueryService`, `RefundService`, `RefundQueryService` (module order và pending-count dùng); `TypeOrmModule.forFeature([Order, PaymentAttempt, PaymentTransaction, Refund])`; `CurrencyModule` (`CurrencyService`); `ConfigService` (qua `PaymentConfigService`) đọc env; `DataSource` cho transaction.
 - `main.ts` giữ `req.rawBody` cho đường dẫn `/api/webhooks/` (xem [common](common.md)).
 - Thư viện `@nestjs/schedule` (`ScheduleModule.forRoot()` trong `PaymentModule`) chạy `PaymentExpiryScheduler`.
 - Biến môi trường (chỉ tên): `SEPAY_RECEIVING_BANK_CODE` (mã ngắn ngân hàng của `vietqr.app/banks.json`, đưa vào `bank=`), `SEPAY_RECEIVING_BANK_NAME`, `SEPAY_RECEIVING_ACCOUNT`, `SEPAY_RECEIVING_ACCOUNT_NAME`, `SEPAY_WEBHOOK_SECRET`, `PAYMENT_TRANSFER_PREFIX` (mặc định `DH`, 2–8 ký tự `A-Z0-9`, tự chuyển chữ hoa; tiền tố của nội dung chuyển khoản, phải khớp tiền tố cấu hình trên SePay). Tỷ giá không còn là biến môi trường: nằm ở dòng `EXCHANGE_RATE` của site-config ([currency](currency.md)). Tạo QR cần cả sáu; webhook cần `SEPAY_WEBHOOK_SECRET`, `SEPAY_RECEIVING_ACCOUNT`, `PAYMENT_TRANSFER_PREFIX`.
-- `PaymentQueryService.countNeedsReview()` và `RefundService.countRequested()` cung cấp số đếm cho [pending-count](pending-count.md) (cùng điều kiện với bộ lọc `needsReview` và `status=REQUESTED` của hai danh sách).
+- `PaymentQueryService.countNeedsReview()` và `RefundQueryService.countRequested()` cung cấp số đếm cho [pending-count](pending-count.md) (cùng điều kiện với bộ lọc `needsReview` và `status=REQUESTED` của hai danh sách).
 - Quyền tạo QR cho đơn: `PAYMENT_ADMIN_CREATE_QR` (không nằm trong `DEFAULT_USER_PERMISSIONS`, admin tự có).
 - Quyền hoàn tiền: `PAYMENT_ADMIN_VIEW` (list), `PAYMENT_ADMIN_REFUND` (tạo, hoàn xong, từ chối); không nằm trong `DEFAULT_USER_PERMISSIONS`, admin tự có. Không có biến môi trường mới.
 - Hằng số trong `payment.constant.ts`: QR hết hạn sau 30 phút (`PAYMENT_QR_TTL_MS`), dung sai timestamp chữ ký 300 giây, URL ảnh `https://vietqr.app/img`.
@@ -376,3 +376,9 @@ Tách `PaymentService` (spec [payment/0002](../specs/payment/0002-split-payment-
 |---|---|---|
 | Tách theo use case (SRP) | `PaymentService` (`createQr`, `createQrAdmin`, `cancelPendingAttempts`, `expireOverdueAttempts`), `PaymentConfirmService` (`confirmPaymentAdmin`), `PaymentQueryService` (`getStatus`, `listAttemptsForCustomer`, `findTransactionsAdmin`, `countNeedsReview`, `findAttemptsAdmin`, `getOrderPaymentsAdmin`) | Cấp mã, xác nhận thủ công và truy vấn có lý do đổi khác nhau; luồng tiền xác nhận nằm riêng. `PaymentQueryService` → `PaymentService` một chiều, chỉ để `findAttemptsAdmin` quét phiên quá hạn trước khi tra cứu |
 | Hàm thuần dùng chung | `assertOrderPayable` (`payment-payable.util.ts`) | Cùng một luật "đơn còn nhận thanh toán" cho `createQr`, `createQrAdmin` và xác nhận thủ công (1702) |
+
+Tách `RefundService` (spec [payment/0003](../specs/payment/0003-split-refund-service.md)):
+
+| Pattern / nguyên lý | Chỗ dùng | Vì sao |
+|---|---|---|
+| Tách command/query theo use case | `RefundQueryService` (`countRequested`, `listForCustomer`, `findAdmin`, `getAdminView` + dựng view admin/khách) và `RefundService` (`createForCancelledOrder`, `createForReturn`, `createAdmin`, `completeAdmin`, `rejectAdmin`) | Luật tính và ghi khoản hoàn tách khỏi phần hiển thị; ghi gọi đọc một chiều để trả view admin sau khi ghi. `OrderQueryService` và `PendingCountService` chỉ cần Query |

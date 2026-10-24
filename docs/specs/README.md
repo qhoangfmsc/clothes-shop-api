@@ -38,6 +38,7 @@ Cấu trúc: `docs/specs/<module>/NNNN-slug.md` (số tăng dần theo từng mo
 | category | [0001 — Kế hoạch flow test cho module category](category/0001-flow-test-plan.md) | Implemented | Đọc công khai/admin, tạo, sửa, xoá, reorder và bất biến thứ hạng: 6/6 route đủ ca; 1 phát hiện chờ quyết định |
 | product | [0001 — Kế hoạch flow test cho module product](product/0001-flow-test-plan.md) | Implemented | Đọc công khai, autocomplete, danh sách/tạo/sửa/xoá admin: 7/7 route đủ ca; 5 phát hiện chờ quyết định |
 | review | [0001 — Kế hoạch flow test cho module review](review/0001-flow-test-plan.md) | Implemented | Đọc công khai, viết, sửa, vote, upload ảnh, kiểm duyệt, phản hồi: 16/16 route đủ ca |
+| payment | [0003 — Tách `RefundService` thành đọc và ghi](payment/0003-split-refund-service.md) | Implemented | RefundQueryService + RefundService |
 | return | [0002 — Tách `ReturnService` thành đọc và ghi](return/0002-split-return-service.md) | Implemented | ReturnQueryService + ReturnService + activeReturnQuantities |
 | payment | [0002 — Tách `PaymentService` theo use case](payment/0002-split-payment-service.md) | Implemented | PaymentService (QR) + PaymentConfirmService + PaymentQueryService + assertOrderPayable |
 | review | [0002 — Tách `ReviewService` thành đọc và ghi](review/0002-split-review-service.md) | Implemented | ReviewQueryService + ReviewService + review-view.util |

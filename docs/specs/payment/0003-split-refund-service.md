@@ -1,6 +1,6 @@
 # 0003 — Tách `RefundService` thành đọc và ghi
 
-> Module: `payment` (+ `order`, `pending-count` đổi chỗ tiêm) · Trạng thái: Draft · Ngày: 2026-10-24 · Cỡ: rút gọn (không đổi hành vi)
+> Module: `payment` (+ `order`, `pending-count` đổi chỗ tiêm) · Trạng thái: Implemented · Ngày: 2026-10-24 · Cỡ: rút gọn (không đổi hành vi)
 
 ## 1. Bối cảnh & vấn đề
 
@@ -71,4 +71,8 @@ Luồng tiền hoàn nằm trong phần ghi (chỉ đổi cách trả view). Gi�
 
 ## 6. Kết quả triển khai
 
-_Điền sau khi làm xong._
+- **File mới:** `refund-query.service.ts` (145 dòng, 2 dependency). **Sửa:** `refund.service.ts` (352 → 229 dòng, 3 dependency), `payment.module.ts` (export thêm `RefundQueryService`), `admin-refund.controller.ts`, `OrderQueryService`, `PendingCountService`, `refund.service.spec.ts`, `order-status.service.spec.ts`, allowlist kiến trúc (bỏ mục `refund.service.ts`).
+- **Kiểm chứng di chuyển nguyên văn:** so mọi dòng của file cũ với hai file mới: chỉ khác import và `this.getAdminView` → `this.queryService.getAdminView` (`getAdminView` thành public).
+- **Khác thiết kế:** `RefundService` vẫn giữ `Repository<Refund>` (`completeAdmin`/`rejectAdmin` đọc khoản hoàn bằng nó) nhưng không còn `Repository<PaymentTransaction>`.
+- **Kiểm chứng:** 829 unit và 883 flow đều xanh, độ phủ route 98/98 và 82/82; không sửa flow nào. Phá thử: đổi điều kiện `refundedAfter === paid` ở `completeAdmin` → 4 unit đỏ.
+- **Docs:** `payment.md` (4.6, 4.9), `order.md`, `pending-count.md`, `common.md` (4.13).
