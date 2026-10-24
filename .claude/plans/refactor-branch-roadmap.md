@@ -27,6 +27,8 @@ Báo cáo mỗi phần: đã đổi gì (file), số liệu trước/sau, patter
 | 10 | Tách `OrderService` thành `OrderQueryService`, `OrderCheckoutService`, `OrderStatusService` (di chuyển nguyên văn, có flow đặc tả truy vấn viết trước) | Xong |
 | 11 | Ranh giới module: đo được 4 nhóm ghi chéo module (payment→order, payment→return, review→product, order→cart); thiết kế và 5 phương án ở spec common/0006 | Xong 2026-10-24 (spec common/0006 Implemented: 4 nhóm ghi chéo → hàm của module chủ + luật máy) |
 | 12+ | Chiến dịch test toàn diện: 25 batch theo `test/PROGRESS.md` (nhóm theo module, mỗi lần một batch). Thứ tự đã đổi: làm trước Phần 11 để có lưới an toàn | Xong (25/25 batch; 98/98 route có ca thành công, 82/82 có ca lỗi, 16 route miễn ca lỗi kèm lý do) |
+| 13 | Cải tiến sản xuất: CI (GitHub Actions: audit, tsc, lint, build, unit, flow), từ chối khởi động khi cấu hình production sai (common/0009), giới hạn tần suất (common/0010), vá phụ thuộc có lỗ hổng nghiêm trọng | Xong 2026-10-24 |
+| 14 | Dọn dẹp kích thước service: tách `ReviewService`, `PaymentService`, `RefundService`, `ReturnService`, `CategoryService`, `ProductService` (đọc/ghi hoặc theo use case) và logic thuần của `MediaService`; hai allowlist kích thước service về rỗng | Xong 2026-10-24 (specs review/0002, payment/0002–0003, return/0002, category/0002, product/0002, media/0002) |
 | Cuối | Đối chiếu toàn bộ docs/spec/test matrix với code, chạy kiểm tra toàn bộ, báo cáo tổng kết | Xong 2026-10-23 (16 phát hiện đã xử lý; Phần 11 xong) |
 
 Thứ tự phần 5–11 có thể đổi theo ý người dùng. Phần 7–11 đụng code production nên mỗi phần có spec riêng ở `docs/specs/<module>/` và cần người dùng duyệt thiết kế trước khi code.
