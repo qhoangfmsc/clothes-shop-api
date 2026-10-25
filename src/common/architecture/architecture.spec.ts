@@ -1,6 +1,7 @@
 import { dirname, join, normalize } from 'node:path';
 import { MODULE_METADATA } from '@nestjs/common/constants';
 import {
+  CELL_DEPENDENCIES,
   COMMON_IMPORTS_MODULES,
   CROSS_MODULE_WRITES,
   MANY_DEPENDENCIES_SERVICES,
@@ -171,24 +172,48 @@ describe('Architecture rules', () => {
     expect(violations).toEqual([]);
   });
 
-  it('keeps cells of a module independent: a cell imports only itself and shared/, and shared/ imports no cell', () => {
+  it('keeps cells of a module independent: only declared cell dependencies, no cycles, no dead edges', () => {
     const problems: string[] = [];
+    const used = new Set<string>();
     for (const file of listFiles('src/modules', (f) => f.endsWith('.ts'))) {
       const [, , module, cell] = file.split('/');
       if (!cell || cell.endsWith('.ts') || cell === 'dtos') continue;
       const moduleDir = `src/modules/${module}/`;
       if (!listFiles(`src/modules/${module}`, (f) => f.startsWith(`${moduleDir}shared/`)).length) continue;
 
+      const declared = cell === 'shared' ? [] : (CELL_DEPENDENCIES[module]?.[cell] ?? []);
       for (const [, spec] of read(file).matchAll(/from\s+'(\.[^']*)'/g)) {
         const target = normalize(join(dirname(file), spec))
           .split('\\')
           .join('/');
         if (!target.startsWith(moduleDir)) continue;
         const targetCell = target.slice(moduleDir.length).split('/')[0];
-        const allowed = cell === 'shared' ? ['shared'] : [cell, 'shared'];
-        if (targetCell.endsWith('.module') || allowed.includes(targetCell)) continue;
-        problems.push(`${file}: import ${spec} sang cell ${targetCell} — cell chỉ được import chính nó và shared/`);
+        if (targetCell.endsWith('.module') || targetCell === cell || targetCell === 'shared') continue;
+        if (declared.includes(targetCell)) used.add(`${module}/${cell}->${targetCell}`);
+        else problems.push(`${file}: import ${spec} sang cell ${targetCell} — khai báo trong CELL_DEPENDENCIES hoặc bỏ import`);
       }
+    }
+    for (const [module, cells] of Object.entries(CELL_DEPENDENCIES)) {
+      for (const [cell, targets] of Object.entries(cells)) {
+        for (const target of targets) {
+          if (!used.has(`${module}/${cell}->${target}`))
+            problems.push(`${module}: cạnh ${cell} -> ${target} khai báo nhưng không có import nào, xoá khỏi CELL_DEPENDENCIES`);
+        }
+      }
+      const visiting = new Set<string>();
+      const done = new Set<string>();
+      const visit = (cell: string, trail: string[]) => {
+        if (done.has(cell)) return;
+        if (visiting.has(cell)) {
+          problems.push(`${module}: vòng phụ thuộc giữa cell ${[...trail, cell].join(' -> ')}`);
+          return;
+        }
+        visiting.add(cell);
+        for (const next of cells[cell] ?? []) visit(next, [...trail, cell]);
+        visiting.delete(cell);
+        done.add(cell);
+      };
+      for (const cell of Object.keys(cells)) visit(cell, []);
     }
     expect(problems).toEqual([]);
   });
