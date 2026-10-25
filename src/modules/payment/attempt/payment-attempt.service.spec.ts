@@ -1,4 +1,4 @@
-import { Order } from '../../order/order.entity';
+import { Order } from '../../order/shared/order.entity';
 import { createFakeManager, futureDate, pastDate } from '../shared/payment.test-utils';
 import { PaymentAttempt } from '../shared/payment-attempt.entity';
 import { PaymentAttemptService } from './payment-attempt.service';

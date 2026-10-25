@@ -4,8 +4,8 @@ import { EOrderErrorCode, EReturnErrorCode } from '@common/exceptions/error-code
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In } from 'typeorm';
-import { Order } from '../order/order.entity';
-import { OrderItem } from '../order/order-item.entity';
+import { Order } from '../order/shared/order.entity';
+import { OrderItem } from '../order/shared/order-item.entity';
 import { RefundService } from '../refund/refund.service';
 import { ShippingConfigService } from '../shipping/shipping-config.service';
 import { ApproveReturnDto } from './dtos/approve-return.dto';

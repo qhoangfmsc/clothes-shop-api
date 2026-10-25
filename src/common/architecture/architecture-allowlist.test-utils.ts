@@ -1,7 +1,9 @@
 // Vi phạm cũ được phép tồn tại; chỉ được co lại (xem docs/specs/common/0002). Thêm mục mới phải có lý do và được duyệt.
 
 // Cell được import cell khác: module -> cell -> các cell (xem docs/specs/common/0012). Đồ thị không vòng, mỗi cạnh phải được dùng.
-export const CELL_DEPENDENCIES: Record<string, Record<string, readonly string[]>> = {};
+export const CELL_DEPENDENCIES: Record<string, Record<string, readonly string[]>> = {
+  order: { status: ['query'] }, // đọc-sau-ghi: huỷ/đổi trạng thái trả lại chi tiết đơn qua OrderQueryService
+};
 
 export const SERVICE_MAX_LINES = 300;
 export const SERVICE_MAX_DEPENDENCIES = 5;

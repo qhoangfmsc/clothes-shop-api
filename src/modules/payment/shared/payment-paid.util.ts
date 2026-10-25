@@ -1,5 +1,5 @@
 import { EntityManager } from 'typeorm';
-import { markOrderPaid } from '../../order/order-payment-state.util';
+import { markOrderPaid } from '../../order/shared/order-payment-state.util';
 import { PaymentAttempt } from './payment-attempt.entity';
 
 /**

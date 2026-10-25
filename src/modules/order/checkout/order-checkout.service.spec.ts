@@ -1,12 +1,12 @@
 import { EOrderErrorCode } from '@common/exceptions/error-codes';
 import { In } from 'typeorm';
-import { Address } from '../address/address.entity';
-import { Cart } from '../cart/cart.entity';
-import { CartItem } from '../cart/cart-item.entity';
-import { PaymentAttemptService } from '../payment/attempt/payment-attempt.service';
-import { createFakeManager } from '../payment/shared/payment.test-utils';
-import { DEFAULT_SHIPPING_CONFIG, ShippingConfig } from '../shipping/shipping-config';
-import { Order } from './order.entity';
+import { Address } from '../../address/address.entity';
+import { Cart } from '../../cart/cart.entity';
+import { CartItem } from '../../cart/cart-item.entity';
+import { PaymentAttemptService } from '../../payment/attempt/payment-attempt.service';
+import { createFakeManager } from '../../payment/shared/payment.test-utils';
+import { DEFAULT_SHIPPING_CONFIG, ShippingConfig } from '../../shipping/shipping-config';
+import { Order } from '../shared/order.entity';
 import { OrderCheckoutService } from './order-checkout.service';
 
 /** Lỗi `throwAppError` mặc định: HTTP 400 kèm `errorCode` */

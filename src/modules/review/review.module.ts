@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { MediaModule } from '../media/media.module';
-import { Order } from '../order/order.entity';
-import { OrderItem } from '../order/order-item.entity';
+import { Order } from '../order/shared/order.entity';
+import { OrderItem } from '../order/shared/order-item.entity';
 import { AdminReviewController } from './admin-review.controller';
 import { MyReviewController } from './my-review.controller';
 import { ReviewController } from './review.controller';

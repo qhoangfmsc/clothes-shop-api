@@ -1,6 +1,6 @@
 import { BaseEntity } from '@common/base/base.entity';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
-import { Order } from '../order/order.entity';
+import { Order } from '../order/shared/order.entity';
 import { ReturnReason, ReturnStatus } from './return.constant';
 
 /** Yêu cầu trả hàng của khách cho một đơn đã giao và đã thanh toán. Tiền hoàn do module payment (`refunds`) theo dõi */

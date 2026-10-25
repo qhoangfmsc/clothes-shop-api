@@ -6,7 +6,7 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { customAlphabet } from 'nanoid';
 import { DataSource, EntityManager, Repository } from 'typeorm';
-import { Order } from '../../order/order.entity';
+import { Order } from '../../order/shared/order.entity';
 import {
   PAYMENT_QR_TTL_MS,
   TRANSFER_CODE_ALPHABET,

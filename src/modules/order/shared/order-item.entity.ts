@@ -1,7 +1,7 @@
 import { bigintTransformer } from '@common/base/column-transformers';
 import { customAlphabet } from 'nanoid';
 import { BeforeInsert, Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryColumn } from 'typeorm';
-import { Product } from '../product/product.entity';
+import { Product } from '../../product/product.entity';
 import { Order } from './order.entity';
 
 const nanoid16 = customAlphabet('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', 16);

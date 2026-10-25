@@ -1,6 +1,6 @@
 import { Permission } from '@common/permissions/permissions.constant';
 import { Injectable } from '@nestjs/common';
-import { OrderQueryService } from '../order/order-query.service';
+import { OrderQueryService } from '../order/query/order-query.service';
 import { PaymentTransactionQueryService } from '../payment/transaction/payment-transaction-query.service';
 import { RefundQueryService } from '../refund/refund-query.service';
 import { ReturnQueryService } from '../return/return-query.service';

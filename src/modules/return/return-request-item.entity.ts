@@ -1,6 +1,6 @@
 import { BaseEntity } from '@common/base/base.entity';
 import { Column, Entity, JoinColumn, ManyToOne, Unique } from 'typeorm';
-import { OrderItem } from '../order/order-item.entity';
+import { OrderItem } from '../order/shared/order-item.entity';
 import { ReturnRequest } from './return-request.entity';
 
 @Unique('UQ_return_request_items_request_and_item', ['returnRequestId', 'orderItemId'])

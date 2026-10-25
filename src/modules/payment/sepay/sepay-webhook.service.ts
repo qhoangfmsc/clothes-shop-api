@@ -4,7 +4,7 @@ import { EPaymentErrorCode } from '@common/exceptions/error-codes';
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In } from 'typeorm';
-import { Order } from '../../order/order.entity';
+import { Order } from '../../order/shared/order.entity';
 import { PAYMENT_PROVIDER_SEPAY, PaymentVerificationStatus } from '../shared/payment.constant';
 import { PaymentAttempt } from '../shared/payment-attempt.entity';
 import { PaymentConfigService, WebhookConfig } from '../shared/payment-config.service';

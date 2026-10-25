@@ -5,7 +5,7 @@ import { vndToUsd } from '@common/utils/money.util';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import { Order } from '../../order/order.entity';
+import { Order } from '../../order/shared/order.entity';
 import { CONFIRMABLE_VERIFICATION_STATUSES, PAYMENT_PROVIDER_MANUAL, PAYMENT_PROVIDER_SEPAY } from '../shared/payment.constant';
 import { presentAmount } from '../shared/payment.presenter';
 import { PaymentAttempt } from '../shared/payment-attempt.entity';

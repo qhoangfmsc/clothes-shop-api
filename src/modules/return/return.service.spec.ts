@@ -1,5 +1,5 @@
 import { ValidationPipe } from '@nestjs/common';
-import { Order } from '../order/order.entity';
+import { Order } from '../order/shared/order.entity';
 import { createFakeManager } from '../payment/shared/payment.test-utils';
 import { Refund } from '../refund/refund.entity';
 import { RefundService } from '../refund/refund.service';

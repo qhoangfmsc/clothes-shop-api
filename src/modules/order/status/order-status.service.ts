@@ -4,12 +4,12 @@ import { EOrderErrorCode } from '@common/exceptions/error-codes';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager } from 'typeorm';
-import { PaymentAttemptService } from '../payment/attempt/payment-attempt.service';
-import { RefundService } from '../refund/refund.service';
+import { PaymentAttemptService } from '../../payment/attempt/payment-attempt.service';
+import { RefundService } from '../../refund/refund.service';
+import { OrderQueryService } from '../query/order-query.service';
+import { ORDER_TRANSITIONS } from '../shared/order.constant';
+import { Order } from '../shared/order.entity';
 import { UpdateOrderStatusDto } from './dtos/admin-order.dto';
-import { ORDER_TRANSITIONS } from './order.constant';
-import { Order } from './order.entity';
-import { OrderQueryService } from './order-query.service';
 
 /** Huỷ đơn (khách) và đổi trạng thái đơn (admin). */
 @Injectable()

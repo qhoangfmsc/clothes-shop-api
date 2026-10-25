@@ -1,6 +1,6 @@
 import { ValidationPipe } from '@nestjs/common';
-import { Order } from '../order/order.entity';
-import { OrderItem } from '../order/order-item.entity';
+import { Order } from '../order/shared/order.entity';
+import { OrderItem } from '../order/shared/order-item.entity';
 import { Product } from '../product/product.entity';
 import { CreateReviewDto } from './dtos/create-review.dto';
 import { HideReviewDto } from './dtos/hide-review.dto';

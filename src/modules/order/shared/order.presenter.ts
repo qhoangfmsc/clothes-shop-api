@@ -1,5 +1,5 @@
 import { type MoneyFields, money } from '@common/utils/money.util';
-import { type ProductSummary, type ProductSummarySource, presentProductSummary } from '../product/product.presenter';
+import { type ProductSummary, type ProductSummarySource, presentProductSummary } from '../../product/product.presenter';
 
 type ItemLike = { price: number; product?: ProductSummarySource | null };
 type OrderLike = { subtotal: number; shippingFee: number; total: number; exchangeRate: number; items?: ItemLike[] };

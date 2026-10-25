@@ -1,5 +1,5 @@
-import { Order } from '../../order/order.entity';
-import { OrderItem } from '../../order/order-item.entity';
+import { Order } from '../../order/shared/order.entity';
+import { OrderItem } from '../../order/shared/order-item.entity';
 import { Refund } from '../../refund/refund.entity';
 import { ReturnRequest } from '../../return/return-request.entity';
 import { ReturnRequestItem } from '../../return/return-request-item.entity';

@@ -6,7 +6,7 @@ import { money } from '@common/utils/money.util';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
-import { Order } from '../../order/order.entity';
+import { Order } from '../../order/shared/order.entity';
 import { PaymentAttemptStatus } from '../shared/payment.constant';
 import { PaymentAttempt } from '../shared/payment-attempt.entity';
 import { resolveAttemptStatus } from '../shared/payment-attempt-status.util';

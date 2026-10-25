@@ -12,7 +12,7 @@ import {
   MaxLength,
   ValidateNested,
 } from 'class-validator';
-import { SHIPPING_METHOD_IDS } from '../../shipping/shipping-config';
+import { SHIPPING_METHOD_IDS } from '../../../shipping/shipping-config';
 
 const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
 

@@ -2,7 +2,7 @@ import { BaseEntity } from '@common/base/base.entity';
 import { bigintTransformer, numericTransformer } from '@common/base/column-transformers';
 import type { OrderPaymentStatus, OrderStatus } from '@common/constants/enum-values.constant';
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
-import { User } from '../user/user.entity';
+import { User } from '../../user/user.entity';
 import { OrderItem } from './order-item.entity';
 
 @Entity('orders')

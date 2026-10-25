@@ -1,8 +1,8 @@
 import { Permission } from '@common/permissions/permissions.constant';
 import { ValidationPipe } from '@nestjs/common';
-import { AdminOrderQueryDto } from '../order/dtos/admin-order-query.dto';
-import { ORDER_NEEDS_ACTION_SQL } from '../order/order-needs-action.util';
-import { OrderQueryService } from '../order/order-query.service';
+import { AdminOrderQueryDto } from '../order/query/dtos/admin-order-query.dto';
+import { ORDER_NEEDS_ACTION_SQL } from '../order/query/order-needs-action.util';
+import { OrderQueryService } from '../order/query/order-query.service';
 import { AdminPaymentTransactionQueryDto } from '../payment/transaction/dtos/admin-payment-transaction-query.dto';
 import { TRANSACTION_NEEDS_REVIEW_SQL } from '../payment/transaction/payment-needs-review.util';
 import { PaymentTransactionQueryService } from '../payment/transaction/payment-transaction-query.service';

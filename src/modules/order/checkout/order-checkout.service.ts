@@ -5,17 +5,17 @@ import { money, moneyOrNull } from '@common/utils/money.util';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager } from 'typeorm';
-import { Address } from '../address/address.entity';
-import { Cart } from '../cart/cart.entity';
-import { removeOrderedCartItems } from '../cart/cart-checkout.util';
-import { CartItem } from '../cart/cart-item.entity';
-import { CurrencyService } from '../currency/currency.service';
-import { ShippingConfigService } from '../shipping/shipping-config.service';
+import { Address } from '../../address/address.entity';
+import { Cart } from '../../cart/cart.entity';
+import { removeOrderedCartItems } from '../../cart/cart-checkout.util';
+import { CartItem } from '../../cart/cart-item.entity';
+import { CurrencyService } from '../../currency/currency.service';
+import { ShippingConfigService } from '../../shipping/shipping-config.service';
+import { ORDER_RELATIONS } from '../shared/order.constant';
+import { Order } from '../shared/order.entity';
+import { presentOrder } from '../shared/order.presenter';
+import { OrderItem } from '../shared/order-item.entity';
 import { CreateOrderDto, PickupContactDto, QuoteOrderDto } from './dtos/order.dto';
-import { ORDER_RELATIONS } from './order.constant';
-import { Order } from './order.entity';
-import { presentOrder } from './order.presenter';
-import { OrderItem } from './order-item.entity';
 
 /** Báo giá và đặt hàng từ giỏ (checkout). */
 @Injectable()
@@ -175,7 +175,7 @@ export class OrderCheckoutService {
     }
 
     // Validate product availability (sản phẩm bị xoá hoặc disabled)
-    const missingProducts = selectedItems.filter((item) => !item.product || item.product.status !== 'active');
+    const missingProducts = selectedItems.filter((item) => item.product?.status !== 'active');
     if (missingProducts.length > 0) {
       const names = missingProducts.map((i) => i.product?.name || i.productId).join(', ');
       throwAppError(EOrderErrorCode.ORDER_PRODUCT_UNAVAILABLE, `Some products are no longer available: ${names}`);

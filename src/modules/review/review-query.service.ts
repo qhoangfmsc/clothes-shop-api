@@ -5,7 +5,7 @@ import { EReviewErrorCode } from '@common/exceptions/error-codes';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
-import { OrderItem } from '../order/order-item.entity';
+import { OrderItem } from '../order/shared/order-item.entity';
 import { AdminReviewQueryDto } from './dtos/admin-review-query.dto';
 import { MyPendingReviewQueryDto } from './dtos/my-pending-review-query.dto';
 import { MyReviewQueryDto } from './dtos/my-review-query.dto';

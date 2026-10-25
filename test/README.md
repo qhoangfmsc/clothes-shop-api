@@ -126,7 +126,7 @@ Trạng thái: **Có** = đã có test cover luồng · **Unit** = chỉ có uni
 | collection | `modules/collection/collection.service.spec.ts` |
 | currency | `modules/currency/currency.service.spec.ts` |
 | media | `modules/media/media.service.spec.ts`, `media-file.util.spec.ts` |
-| order | `modules/order/order-checkout.service.spec.ts`, `order-query.service.spec.ts`, `order-status.service.spec.ts`, `order.presenter.spec.ts`, `order.constant.spec.ts` (bảng chuyển trạng thái), `dtos/order.dto.spec.ts` |
+| order | `modules/order/checkout/order-checkout.service.spec.ts`, `checkout/dtos/order.dto.spec.ts`, `query/order-query.service.spec.ts`, `status/order-status.service.spec.ts`, `shared/order.presenter.spec.ts`, `shared/order.constant.spec.ts` (bảng chuyển trạng thái), `shared/order-payment-state.util.spec.ts` |
 | payment | `modules/payment/attempt/payment-attempt.service.spec.ts`, `attempt/payment-expiry.spec.ts`, `attempt/payment-attempts-admin.spec.ts`, `transaction/payment-confirm.spec.ts`, `order-payments/payment-overview.service.spec.ts`, `shared/payment-payable.util.spec.ts`, `sepay/sepay-webhook.service.spec.ts`, `sepay/sepay-payload.util.spec.ts`, `sepay/sepay-signature.util.spec.ts` |
 | refund | `modules/refund/refund.service.spec.ts` |
 | pending-count | `modules/pending-count/pending-count.spec.ts` |

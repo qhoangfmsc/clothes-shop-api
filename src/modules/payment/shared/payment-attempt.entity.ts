@@ -1,7 +1,7 @@
 import { BaseEntity } from '@common/base/base.entity';
 import { bigintTransformer } from '@common/base/column-transformers';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
-import { Order } from '../../order/order.entity';
+import { Order } from '../../order/shared/order.entity';
 import { PaymentAttemptStatus } from './payment.constant';
 
 @Entity('payment_attempts')

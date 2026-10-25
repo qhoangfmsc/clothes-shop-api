@@ -1,6 +1,6 @@
 # 0012 — Cell phụ thuộc cell: khai báo tường minh, không vòng
 
-> Module: `common` (quy ước kiến trúc) · Trạng thái: Approved · Ngày: 2026-10-25 · Bổ sung cho 0011
+> Module: `common` (quy ước kiến trúc) · Trạng thái: Implemented · Ngày: 2026-10-25 · Bổ sung cho 0011
 
 ## 1. Bối cảnh & vấn đề
 
@@ -55,4 +55,5 @@ Thấp. Rollback: `git revert`.
 
 ## 6. Kết quả triển khai
 
-_Điền sau khi làm xong._
+- **File:** `architecture-allowlist.test-utils.ts` (`CELL_DEPENDENCIES`), `architecture.spec.ts` (test cell: chỉ cạnh khai báo, không vòng, không cạnh chết). Cạnh đầu tiên: `order.status → query` (spec order/0004).
+- **Khác thiết kế:** không có.

@@ -4,8 +4,8 @@ import { EOrderErrorCode, EPaymentErrorCode } from '@common/exceptions/error-cod
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, Repository } from 'typeorm';
-import { Order } from '../order/order.entity';
-import { markOrderRefunded } from '../order/order-payment-state.util';
+import { Order } from '../order/shared/order.entity';
+import { markOrderRefunded } from '../order/shared/order-payment-state.util';
 import { PaymentAttempt } from '../payment/shared/payment-attempt.entity';
 import { PaymentTransaction } from '../payment/shared/payment-transaction.entity';
 import { markReturnRefunded, reopenReturnAfterRefundRejected } from '../return/return-refund-state.util';

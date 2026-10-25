@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { Order } from '../order/order.entity';
-import { OrderItem } from '../order/order-item.entity';
+import { Order } from '../order/shared/order.entity';
+import { OrderItem } from '../order/shared/order-item.entity';
 import { RefundModule } from '../refund/refund.module';
 import { ShippingModule } from '../shipping/shipping.module';
 import { AdminReturnController } from './admin-return.controller';

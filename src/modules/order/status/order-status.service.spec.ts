@@ -1,10 +1,10 @@
-import { createFakeManager } from '../payment/shared/payment.test-utils';
-import { PaymentAttempt } from '../payment/shared/payment-attempt.entity';
-import { Refund } from '../refund/refund.entity';
-import { RefundService } from '../refund/refund.service';
-import { RefundQueryService } from '../refund/refund-query.service';
-import { Order } from './order.entity';
-import { OrderQueryService } from './order-query.service';
+import { createFakeManager } from '../../payment/shared/payment.test-utils';
+import { PaymentAttempt } from '../../payment/shared/payment-attempt.entity';
+import { Refund } from '../../refund/refund.entity';
+import { RefundService } from '../../refund/refund.service';
+import { RefundQueryService } from '../../refund/refund-query.service';
+import { OrderQueryService } from '../query/order-query.service';
+import { Order } from '../shared/order.entity';
 import { OrderStatusService } from './order-status.service';
 
 describe('OrderStatusService cancel rules with payments and refunds', () => {

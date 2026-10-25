@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { CurrencyModule } from '../currency/currency.module';
-import { Order } from '../order/order.entity';
+import { Order } from '../order/shared/order.entity';
 import { AdminPaymentAttemptController } from './attempt/admin-payment-attempt.controller';
 import { PaymentAttemptController } from './attempt/payment-attempt.controller';
 import { PaymentAttemptService } from './attempt/payment-attempt.service';
