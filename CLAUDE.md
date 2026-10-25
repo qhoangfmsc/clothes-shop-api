@@ -28,6 +28,7 @@ src/
 │   ├── shipping/    # Static data, no DB
 │   └── size-guide/  # Static data, no DB
 └── migrations/      # TypeORM migrations
+tools/               # Công cụ kiểm tra của repo: impact (phạm vi ảnh hưởng), check-docs, check-change
 test/                # Flow test (Postgres thật): flows/<module>/*.flow.ts, support/, README.md = test matrix
 docs/
 ├── modules/         # Docs hiện trạng, mỗi module một file (viết SAU khi code)
@@ -122,9 +123,9 @@ Mọi việc chạm `src/modules`, `src/common`, `src/core`, `src/migrations` ph
 2. **Tech spec trước khi code** (skill `tech-spec`): `docs/specs/<module>/NNNN-slug.md` — vấn đề, phương án, kiến trúc, design pattern, kiểm tra SOLID, dữ liệu, luồng, lỗi, kế hoạch test. Cỡ đầy đủ / rút gọn / miễn theo bảng trong rule. Quyết định thiết kế đáng kể thì trình người dùng trước khi code.
 3. **Code + test cùng lượt**: theo spec, `.claude/rules/engineering-principles.md` và các chuẩn trong file này; test theo `.claude/rules/testing.md` (skill `module-test`).
 4. **Docs hiện trạng**: `docs/modules/<module>.md` (+ `common.md` nếu chạm phần chung, `docs/README.md` nếu thêm module); spec điền mục 6 và chuyển Implemented; cập nhật `test/README.md`.
-5. **Đối chiếu & báo xong**: type check, lint, `yarn test`, `yarn test:flows` đều qua; docs/spec/test khớp code.
+5. **Đối chiếu & báo xong**: type check, lint, `yarn check:docs`, `yarn test`, `yarn test:flows` đều qua (`yarn verify` chạy cả chuỗi); docs/spec/test khớp code; **kiểm lại bên liên quan** của module đã đổi (module phụ thuộc, phía admin, lõi tiền/quyền) bằng `yarn impact` theo `.claude/rules/change-impact.md`.
 
-**Chưa đủ 5 bước = chưa xong.** Báo cáo cuối nêu: file spec, docs, test đã tạo/sửa + 1–3 dòng về pattern/nguyên lý đã áp dụng và vì sao. Chỉ được bỏ qua khi thay đổi không đổi hành vi (đổi tên biến nội bộ, format, comment, test thuần) và phải nói rõ.
+**Chưa đủ 5 bước = chưa xong.** Báo cáo cuối nêu: file spec, docs, test đã tạo/sửa + 1–3 dòng về pattern/nguyên lý đã áp dụng và vì sao + dòng **Phạm vi ảnh hưởng** (module đổi · bên liên quan đã kiểm lại · flow/unit đã chạy). Chỉ được bỏ qua khi thay đổi không đổi hành vi (đổi tên biến nội bộ, format, comment, test thuần) và phải nói rõ.
 
 | Loại tài liệu | Nơi | Trả lời | Viết khi |
 |---|---|---|---|
@@ -180,5 +181,6 @@ yarn lint             # Lint (biome: src + test)
 yarn test             # Unit test (mock)
 yarn test:flows       # Flow test (tự bật Postgres test bằng docker; cần Docker chạy)
 yarn test:db:down     # Tắt Postgres test
+yarn impact           # Module/flow bị ảnh hưởng bởi thay đổi hiện tại (--run unit|flows)
 npx typeorm migration:run -d data-source.ts  # Run migrations
 ```

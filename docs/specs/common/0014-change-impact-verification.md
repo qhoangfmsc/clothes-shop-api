@@ -1,6 +1,6 @@
 # 0014 — Kiểm tra lại theo phạm vi ảnh hưởng của thay đổi
 
-> Module: `common` (quy trình + công cụ) · Trạng thái: Draft · Ngày: 2026-10-26
+> Module: `common` (quy trình + công cụ) · Trạng thái: Implemented · Ngày: 2026-10-26
 
 ## 1. Bối cảnh & vấn đề
 
@@ -96,4 +96,8 @@ Rủi ro: đồ thị rộng → danh sách dài (chấp nhận, vì đúng bả
 
 ## 6. Kết quả triển khai
 
-_(điền sau khi xong)_
+- **File:** `tools/impact.ts` (CLI), `tools/lib/{fs,source-graph,impact,format-impact}.ts`, `tools/impact.spec.ts` (21 test); `package.json` (script `impact`, jest `roots` thêm `tools/`); `biome.json` (lint `tools/**`); `tsconfig.build.json` (loại `tools` khỏi bản build); rule mới `.claude/rules/change-impact.md`; cập nhật `feature-workflow.md` (bước ⑤, DoD mục 6–7), `testing.md`, `engineering-principles.md`, skills `tech-spec` (template mục 3.9), `feature-workflow`, `CLAUDE.md`.
+- **Khác thiết kế:** (1) thêm `GLOBAL_FLOW_DIRS` (`access`, `rate-limit`, `health`): flow `route-table` nhắc `/api/admin/media` nên bị gắn nhầm vào `media`, và `rate-limit` gọi 7 module; các flow quét toàn hệ thống nên là lưới toàn cục. (2) spec/test-utils trong `src/common` chỉ chạy lại unit `src/common`, không kéo mọi module. (3) Module không có controller (`currency`) không bắt buộc có flow riêng; được phủ qua `shipping`, `site-config`.
+- **Thử phá:** làm hỏng nhánh import tương đối của đồ thị → 3 test đỏ; vô hiệu nhánh `unitOnly` → 1 test đỏ. (Bài học: thử phá phải làm sau khi commit, vì file mới chưa được git theo dõi nên `git checkout` không khôi phục; đã khôi phục tay.)
+- **Kết quả thật trên repo:** đổi `payment` kéo `order`, `pending-count`, `refund` (trực tiếp), `return`, `review` (gián tiếp), 26/39 flow; đổi `size-guide` chỉ 4/39 flow; đổi `common`/migration → 39/39.
+- **Docs/test:** `docs/modules/common.md` (4.12), `test/README.md`, `docs/specs/README.md`.

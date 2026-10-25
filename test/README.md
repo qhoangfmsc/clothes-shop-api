@@ -21,6 +21,7 @@ yarn test:flows:run    # chỉ chạy jest, không bật docker (khi dùng Postg
 yarn test:coverage     # in lại báo cáo độ phủ + ratchet từ lần chạy gần nhất
 yarn test:coverage:update  # gỡ khỏi baseline các mục đã đủ ca
 yarn test:db:down      # tắt DB test khi xong
+yarn impact            # flow/unit bị ảnh hưởng bởi thay đổi hiện tại (--run unit|flows để chạy hộ); xem .claude/rules/change-impact.md
 yarn -s jest --config test/jest.flows.config.js --runInBand -t "<tên test>"   # chạy một test (DB đã up)
 ```
 
@@ -121,6 +122,7 @@ Trạng thái: **Có** = đã có test cover luồng · **Unit** = chỉ có uni
 | Module | File spec |
 |---|---|
 | common | `common/dto/list-query.dto.spec.ts` (ép chuẩn list cho mọi `*-query.dto.ts`), `common/dto/update-dto.spec.ts` (mọi cặp `Create<X>Dto`/`Update<X>Dto`: không khoá "ma", giữ ràng buộc của create), `common/base/provided-fields.util.spec.ts`, `common/base/db-error.util.spec.ts`, `common/utils/rate-limit.config.spec.ts` + `common/guards/rate-limit.guard.spec.ts`, `core/env.validation.spec.ts` + `core/core.module.spec.ts` (app từ chối khởi động khi cấu hình production sai), `common/filter/exception.filter.spec.ts` (lưới an toàn lỗi toàn vẹn DB), `common/utils/money.util.spec.ts`, `common/base/lock.util.spec.ts`, `common/architecture/architecture.spec.ts` (luật kiến trúc: hướng phụ thuộc, vòng module, export thừa, exception thô, kích thước service, cell), `common/architecture/conventions.spec.ts` (convention: tên file + hậu tố vai trò, tên class, DTO trong `dtos/`, controller không chạm DB, không exception HTTP thô, không `console.*`, không `process.env` trong module) |
+| tools | `tools/impact.spec.ts` (đồ thị module từ import, gắn flow với module qua route, báo cáo ảnh hưởng; kiểm trên repo thật) |
 | auth | `modules/auth/auth.service.spec.ts`, `modules/auth/google-auth.service.spec.ts` |
 | cart | `modules/cart/cart.service.spec.ts` |
 | collection | `modules/collection/collection.service.spec.ts` |

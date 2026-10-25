@@ -40,6 +40,10 @@ Hạ tầng flow test (spec): `docs/specs/testing/0001-flow-test-infrastructure.
 - Flow test hermetic: không ra mạng. Biến dịch vụ ngoài (`SUPABASE_*`, `GOOGLE_*`) bị đặt rỗng và `fetch` bị chặn; cần giả dịch vụ ngoài thì `jest.spyOn(globalThis, 'fetch')` trong chính test đó. Thêm biến môi trường dịch vụ ngoài mới vào code → thêm vào `test-env.ts` (giá trị rỗng).
 - Không chạy hai lần `yarn test:flows` đồng thời (khoá advisory sẽ chặn lần thứ hai).
 
+## Kiểm tra lại bên liên quan
+
+Test của module đổi chưa đủ: các module phụ thuộc nó, phía admin của cùng tài nguyên, và lõi tiền/quyền phải được chạy lại và còn xanh. Cách xác định và việc phải làm: `.claude/rules/change-impact.md`; công cụ `yarn impact` (`--run unit`, `--run flows`). Trước khi báo xong vẫn chạy **toàn bộ** unit + flow.
+
 ## Test kiến trúc
 
 `src/common/architecture/architecture.spec.ts` (chạy trong `yarn test`) ép luật kiến trúc với allowlist chỉ co lại (`architecture-allowlist.test-utils.ts`). Đỏ vì vi phạm mới → sửa code, không thêm vào allowlist. Đỏ vì "allowlist chưa giảm" → giảm số hoặc xoá mục trong allowlist cùng lượt với việc sửa.
@@ -58,4 +62,4 @@ Mỗi flow/unit đáng kể phải có dòng trong `test/README.md` (module · l
 
 ## Chạy trước khi báo xong
 
-`npx tsc --noEmit` · `yarn lint` · `yarn test` · `yarn test:flows` (cần Docker). Nếu không chạy được flow vì môi trường, **nói rõ trong báo cáo** và không tuyên bố đã xong phần đó.
+`npx tsc --noEmit` · `yarn lint` · `yarn check:docs` · `yarn test` · `yarn test:flows` (cần Docker); `yarn verify` chạy cả chuỗi. Nếu không chạy được flow vì môi trường, **nói rõ trong báo cáo** và không tuyên bố đã xong phần đó.

@@ -69,6 +69,14 @@ Kiểm tra: không phụ thuộc vòng, `common/` không import `modules/`, modu
 |---|---|
 | ... | ... |
 
+### 3.9 Ảnh hưởng & kiểm tra lại
+
+<Module đổi, bên liên quan trực tiếp và gián tiếp (lấy từ `yarn impact --files …`), kèm bảng việc kiểm tra lại. Cỡ rút gọn: một dòng "chỉ module X, bên liên quan: …". Luật: `.claude/rules/change-impact.md`.>
+
+| Bên liên quan | Vì sao bị ảnh hưởng | Kiểm tra lại bằng |
+|---|---|---|
+| <module> | <import/hành vi nào> | <unit/flow cụ thể> |
+
 ## 4. Kế hoạch test
 
 | Tầng | Case | Vị trí file |

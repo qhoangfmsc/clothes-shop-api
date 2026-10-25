@@ -25,7 +25,8 @@
     "test:flows": "yarn test:db:up && yarn test:flows:run && yarn test:coverage",
     "test:flows:run": "jest --config test/jest.flows.config.js --runInBand --forceExit",
     "test:coverage": "ts-node --transpile-only test/support/coverage-report.ts",
-    "test:coverage:update": "ts-node --transpile-only test/support/coverage-report.ts --update-baseline"
+    "test:coverage:update": "ts-node --transpile-only test/support/coverage-report.ts --update-baseline",
+    "impact": "ts-node --transpile-only tools/impact.ts"
   },
   "dependencies": {
     "@nestjs/cli": "^11.0.0",
@@ -85,6 +86,10 @@
       "ts"
     ],
     "rootDir": "src",
+    "roots": [
+      "<rootDir>",
+      "<rootDir>/../tools"
+    ],
     "testRegex": ".*(\\.|e2e-)spec\\.ts$",
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"

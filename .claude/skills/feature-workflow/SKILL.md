@@ -27,7 +27,8 @@ Luật gốc: `.claude/rules/feature-workflow.md`. Kèm: `engineering-principles
 
 ## ③ Code + Test  → `design-principles`, `module-test`, `list-api` (nếu API list)
 
-- [ ] Code theo spec và `engineering-principles.md`. Lệch spec thì ghi lại để điền mục 6.
+- [ ] Code theo spec và các rule kỹ thuật (`engineering-principles.md` → kiến trúc, pattern, SOLID, convention). Lệch spec thì ghi lại để điền mục 6.
+- [ ] Chạy `yarn impact --run unit` (và `--run flows`) trong lúc làm để thấy sớm bên liên quan bị vỡ.
 - [ ] Viết test cùng lượt: unit cạnh code; **flow** nếu chạm luồng chính (xem `testing.md`). Sửa bug → test tái hiện trước.
 - [ ] Chạy: `npx tsc --noEmit` · `yarn lint` · `yarn test` · `yarn test:flows` (Docker) · `npx nest build`.
 
@@ -39,9 +40,10 @@ Luật gốc: `.claude/rules/feature-workflow.md`. Kèm: `engineering-principles
 
 ## ⑤ Đối chiếu & báo xong
 
+- [ ] `yarn impact`: ghi module đổi, bên liên quan trực tiếp/gián tiếp (kể cả admin), rồi chạy **toàn bộ** `yarn verify` (tsc, lint, check:docs, unit, build, flow). Luật: `.claude/rules/change-impact.md`.
 - [ ] Đối chiếu docs với code từng endpoint, cột, constraint, error code, permission.
 - [ ] Mọi mục Definition of Done trong rule đạt.
-- [ ] Báo cáo cuối: **file spec, docs, test đã tạo/sửa** + 1–3 dòng pattern/nguyên lý đã áp dụng và vì sao + việc chưa chạy được (nếu có) nói thẳng.
+- [ ] Báo cáo cuối: **file spec, docs, test đã tạo/sửa** + 1–3 dòng pattern/nguyên lý đã áp dụng và vì sao + dòng **Phạm vi ảnh hưởng** + việc chưa chạy được (nếu có) nói thẳng.
 
 ## Mẹo giữ nhịp
 

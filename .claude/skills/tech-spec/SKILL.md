@@ -13,7 +13,7 @@ Spec trả lời **vì sao và thiết kế thế nào**, viết **trước** kh
 
 1. **Đánh số.** `ls docs/specs/<module>/` lấy số kế tiếp (`0001` nếu chưa có). Tên file `NNNN-slug-ngan.md` (kebab-case, không ngày).
 2. **Copy template** vào `docs/specs/<module>/`, điền header (module, trạng thái Draft, ngày hôm nay).
-3. **Điền theo thứ tự** (cỡ rút gọn: mục 1, 2, 3.3, 3.4, 4, 6):
+3. **Điền theo thứ tự** (cỡ rút gọn: mục 1, 2, 3.3, 3.4, 3.9 một dòng, 4, 6):
    - **1 Bối cảnh:** hiện trạng đã đọc (trích file/hàm thật), vấn đề.
    - **2 Mục tiêu / ngoài phạm vi:** ngoài phạm vi quan trọng không kém, chống trượt phạm vi.
    - **3.1 Phương án:** ≥ 2 phương án thật (kể cả "không làm gì"), chọn một và nói vì sao.
@@ -21,6 +21,7 @@ Spec trả lời **vì sao và thiết kế thế nào**, viết **trước** kh
    - **3.3 Pattern:** mỗi pattern có *vấn đề cụ thể* và *cái giá*. "Không dùng pattern" là hợp lệ. Tra skill `design-principles` để chọn.
    - **3.4 SOLID:** điền 5 dòng; ✘ phải có lý do chấp nhận.
    - **3.5–3.8:** dữ liệu (CHECK/FK/UNIQUE/INDEX), API, luồng + transaction + thứ tự khoá + idempotency, bảng lỗi/biên.
+   - **3.9 Ảnh hưởng:** chạy `yarn impact --files <các file dự kiến sửa>`; ghi bên liên quan trực tiếp/gián tiếp và cách kiểm tra lại (rule `change-impact.md`).
    - **4 Kế hoạch test:** liệt kê case theo tầng (unit / flow / ràng buộc DB) và file đích. Luồng chính phải có ≥ 1 flow.
    - **5 Rủi ro & rollback.**
 4. **Trình người dùng** nếu có quyết định đáng kể (xem workflow), chuyển Draft → Approved khi được đồng ý (hoặc khi việc nhỏ, tự Approved).
