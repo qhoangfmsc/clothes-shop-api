@@ -288,6 +288,12 @@ yarn migration:run              # chạy migration
   - không ghi bảng của module khác (`update/delete/insert/remove/upsert/create(<Entity khác module>)` hoặc ghi qua `@InjectRepository(<Entity khác module>)`): module chủ viết hàm chuyển trạng thái (`*-state.util.ts`, `product-rating.util.ts`, `cart-checkout.util.ts`) và module khác gọi, trong cùng transaction. Ngoại lệ có lý do trong `CROSS_MODULE_WRITES`: `auth.service.ts` tạo/cập nhật `User` khi đăng nhập;
   - service tối đa 300 dòng và 5 dependency constructor;
   - module có `shared/` thì mỗi cell (thư mục con trực tiếp) chỉ import chính nó, `shared/` và các cell khai báo ở `CELL_DEPENDENCIES` (đồ thị không vòng, không cạnh chết), và `shared/` không import cell (spec 0011, 0012).
+  `src/common/architecture/conventions.spec.ts` ép convention của `coding-conventions.md` (spec 0013), allowlist cùng file `architecture-allowlist.test-utils.ts`:
+  - tên file `kebab-case` + hậu tố vai trò (`x.service.ts`, `x.util.ts`...; test `x.<vai trò>.spec.ts`, `x.test-utils.ts`), ngoại lệ không hậu tố trong `UNSUFFIXED_FILES`;
+  - `*.service/controller/module/scheduler/guard.ts` export class đặt theo tên file; file trong `dtos/` là `*.dto.ts` và ngược lại;
+  - controller không inject Repository/DataSource/EntityManager (ngoại lệ `CONTROLLERS_WITH_DB_ACCESS`: health check);
+  - không ném exception HTTP thô ngoài `RAW_HTTP_EXCEPTIONS` (`jwt.strategy.ts`, `typeorm-list-query.util.ts`);
+  - không `console.*` trong code ứng dụng; module nghiệp vụ không đọc `process.env` (dùng `ConfigService`).
   Thêm vi phạm mới hoặc để vi phạm cũ lớn thêm → đỏ; sửa xong mà chưa giảm allowlist → đỏ. `src/common/dto/list-query.dto.spec.ts` là guard chuẩn list cho mọi `*-query.dto.ts` (xem 4.5); `src/common/utils/money.util.spec.ts` cho helper tiền. Test của từng module: xem file module tương ứng.
 - **Flow** (`yarn test:flows`): `test/flows/<module>/*.flow.ts`, đi qua HTTP thật (`MainModule` + `configureApp`) trên Postgres thật. Config riêng `test/jest.flows.config.js` (rootDir repo, chỉ nhận `*.flow.ts`, chạy tuần tự).
   - Mỗi lần chạy: lấy khoá advisory (`pg_try_advisory_lock`; lần chạy thứ hai cùng DB bị chặn), `DROP SCHEMA public` → chạy toàn bộ migration → `TRUNCATE` dữ liệu seed; sau mỗi test `truncateAll`.

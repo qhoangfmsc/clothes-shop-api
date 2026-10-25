@@ -25,3 +25,18 @@ export function stripComments(code: string): string {
 }
 
 export const count = (pattern: RegExp, text: string) => [...text.matchAll(pattern)].length;
+
+/** So số vi phạm thực tế với allowlist: mới/tăng → lỗi; giảm mà allowlist chưa giảm → lỗi nhắc cập nhật */
+export function compareToAllowlist(actual: Record<string, number>, allowed: Record<string, number>, what: string): string[] {
+  const problems: string[] = [];
+  for (const [file, n] of Object.entries(actual)) {
+    if (!(file in allowed)) problems.push(`${file}: ${n} ${what} (mới, không được phép)`);
+    else if (n > allowed[file]) problems.push(`${file}: ${what} tăng từ ${allowed[file]} lên ${n}`);
+  }
+  for (const [file, n] of Object.entries(allowed)) {
+    const now = actual[file] ?? 0;
+    if (now < n)
+      problems.push(`${file}: còn ${now} ${what} nhưng allowlist ghi ${n} — ${now ? `giảm allowlist xuống ${now}` : 'xoá khỏi allowlist'}`);
+  }
+  return problems;
+}

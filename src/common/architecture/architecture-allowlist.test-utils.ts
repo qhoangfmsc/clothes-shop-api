@@ -26,3 +26,23 @@ export const OVERSIZED_SERVICES: Record<string, number> = {};
 
 // Service đang có quá nhiều dependency: số hiện tại là trần
 export const MANY_DEPENDENCIES_SERVICES: Record<string, number> = {};
+
+// Controller được chạm DB trực tiếp (số chỗ inject); mặc định controller chỉ gọi service
+export const CONTROLLERS_WITH_DB_ACCESS: Record<string, number> = {
+  'src/main.controller.ts': 1, // health check `SELECT 1`, không có nghiệp vụ để đặt vào service
+};
+
+// Chỗ ném exception HTTP thô ngoài service (số chỗ); code mới dùng throwAppError
+export const RAW_HTTP_EXCEPTIONS: Record<string, number> = {
+  'src/modules/auth/jwt.strategy.ts': 2, // 401 của Passport, cố ý không có errorCode (xem common.md 4.13)
+  'src/common/base/typeorm-list-query.util.ts': 2, // lỗi lập trình/tham số sai của helper, không phải lỗi nghiệp vụ
+};
+
+// File không có hậu tố vai trò trong tên (`x.<vai trò>.ts`); mặc định mọi file phải có
+export const UNSUFFIXED_FILES: Record<string, string> = {
+  'src/main.ts': 'điểm vào của ứng dụng',
+  'src/common/exceptions/error-codes.ts': 'bảng mã lỗi của mọi module',
+  'src/common/base/column-transformers.ts': 'tập transformer cột dùng chung',
+  'src/modules/shipping/shipping-config.ts': 'kiểu + validate cấu hình phí ship (gom, không phải một vai trò)',
+  'src/modules/currency/exchange-rate-config.ts': 'kiểu + validate cấu hình tỷ giá (gom, không phải một vai trò)',
+};

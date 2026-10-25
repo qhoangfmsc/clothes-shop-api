@@ -38,7 +38,7 @@ export class GoogleAuthService {
       });
 
       const payload = ticket.getPayload();
-      if (!payload || !payload.email) {
+      if (!payload?.email) {
         unauthorized(EAuthErrorCode.AUTH_GOOGLE_TOKEN_INVALID, 'Invalid Google token: missing email');
       }
 

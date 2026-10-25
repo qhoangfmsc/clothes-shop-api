@@ -10,24 +10,9 @@ import {
   SERVICE_MAX_LINES,
   UNUSED_EXPORTS,
 } from './architecture-allowlist.test-utils';
-import { count, isSource, listFiles, ROOT, read, stripComments } from './source-scan.test-utils';
+import { compareToAllowlist, count, isSource, listFiles, ROOT, read, stripComments } from './source-scan.test-utils';
 
 /** Luật kiến trúc được máy ép (docs/specs/common/0002). Vi phạm cũ nằm trong allowlist và chỉ được co lại. */
-
-/** So số vi phạm thực tế với allowlist: mới/tăng → lỗi; giảm mà allowlist chưa giảm → lỗi nhắc cập nhật */
-function compareToAllowlist(actual: Record<string, number>, allowed: Record<string, number>, what: string): string[] {
-  const problems: string[] = [];
-  for (const [file, n] of Object.entries(actual)) {
-    if (!(file in allowed)) problems.push(`${file}: ${n} ${what} (mới, không được phép)`);
-    else if (n > allowed[file]) problems.push(`${file}: ${what} tăng từ ${allowed[file]} lên ${n}`);
-  }
-  for (const [file, n] of Object.entries(allowed)) {
-    const now = actual[file] ?? 0;
-    if (now < n)
-      problems.push(`${file}: còn ${now} ${what} nhưng allowlist ghi ${n} — ${now ? `giảm allowlist xuống ${now}` : 'xoá khỏi allowlist'}`);
-  }
-  return problems;
-}
 
 describe('Architecture rules', () => {
   const serviceFiles = listFiles('src/modules', (file) => file.endsWith('.service.ts'));

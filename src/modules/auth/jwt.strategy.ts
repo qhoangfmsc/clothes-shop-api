@@ -32,7 +32,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('Invalid access token');
     }
     const user = await this.userRepo.findOne({ where: { id: payload.sub } });
-    if (!user || user.status !== 'active') {
+    if (user?.status !== 'active') {
       throw new UnauthorizedException('User not found or disabled');
     }
     return user;
