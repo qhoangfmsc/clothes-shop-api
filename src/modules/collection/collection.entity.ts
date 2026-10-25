@@ -1,6 +1,6 @@
 import { BaseEntity } from '@common/base/base.entity';
 import { Column, Entity, JoinTable, ManyToMany } from 'typeorm';
-import { Product } from '../product/product.entity';
+import { Product } from '../product/shared/product.entity';
 
 @Entity('collections')
 export class Collection extends BaseEntity {

@@ -130,7 +130,7 @@ Trạng thái: **Có** = đã có test cover luồng · **Unit** = chỉ có uni
 | payment | `modules/payment/attempt/payment-attempt.service.spec.ts`, `attempt/payment-expiry.spec.ts`, `attempt/payment-attempts-admin.spec.ts`, `transaction/payment-confirm.spec.ts`, `order-payments/payment-overview.service.spec.ts`, `shared/payment-payable.util.spec.ts`, `sepay/sepay-webhook.service.spec.ts`, `sepay/sepay-payload.util.spec.ts`, `sepay/sepay-signature.util.spec.ts` |
 | refund | `modules/refund/refund.service.spec.ts` |
 | pending-count | `modules/pending-count/pending-count.spec.ts` |
-| product | `modules/product/product-query.service.spec.ts`, `product.presenter.spec.ts` |
+| product | `modules/product/catalog/product-catalog-query.service.spec.ts`, `admin/product-admin-query.service.spec.ts`, `shared/product.presenter.spec.ts` |
 | return | `modules/return/request/return-request.service.spec.ts`, `processing/return-processing.service.spec.ts`, `shared/return-eligibility.util.spec.ts`, `shared/return-refund-state.util.spec.ts` |
 | review | `modules/review/authoring/review-authoring.service.spec.ts`, `vote/review-vote.service.spec.ts`, `moderation/review-moderation.service.spec.ts`, `public/review-public-query.service.spec.ts`, `shared/review-eligibility.util.spec.ts` |
 | shipping | `modules/shipping/shipping-config.service.spec.ts`, `shipping-config.spec.ts` |

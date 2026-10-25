@@ -1,7 +1,7 @@
 import { findLocked } from '@common/base/lock.util';
 import { EntityManager } from 'typeorm';
-import { Product } from '../../product/product.entity';
-import { setProductRating } from '../../product/product-rating.util';
+import { Product } from '../../product/shared/product.entity';
+import { setProductRating } from '../../product/shared/product-rating.util';
 import { Review } from './review.entity';
 
 /** Khoá dòng sản phẩm; mọi thay đổi đánh giá chạy tuần tự theo sản phẩm nên số liệu tổng hợp luôn tính trên dữ liệu đã commit */

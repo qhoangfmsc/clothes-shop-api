@@ -1,5 +1,5 @@
 import { ValidationPipe } from '@nestjs/common';
-import { Product } from '../../product/product.entity';
+import { Product } from '../../product/shared/product.entity';
 import { Review } from '../shared/review.entity';
 import { daysAgo, IMG, order, orderItem, type Row, rejects, review, user } from '../shared/review.test-utils';
 import { setupAuthoring } from './authoring.test-utils';

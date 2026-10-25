@@ -5,8 +5,8 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CurrencyService } from '../currency/currency.service';
-import { Product } from '../product/product.entity';
-import { presentProduct } from '../product/product.presenter';
+import { Product } from '../product/shared/product.entity';
+import { presentProduct } from '../product/shared/product.presenter';
 import { Wishlist } from './wishlist.entity';
 
 @Injectable()

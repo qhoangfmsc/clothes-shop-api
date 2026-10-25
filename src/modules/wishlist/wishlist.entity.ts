@@ -1,6 +1,6 @@
 import { customAlphabet } from 'nanoid';
 import { BeforeInsert, Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryColumn, Unique } from 'typeorm';
-import { Product } from '../product/product.entity';
+import { Product } from '../product/shared/product.entity';
 import { User } from '../user/user.entity';
 
 const nanoid16 = customAlphabet('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', 16);

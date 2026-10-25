@@ -1,6 +1,6 @@
 import { Order } from '../../order/shared/order.entity';
 import { OrderItem } from '../../order/shared/order-item.entity';
-import { Product } from '../../product/product.entity';
+import { Product } from '../../product/shared/product.entity';
 import { MS_PER_DAY } from './review.constant';
 import { Review } from './review.entity';
 import { ReviewVote } from './review-vote.entity';

@@ -1,5 +1,5 @@
 import { ValidationPipe } from '@nestjs/common';
-import { Product } from '../../product/product.entity';
+import { Product } from '../../product/shared/product.entity';
 import { Review } from '../shared/review.entity';
 import { type Row, rejects, review } from '../shared/review.test-utils';
 import { HideReviewDto } from './dtos/hide-review.dto';

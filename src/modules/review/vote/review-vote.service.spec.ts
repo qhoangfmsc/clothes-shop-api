@@ -1,4 +1,4 @@
-import { Product } from '../../product/product.entity';
+import { Product } from '../../product/shared/product.entity';
 import { Review } from '../shared/review.entity';
 import { rejects, review } from '../shared/review.test-utils';
 import { ReviewVote } from '../shared/review-vote.entity';

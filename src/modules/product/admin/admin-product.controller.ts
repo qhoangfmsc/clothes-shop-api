@@ -4,16 +4,16 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestj
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AdminProductQueryDto } from './dtos/admin-product-query.dto';
 import { CreateProductDto, UpdateProductDto } from './dtos/product.dto';
-import { ProductService } from './product.service';
-import { ProductQueryService } from './product-query.service';
+import { ProductAdminService } from './product-admin.service';
+import { ProductAdminQueryService } from './product-admin-query.service';
 
 @ApiTags('Admin — Products')
 @Controller('api/admin/products')
 @ApiBearerAuth()
 export class AdminProductController {
   constructor(
-    private readonly productService: ProductService,
-    private readonly queryService: ProductQueryService,
+    private readonly productService: ProductAdminService,
+    private readonly queryService: ProductAdminQueryService,
   ) {}
 
   @Get()

@@ -5,12 +5,12 @@ import { EProductErrorCode } from '@common/exceptions/error-codes';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { FindOptionsWhere, Not, Repository } from 'typeorm';
-import { Category } from '../category/category.entity';
-import { SubCategory } from '../category/sub-category.entity';
-import { CurrencyService } from '../currency/currency.service';
+import { Category } from '../../category/category.entity';
+import { SubCategory } from '../../category/sub-category.entity';
+import { CurrencyService } from '../../currency/currency.service';
+import { Product } from '../shared/product.entity';
+import { PRODUCT_RELATIONS, presentProduct } from '../shared/product.presenter';
 import { CreateProductDto, UpdateProductDto } from './dtos/product.dto';
-import { Product } from './product.entity';
-import { PRODUCT_RELATIONS, presentProduct } from './product.presenter';
 
 const PRODUCT_UNIQUE_ERRORS = {
   UQ_products_slug: EProductErrorCode.PRODUCT_SLUG_DUPLICATE,
@@ -18,7 +18,7 @@ const PRODUCT_UNIQUE_ERRORS = {
 };
 
 @Injectable()
-export class ProductService {
+export class ProductAdminService {
   constructor(
     @InjectRepository(Product)
     private readonly productRepo: Repository<Product>,
