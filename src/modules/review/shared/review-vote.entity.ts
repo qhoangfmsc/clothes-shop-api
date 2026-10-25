@@ -1,6 +1,6 @@
 import { BaseEntity } from '@common/base/base.entity';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
-import { User } from '../user/user.entity';
+import { User } from '../../user/user.entity';
 import { Review } from './review.entity';
 
 /** Một lượt "hữu ích" của một user cho một đánh giá (UNIQUE theo cặp review + user) */

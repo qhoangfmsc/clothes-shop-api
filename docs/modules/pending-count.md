@@ -11,7 +11,7 @@ Module nhỏ trả các con số "việc đang chờ admin xử lý" để hiệ
 | Thư mục | `src/modules/pending-count` |
 | Route prefix | `/api/admin/pending-counts` |
 | Bảng DB | không có (đọc `orders`, `payment_transactions`, `refunds`, `return_requests`, `reviews` qua service của từng module) |
-| Module phụ thuộc | `order` (`OrderQueryService.countNeedsAction`), `payment` (`PaymentTransactionQueryService.countNeedsReview`), `refund` (`RefundQueryService.countRequested`), `return` (`ReturnProcessingQueryService.countRequested`), `review` (`ReviewQueryService.countAwaitingReply`) |
+| Module phụ thuộc | `order` (`OrderQueryService.countNeedsAction`), `payment` (`PaymentTransactionQueryService.countNeedsReview`), `refund` (`RefundQueryService.countRequested`), `return` (`ReturnProcessingQueryService.countRequested`), `review` (`ReviewModerationQueryService.countAwaitingReply`) |
 | Export | không |
 
 ## 2. Mục đích & nghiệp vụ phục vụ
@@ -65,7 +65,7 @@ Không có bảng riêng. Các COUNT dùng index sẵn có: `IDX_orders_status`,
    - `PaymentTransactionQueryService.countNeedsReview()` và `findTransactionsAdmin({ needsReview })` cùng dùng `TRANSACTION_NEEDS_REVIEW_SQL` (`payment/transaction/payment-needs-review.util.ts`, alias `t`, `a`, `o`).
    - `RefundQueryService.countRequested()` đếm `status = REQUESTED`, cùng điều kiện với `findAdmin({ status: 'REQUESTED' })`.
    - `ReturnProcessingQueryService.countRequested()` đếm `status = REQUESTED`, cùng điều kiện với `findAllAdmin({ status: 'REQUESTED' })`.
-   - `ReviewQueryService.countAwaitingReply()` đếm `status = PUBLISHED` và `reply IS NULL`, cùng điều kiện với `findAllAdmin({ status: 'PUBLISHED', replied: false })`.
+   - `ReviewModerationQueryService.countAwaitingReply()` đếm `status = PUBLISHED` và `reply IS NULL`, cùng điều kiện với `findAllAdmin({ status: 'PUBLISHED', replied: false })`.
 3. Trả `{ data }` gồm đúng các key đã chạy.
 
 Đơn `pending` chưa thanh toán được tính là "khách đang chuyển khoản" (không đếm) chỉ khi phiên QR còn hạn theo `expires_at`; đơn tự quay lại số đếm ngay khi quá hạn, không cần chờ bộ đếm giờ đổi phiên sang `EXPIRED`.
@@ -76,7 +76,7 @@ Không có mã riêng. `401` (thiếu/sai JWT) và `403` `PERMISSION_DENIED (900
 
 ### 4.6 Phụ thuộc & cấu hình
 
-`PendingCountModule` import `OrderModule`, `PaymentModule`, `RefundModule`, `ReturnModule`, `ReviewModule` (các module này export `OrderQueryService`, `PaymentTransactionQueryService`, `RefundQueryService`, `ReturnProcessingQueryService`, `ReviewQueryService`). Không có biến môi trường.
+`PendingCountModule` import `OrderModule`, `PaymentModule`, `RefundModule`, `ReturnModule`, `ReviewModule` (các module này export `OrderQueryService`, `PaymentTransactionQueryService`, `RefundQueryService`, `ReturnProcessingQueryService`, `ReviewModerationQueryService`). Không có biến môi trường.
 
 ### 4.7 Test
 

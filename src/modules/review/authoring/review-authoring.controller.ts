@@ -1,42 +1,20 @@
 import { CurrentUser } from '@common/decorator/current-user.decorator';
 import { Permissions } from '@common/decorator/permissions.decorator';
-import { Public } from '@common/decorator/public.decorator';
 import { RateLimit } from '@common/decorator/rate-limit.decorator';
 import { Permission } from '@common/permissions/permissions.constant';
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Param, Patch, Post, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { REVIEW_IMAGE_MAX_FILE_SIZE } from '../media/media.constant';
-import { User } from '../user/user.entity';
+import { REVIEW_IMAGE_MAX_FILE_SIZE } from '../../media/media.constant';
+import { User } from '../../user/user.entity';
 import { CreateReviewDto } from './dtos/create-review.dto';
-import { PublicReviewQueryDto } from './dtos/public-review-query.dto';
 import { UpdateReviewDto } from './dtos/update-review.dto';
-import { ReviewService } from './review.service';
-import { ReviewQueryService } from './review-query.service';
+import { ReviewAuthoringService } from './review-authoring.service';
 
 @ApiTags('Reviews')
 @Controller('api/reviews')
-export class ReviewController {
-  constructor(
-    private readonly reviewService: ReviewService,
-    private readonly queryService: ReviewQueryService,
-  ) {}
-
-  @Get(':productId')
-  @Public()
-  @ApiOperation({
-    summary: 'Đánh giá đang hiển thị của một sản phẩm (filter rating/fit/hasImages, sort rating/createdAt/helpfulCount, pagination)',
-  })
-  findByProduct(@Param('productId') productId: string, @Query() query: PublicReviewQueryDto) {
-    return this.queryService.findByProductId(productId, query);
-  }
-
-  @Get(':productId/summary')
-  @Public()
-  @ApiOperation({ summary: 'Điểm trung bình, số đánh giá, số đánh giá có ảnh, phân bố 1–5 sao và phân bố fit của một sản phẩm' })
-  getSummary(@Param('productId') productId: string) {
-    return this.queryService.getSummary(productId);
-  }
+export class ReviewAuthoringController {
+  constructor(private readonly reviewService: ReviewAuthoringService) {}
 
   @Post('images')
   @ApiBearerAuth()
@@ -68,21 +46,5 @@ export class ReviewController {
   @Permissions(Permission.REVIEW_CREATE)
   update(@CurrentUser() user: User, @Param('reviewId') reviewId: string, @Body() dto: UpdateReviewDto) {
     return this.reviewService.update(user.id, reviewId, dto);
-  }
-
-  @Post(':reviewId/helpful')
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Bấm "hữu ích" cho một đánh giá (idempotent; không vote đánh giá của chính mình)' })
-  @Permissions(Permission.REVIEW_VOTE)
-  vote(@CurrentUser() user: User, @Param('reviewId') reviewId: string) {
-    return this.reviewService.vote(user.id, reviewId);
-  }
-
-  @Delete(':reviewId/helpful')
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Bỏ "hữu ích" đã bấm' })
-  @Permissions(Permission.REVIEW_VOTE)
-  unvote(@CurrentUser() user: User, @Param('reviewId') reviewId: string) {
-    return this.reviewService.unvote(user.id, reviewId);
   }
 }

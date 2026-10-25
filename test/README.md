@@ -132,7 +132,7 @@ Trạng thái: **Có** = đã có test cover luồng · **Unit** = chỉ có uni
 | pending-count | `modules/pending-count/pending-count.spec.ts` |
 | product | `modules/product/product-query.service.spec.ts`, `product.presenter.spec.ts` |
 | return | `modules/return/request/return-request.service.spec.ts`, `processing/return-processing.service.spec.ts`, `shared/return-eligibility.util.spec.ts`, `shared/return-refund-state.util.spec.ts` |
-| review | `modules/review/review.service.spec.ts`, `review-eligibility.util.spec.ts` |
+| review | `modules/review/authoring/review-authoring.service.spec.ts`, `vote/review-vote.service.spec.ts`, `moderation/review-moderation.service.spec.ts`, `public/review-public-query.service.spec.ts`, `shared/review-eligibility.util.spec.ts` |
 | shipping | `modules/shipping/shipping-config.service.spec.ts`, `shipping-config.spec.ts` |
 | site-config | `modules/site-config/site-config.service.spec.ts` |
 | wishlist | `modules/wishlist/wishlist.service.spec.ts` |

@@ -6,7 +6,7 @@ import { CartItem } from '../../src/modules/cart/cart-item.entity';
 import { Category } from '../../src/modules/category/category.entity';
 import { SubCategory } from '../../src/modules/category/sub-category.entity';
 import { Product } from '../../src/modules/product/product.entity';
-import { Review } from '../../src/modules/review/review.entity';
+import { Review } from '../../src/modules/review/shared/review.entity';
 import { User } from '../../src/modules/user/user.entity';
 
 let seq = 0;

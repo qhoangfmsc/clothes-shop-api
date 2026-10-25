@@ -3,20 +3,20 @@ import { Permissions } from '@common/decorator/permissions.decorator';
 import { Permission } from '@common/permissions/permissions.constant';
 import { Body, Controller, Delete, Get, Param, Post, Put, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { User } from '../user/user.entity';
+import { User } from '../../user/user.entity';
 import { AdminReviewQueryDto } from './dtos/admin-review-query.dto';
 import { HideReviewDto } from './dtos/hide-review.dto';
 import { ReplyReviewDto } from './dtos/reply-review.dto';
-import { ReviewService } from './review.service';
-import { ReviewQueryService } from './review-query.service';
+import { ReviewModerationService } from './review-moderation.service';
+import { ReviewModerationQueryService } from './review-moderation-query.service';
 
 @ApiTags('Admin — Reviews')
 @Controller('api/admin/reviews')
 @ApiBearerAuth()
 export class AdminReviewController {
   constructor(
-    private readonly reviewService: ReviewService,
-    private readonly queryService: ReviewQueryService,
+    private readonly reviewService: ReviewModerationService,
+    private readonly queryService: ReviewModerationQueryService,
   ) {}
 
   @Get()

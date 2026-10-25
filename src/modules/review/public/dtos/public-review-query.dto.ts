@@ -4,7 +4,7 @@ import { parseQueryBoolean } from '@common/dto/query-boolean.transform';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
-import { REVIEW_FITS } from '../review.constant';
+import { REVIEW_FITS } from '../../shared/review.constant';
 
 export class PublicReviewQueryDto extends PaginationQueryDto {
   @ApiPropertyOptional({ type: Number, minimum: 1, maximum: 5, description: 'Filter by star rating' })

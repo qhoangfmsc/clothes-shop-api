@@ -41,6 +41,7 @@ Cấu trúc: `docs/specs/<module>/NNNN-slug.md` (số tăng dần theo từng mo
 | product | [0002 — Tách `ProductService` thành đọc và ghi](product/0002-split-product-service.md) | Implemented | ProductQueryService + ProductService; allowlist kích thước service về rỗng |
 | category | [0002 — Tách `CategoryService` thành đọc và ghi](category/0002-split-category-service.md) | Implemented | CategoryQueryService + CategoryService |
 | media | [0002 — Tách logic thuần của ảnh khỏi `MediaService`](media/0002-extract-media-file-util.md) | Implemented | media-file.util: sniff mime, tên key, tên hiển thị |
+| review | [0003 — `review` chia cell: public, authoring, vote, moderation](review/0003-review-cells.md) | Implemented | 4 cell + shared, 6 service, 6 controller |
 | return | [0003 — `return` chia cell: request, processing](return/0003-return-cells.md) | Implemented | 2 cell + shared, 4 service |
 | order | [0004 — `order` chia cell: checkout, status, query](order/0004-order-cells.md) | Implemented | 3 cell + shared, cạnh status → query |
 | common | [0012 — Cell phụ thuộc cell: khai báo tường minh](common/0012-declared-cell-dependencies.md) | Implemented | CELL_DEPENDENCIES, không vòng, không cạnh chết |

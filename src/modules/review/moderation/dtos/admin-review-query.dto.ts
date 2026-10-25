@@ -5,7 +5,7 @@ import { parseQueryBoolean } from '@common/dto/query-boolean.transform';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
-import { REVIEW_FITS, REVIEW_STATUSES } from '../review.constant';
+import { REVIEW_FITS, REVIEW_STATUSES } from '../../shared/review.constant';
 
 export class AdminReviewQueryDto extends PaginationQueryDto {
   @SearchField('Search keyword (review title, content, author name, product name)')

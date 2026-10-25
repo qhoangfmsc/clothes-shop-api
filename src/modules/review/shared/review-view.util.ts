@@ -1,5 +1,5 @@
-import { Product } from '../product/product.entity';
-import { presentProductSummary } from '../product/product.presenter';
+import { Product } from '../../product/product.entity';
+import { presentProductSummary } from '../../product/product.presenter';
 import { Review } from './review.entity';
 import { editDeadline, reviewEditBlock } from './review-eligibility.util';
 

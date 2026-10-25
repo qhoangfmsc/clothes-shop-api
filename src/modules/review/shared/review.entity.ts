@@ -1,8 +1,8 @@
 import { BaseEntity } from '@common/base/base.entity';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
-import { OrderItem } from '../order/shared/order-item.entity';
-import { Product } from '../product/product.entity';
-import { User } from '../user/user.entity';
+import { OrderItem } from '../../order/shared/order-item.entity';
+import { Product } from '../../product/product.entity';
+import { User } from '../../user/user.entity';
 import { ReviewFit, ReviewStatus } from './review.constant';
 
 /**
