@@ -155,7 +155,7 @@ Enum dùng chung (`@common/constants/enum-values.constant`):
 | `PRODUCT_BADGES` | `new`, `sale`, `bestseller`, `sold_out`, `limited`, `custom_order` |
 | `NON_ORDERABLE_BADGES` | `sold_out`, `custom_order` (không cho thêm vào giỏ / checkout) |
 
-Entity dùng đúng các type này cho cột trạng thái (`Order.status: OrderStatus`, `Order.paymentStatus: OrderPaymentStatus`, `Product.status`/`User.status: ActiveStatus`); luật "cột `status` không khai báo `string`" được ép bởi `architecture.spec.ts`. Bảng chuyển trạng thái của đơn: `ORDER_TRANSITIONS` ở `order/order.constant.ts`.
+Entity dùng đúng các type này cho cột trạng thái (`Order.status: OrderStatus`, `Order.paymentStatus: OrderPaymentStatus`, `Product.status`/`User.status: ActiveStatus`); luật "cột `status` không khai báo `string`" được ép bởi `architecture.spec.ts`. Bảng chuyển trạng thái của đơn: `ORDER_TRANSITIONS` ở `order/shared/order.constant.ts`.
 
 ### 4.6 Error code & xử lý lỗi
 
