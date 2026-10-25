@@ -84,12 +84,12 @@ Trạng thái: **Có** = đã có test cover luồng · **Unit** = chỉ có uni
 | payment (phiên khách) | Trạng thái PENDING/EXPIRED/CANCELLED/PAID; QR (thông tin, dùng lại, cấp mã mới, từ chối đơn đã trả/huỷ/của người khác); webhook IGNORED, ACCOUNT_MISMATCH, UNMATCHED, LATE, lowercase, payload sai (1705), timestamp cũ/thiếu chữ ký (1704) | Flow | `flows/payment/payment-session.flow.ts` | Có (batch 01) |
 | payment (admin tra cứu) | Danh sách phiên (lọc trạng thái hiệu lực, orderId, tìm kiếm, sắp xếp, phân trang, tham số sai) và toàn cảnh thanh toán của đơn | Flow | `flows/payment/payment-admin-queries.flow.ts` | Có (batch 01) |
 | order | Khách huỷ đơn chưa trả (huỷ QR); khách không huỷ được đơn đã trả (1307) | Flow | `flows/order-payment/cancel-and-refund.flow.ts` | Có |
-| order + payment (refund) | Admin huỷ đơn đã trả → tự sinh hoàn tiền đủ → hoàn xong → `refunded`; hoàn lần hai (1713); trùng mã tham chiếu (1714) | Flow | `flows/order-payment/cancel-and-refund.flow.ts` | Có |
+| order + refund | Admin huỷ đơn đã trả → tự sinh hoàn tiền đủ → hoàn xong → `refunded`; hoàn lần hai (1713); trùng mã tham chiếu (1714) | Flow | `flows/order-payment/cancel-and-refund.flow.ts` | Có |
 | order + payment (song song) | 6 QR cùng lúc → 1 phiên PENDING; webhook trùng id song song; hai chuyển khoản khác id; huỷ vs thanh toán đua nhau | Flow | `flows/order-payment/concurrency.flow.ts` | Có |
 | order + payment (khoá dòng) | Hợp đồng khoá `orders`: huỷ, đổi trạng thái, tạo QR, webhook đều chờ khoá rồi quyết định trên dữ liệu mới | Flow | `flows/order-payment/lock-contract.flow.ts` | Có |
 | payment (admin) | Xác nhận thủ công (giao dịch mới, theo mã, gắn giao dịch có sẵn, các lỗi 1702/1707/1708/1709/1710/1703); QR do admin tạo (thay mã cũ, LATE) | Flow | `flows/payment/payment-admin-actions.flow.ts` | Có (batch 02) |
-| payment (hoàn xong / từ chối) | Hoàn đủ và hoàn từng phần, 1711/1712/1713/1714, validation, hai admin bấm cùng lúc, hai khoản cùng mã tham chiếu | Flow | `flows/payment/payment-refund-actions.flow.ts` | Có (batch 03) |
-| payment (giao dịch, hoàn tiền) | Danh sách giao dịch (lọc, needsReview, sắp xếp), danh sách hoàn tiền (lọc, tìm, nguồn tiền), tạo yêu cầu hoàn thủ công và các từ chối 1712 | Flow | `flows/payment/payment-transactions-refunds.flow.ts` | Có (batch 02) |
+| refund (hoàn xong / từ chối) | Hoàn đủ và hoàn từng phần, 1711/1712/1713/1714, validation, hai admin bấm cùng lúc, hai khoản cùng mã tham chiếu | Flow | `flows/payment/payment-refund-actions.flow.ts` | Có (batch 03) |
+| payment + refund (giao dịch, hoàn tiền) | Danh sách giao dịch (lọc, needsReview, sắp xếp), danh sách hoàn tiền (lọc, tìm, nguồn tiền), tạo yêu cầu hoàn thủ công và các từ chối 1712 | Flow | `flows/payment/payment-transactions-refunds.flow.ts` | Có (batch 02) |
 | return (khách) | Điều kiện trả hàng (4 lý do không đủ điều kiện, hạn), tạo yêu cầu (snapshot, trả phần còn lại, 1802/1803, validation), danh sách (lọc, sắp xếp), chi tiết, huỷ (REQUESTED/APPROVED, 1804, sở hữu 1801) | Flow | `flows/return/return-customer.flow.ts` | Có (batch 06) |
 | return (admin) | Danh sách (lọc, tìm theo SĐT/tên/mã), chi tiết, duyệt, từ chối, nhận hàng (tiền theo tỷ lệ, cộng dồn nhiều lần trả, phí ship một lần, 1804/1805/1712), khoá đơn, khoản hoàn xong → REFUNDED, bị từ chối → APPROVED | Flow | `flows/return/return-admin.flow.ts` | Có (batch 07) |
 | review (đọc công khai, viết, sửa) | Tạo (snapshot, điểm sản phẩm, ảnh của chính mình, 1902/1903/1905/1908, song song), danh sách và tổng hợp công khai (lọc, sort, làm tròn), sửa một lần (1904/1901/1909, song song), bỏ "hữu ích" | Flow | `flows/review/review.flow.ts` | Có (batch 09) |
@@ -127,7 +127,8 @@ Trạng thái: **Có** = đã có test cover luồng · **Unit** = chỉ có uni
 | currency | `modules/currency/currency.service.spec.ts` |
 | media | `modules/media/media.service.spec.ts`, `media-file.util.spec.ts` |
 | order | `modules/order/order-checkout.service.spec.ts`, `order-query.service.spec.ts`, `order-status.service.spec.ts`, `order.presenter.spec.ts`, `order.constant.spec.ts` (bảng chuyển trạng thái), `dtos/order.dto.spec.ts` |
-| payment | `modules/payment/payment.service.spec.ts`, `payment-payable.util.spec.ts`, `payment-confirm.spec.ts`, `payment-expiry.spec.ts`, `payment-attempts-admin.spec.ts`, `refund.service.spec.ts`, `sepay-webhook.service.spec.ts`, `sepay-payload.util.spec.ts`, `sepay-signature.util.spec.ts` |
+| payment | `modules/payment/attempt/payment-attempt.service.spec.ts`, `attempt/payment-expiry.spec.ts`, `attempt/payment-attempts-admin.spec.ts`, `transaction/payment-confirm.spec.ts`, `order-payments/payment-overview.service.spec.ts`, `shared/payment-payable.util.spec.ts`, `sepay/sepay-webhook.service.spec.ts`, `sepay/sepay-payload.util.spec.ts`, `sepay/sepay-signature.util.spec.ts` |
+| refund | `modules/refund/refund.service.spec.ts` |
 | pending-count | `modules/pending-count/pending-count.spec.ts` |
 | product | `modules/product/product-query.service.spec.ts`, `product.presenter.spec.ts` |
 | return | `modules/return/return.service.spec.ts`, `return-eligibility.util.spec.ts` |

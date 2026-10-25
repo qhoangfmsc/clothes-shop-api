@@ -72,4 +72,4 @@ Thêm/sửa dòng trong `test/README.md`: module · luồng · tầng · file. T
 
 ## 5. Viết unit test
 
-Theo mẫu spec hiện có trong module. Với service dùng transaction, mẫu mock có sẵn là `createFakeManager` (`src/modules/payment/payment.test-utils.ts`). Unit mock không thay được flow ở các điểm trong bảng mục 1.
+Theo mẫu spec hiện có trong module. Với service dùng transaction, mẫu mock có sẵn là `createFakeManager` (`src/modules/payment/shared/payment.test-utils.ts`). Unit mock không thay được flow ở các điểm trong bảng mục 1.

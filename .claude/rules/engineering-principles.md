@@ -16,6 +16,7 @@ Kiến thức, ví dụ và checklist chi tiết: skill `design-principles` (`.c
 
 | Quy tắc | Chi tiết |
 |---|---|
+| Cell (module nhiều nhóm chức năng) | Mỗi nhóm chức năng là một thư mục `<module>/<cell>/` (controller, service, dto, util, spec của nhóm); entity, hằng, presenter dùng chung ở `<module>/shared/`. Cell chỉ import chính nó và `shared/`; `shared/` không import cell. Thực thể độc lập (có vòng đời, bảng, route riêng và không cell nào khác dùng) tách thành module cấp cao. Module nhỏ (một nhóm chức năng, dưới ~8 file) không cần chia. Máy ép: `architecture.spec.ts`. Spec: `docs/specs/common/0011`. |
 | Phân lớp trong module | `Controller` (HTTP, không logic nghiệp vụ) → `Service` (use case) → Repository/`EntityManager`. `Presenter` map entity → response. |
 | Hướng phụ thuộc | Một chiều, không vòng, không `forwardRef`. `common/` không import `modules/`. Module này dùng module khác qua **service được export**, không với tay vào bảng của module kia khi đã có service chủ; nếu chưa có thì thêm method vào service chủ. |
 | Kích thước service | Quá ~300 dòng hoặc quá ~5 dependency là tín hiệu **dừng lại và cân nhắc tách** theo use case (vd `XCheckoutService`) hoặc tách phần đọc/lọc admin (`XQueryService`). Ghi quyết định ở spec. |

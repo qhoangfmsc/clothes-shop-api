@@ -1,6 +1,6 @@
 # common & core (`src/common`, `src/core`, `src/main*.ts`, `src/migrations`)
 
-> Cập nhật lần cuối: 2026-10-24
+> Cập nhật lần cuối: 2026-10-25
 
 ## 1. Tổng quan
 
@@ -286,7 +286,8 @@ yarn migration:run              # chạy migration
   - cột entity tên `status`/`paymentStatus` không khai báo `string` (dùng type union);
   - khoá dòng chỉ qua `findLocked` (không có `lock: { mode:` ngoài `lock.util.ts`);
   - không ghi bảng của module khác (`update/delete/insert/remove/upsert/create(<Entity khác module>)` hoặc ghi qua `@InjectRepository(<Entity khác module>)`): module chủ viết hàm chuyển trạng thái (`*-state.util.ts`, `product-rating.util.ts`, `cart-checkout.util.ts`) và module khác gọi, trong cùng transaction. Ngoại lệ có lý do trong `CROSS_MODULE_WRITES`: `auth.service.ts` tạo/cập nhật `User` khi đăng nhập;
-  - service tối đa 300 dòng và 5 dependency constructor.
+  - service tối đa 300 dòng và 5 dependency constructor;
+  - module có `shared/` thì mỗi cell (thư mục con trực tiếp) chỉ import chính nó và `shared/`, và `shared/` không import cell (spec 0011).
   Thêm vi phạm mới hoặc để vi phạm cũ lớn thêm → đỏ; sửa xong mà chưa giảm allowlist → đỏ. `src/common/dto/list-query.dto.spec.ts` là guard chuẩn list cho mọi `*-query.dto.ts` (xem 4.5); `src/common/utils/money.util.spec.ts` cho helper tiền. Test của từng module: xem file module tương ứng.
 - **Flow** (`yarn test:flows`): `test/flows/<module>/*.flow.ts`, đi qua HTTP thật (`MainModule` + `configureApp`) trên Postgres thật. Config riêng `test/jest.flows.config.js` (rootDir repo, chỉ nhận `*.flow.ts`, chạy tuần tự).
   - Mỗi lần chạy: lấy khoá advisory (`pg_try_advisory_lock`; lần chạy thứ hai cùng DB bị chặn), `DROP SCHEMA public` → chạy toàn bộ migration → `TRUNCATE` dữ liệu seed; sau mỗi test `truncateAll`.
@@ -303,6 +304,7 @@ yarn migration:run              # chạy migration
 ### 4.13 Lưu ý hiện trạng
 
 - Phụ thuộc: `package.json` có `resolutions` ghim bản vá cho các gói bắc cầu nằm trên đường chạy production (`proxy-addr`, `body-parser`, `qs`, `multer`, `js-yaml`) vì `@nestjs/platform-express` 11.x ghim phiên bản cũ có lỗ hổng (đo ngày 2026-10-24: 1 critical + 55 high → 0 critical + 39 high; số còn lại đều thuộc công cụ build `@nestjs/cli`: `brace-expansion`, `browserslist`, `fast-uri`). CI chặn merge khi `yarn audit --groups dependencies` có critical. Bỏ `resolutions` khi nâng Nest lên bản đã kéo các gói này lên bản vá.
+- Cấu trúc cell (spec 0011): `payment` chia `attempt/`, `transaction/`, `order-payments/`, `sepay/`, `shared/`; `refund` tách thành module riêng (spec payment/0004). Các module còn lại giữ cấu trúc phẳng cho tới khi được chia theo quy ước này. Hai guard `list-query.dto.spec.ts` và `update-dto.spec.ts` quét `dtos/` ở mọi cấp thư mục của `modules/`.
 - Ranh giới ghi giữa các module (spec 0006): payment không còn `UPDATE` bảng `orders`/`return_requests`, review không còn `UPDATE products`, order không còn xoá `cart_items` — mỗi nơi gọi hàm của module chủ. Việc **đọc** chéo module (giỏ/yêu thích/collection/review đọc `Product`, return/review đọc `Order`/`OrderItem`, product đọc `Category`) được giữ có chủ đích.
 - Mọi service tạo bản ghi theo mẫu "kiểm tra rồi ghi" (`ensure*Unique`) vẫn giữ kiểm tra cho đường thường nhưng phải bắt thêm vi phạm ràng buộc khi hai request đồng thời (spec 0008): dùng `saveOrThrowOnConstraint` hoặc `isUniqueViolation` + đọc lại.
 - Quy ước `PATCH` (spec 0007): `Update*Dto` luôn là `PartialType(Create*Dto, { skipNullProperties: false })` — được ép bởi `src/common/dto/update-dto.spec.ts` (mọi cặp `Create<X>Dto`/`Update<X>Dto`: không khoá "ma", giữ mọi ràng buộc của create trên các field chung). `null` ở field bắt buộc → 400; field tuỳ chọn mang `@IsOptional()` coi `null` là "không gửi" nên service ghi entity qua `pickProvided(dto, nullableKeys)` (`common/base/provided-fields.util.ts`), chỉ giữ `null` ở field cố ý nhận null (`badge`, `heroImage`, `originalPriceVnd`).

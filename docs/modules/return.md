@@ -1,6 +1,6 @@
 # return (`src/modules/return`)
 
-> Cập nhật lần cuối: 2026-10-24
+> Cập nhật lần cuối: 2026-10-25
 
 ## 1. Tổng quan
 
@@ -10,15 +10,15 @@ Module trả hàng sau khi giao: khách gửi yêu cầu trả một phần ho�
 |---|---|
 | Thư mục | `src/modules/return` |
 | Route prefix | `/api/returns` (khách), `/api/admin/returns` (admin) |
-| Bảng DB | `return_requests`, `return_request_items`; thêm cột `delivered_at` vào `orders` ([order](order.md)) và `return_request_id` vào `refunds` ([payment](payment.md)) |
-| Module phụ thuộc | `order` (entity `Order`, `OrderItem` qua `EntityManager`); `payment` (`RefundService.createForReturn` — tạo khoản hoàn); `shipping` (`ShippingConfigService` — số ngày đổi trả `returnPolicy.days`) |
-| Export | `ReturnQueryService` (module [pending-count](pending-count.md) dùng `countRequested`); các entity `ReturnRequest`, `ReturnRequestItem` được module [payment](payment.md) cập nhật khi khoản hoàn xong/bị từ chối |
+| Bảng DB | `return_requests`, `return_request_items`; thêm cột `delivered_at` vào `orders` ([order](order.md)) và `return_request_id` vào `refunds` ([refund](refund.md)) |
+| Module phụ thuộc | `order` (entity `Order`, `OrderItem` qua `EntityManager`); `refund` (`RefundService.createForReturn` — tạo khoản hoàn); `shipping` (`ShippingConfigService` — số ngày đổi trả `returnPolicy.days`) |
+| Export | `ReturnQueryService` (module [pending-count](pending-count.md) dùng `countRequested`); các entity `ReturnRequest`, `ReturnRequestItem` được module [refund](refund.md) cập nhật (qua `return-refund-state.util.ts`) khi khoản hoàn xong/bị từ chối |
 
 ## 2. Mục đích & nghiệp vụ phục vụ
 
 - Cho khách xin trả từng dòng hàng (kèm số lượng) của đơn đã giao, không vượt số đã mua, trong hạn đổi trả tính từ lúc giao.
 - Cho cửa hàng kiểm soát từng bước: duyệt/từ chối, xác nhận đã nhận hàng, chốt số lượng chấp nhận, quyết định hoàn cả phí ship hay không.
-- Số tiền hoàn tính theo giá lúc đặt và theo tỷ lệ trên số tiền khách thực trả; việc chuyển khoản trả khách do admin làm và ghi nhận ở [payment](payment.md).
+- Số tiền hoàn tính theo giá lúc đặt và theo tỷ lệ trên số tiền khách thực trả; việc chuyển khoản trả khách do admin làm và ghi nhận ở [refund](refund.md).
 
 ## 3. Submodule & chức năng
 
@@ -152,7 +152,7 @@ Sai bước → `RETURN_INVALID_STATE`. `REJECTED`, `CANCELLED`, `REFUNDED` là 
 3. `RefundService.createForReturn`: số tiền VND tính theo tỷ lệ trên số tiền ngân hàng thực nhận (so với `orders.total`, cùng đơn vị VND) và theo luỹ kế: `prorate(đã nhận, giá trị các lần trả đã nhận trước + lần này) − prorate(đã nhận, giá trị các lần trả đã nhận trước)`, nên nhiều lần trả cộng lại đúng bằng số đã nhận, không lệch do làm tròn; hoàn đủ giá trị đơn thì đúng bằng số đã nhận; không vượt phần còn lại chưa hoàn; đơn đang có khoản hoàn `REQUESTED` khác thì từ chối (`REFUND_NOT_ALLOWED`).
 4. Ghi `accepted_quantity`, `status = RECEIVED`, `received_at`, `processed_by`, `shipping_refunded`, `admin_note` (nếu có `note`).
 
-Sau đó admin chuyển khoản và ghi khoản hoàn ở `/api/admin/refunds` ([payment](payment.md)): xong → yêu cầu trả hàng `REFUNDED`; khi tổng đã hoàn bằng số đã trả thì đơn `payment_status = refunded`.
+Sau đó admin chuyển khoản và ghi khoản hoàn ở `/api/admin/refunds` ([refund](refund.md)): xong → yêu cầu trả hàng `REFUNDED`; khi tổng đã hoàn bằng số đã trả thì đơn `payment_status = refunded`.
 
 ### 4.5 Error code
 
@@ -164,12 +164,12 @@ Sau đó admin chuyển khoản và ghi khoản hoàn ở `/api/admin/refunds` (
 | 1804 | `RETURN_INVALID_STATE` | Thao tác không hợp lệ với trạng thái hiện tại (message nêu trạng thái và các trạng thái cho phép) |
 | 1805 | `RETURN_RECEIVE_INVALID` | Số lượng chấp nhận sai / tổng bằng 0 / phí ship đã hoàn / đơn không còn `paid` |
 
-Đơn không thuộc user dùng `ORDER_NOT_FOUND (1301)` (HTTP 404). Lỗi tạo khoản hoàn dùng mã `REFUND_NOT_ALLOWED (1712)` của [payment](payment.md).
+Đơn không thuộc user dùng `ORDER_NOT_FOUND (1301)` (HTTP 404). Lỗi tạo khoản hoàn dùng mã `REFUND_NOT_ALLOWED (1712)` của [refund](refund.md).
 
 ### 4.6 Phụ thuộc & cấu hình
 
-- `TypeOrmModule.forFeature([Order, OrderItem, ReturnRequest, ReturnRequestItem])`; `ReturnModule` import `PaymentModule` (`RefundService`) và `ShippingModule` (`ShippingConfigService`); `DataSource` cho transaction. `ReturnQueryService` inject `DataSource`, `Repository<ReturnRequest>`, `ShippingConfigService`; `ReturnService` inject `DataSource`, `ShippingConfigService`, `RefundService`, `ReturnQueryService`. Module export `ReturnQueryService`.
-- Module [payment](payment.md) import entity `ReturnRequest`, `ReturnRequestItem` (không import `ReturnModule`) để cập nhật trạng thái khi khoản hoàn xong/bị từ chối.
+- `TypeOrmModule.forFeature([Order, OrderItem, ReturnRequest, ReturnRequestItem])`; `ReturnModule` import `RefundModule` (`RefundService`) và `ShippingModule` (`ShippingConfigService`); `DataSource` cho transaction. `ReturnQueryService` inject `DataSource`, `Repository<ReturnRequest>`, `ShippingConfigService`; `ReturnService` inject `DataSource`, `ShippingConfigService`, `RefundService`, `ReturnQueryService`. Module export `ReturnQueryService`.
+- Module [refund](refund.md) dùng `markReturnRefunded`/`reopenReturnAfterRefundRejected` của module này (không import `ReturnModule`) để cập nhật trạng thái khi khoản hoàn xong/bị từ chối.
 - Quyền: `RETURN_CREATE 15000`, `RETURN_VIEW 15001` (trong `DEFAULT_USER_PERMISSIONS`), `RETURN_ADMIN_VIEW 16000`, `RETURN_ADMIN_PROCESS 16001` (admin tự có). Không có biến môi trường.
 
 ### 4.7 Test
@@ -177,7 +177,7 @@ Sau đó admin chuyển khoản và ghi khoản hoàn ở `/api/admin/refunds` (
 - `return-eligibility.util.spec.ts` — điều kiện trả hàng (đã giao/đã trả, biên hạn, trừ số lượng đang trả, không âm).
 - `return.service.spec.ts` (dựng `ReturnQueryService` và `ReturnService`) — tra cứu điều kiện (hạn theo chính sách, đơn người khác), tạo yêu cầu (snapshot sản phẩm, khoá đơn, từng lý do bị từ chối, vượt số lượng, trùng dòng, số lượng được trả lại khi `REJECTED`/`CANCELLED`), khách xem/list/huỷ, admin duyệt/từ chối/list, nhận hàng (số tiền theo tỷ lệ, số lượng chấp nhận từng dòng, phí ship một lần mỗi đơn, trần theo phần còn lại, dữ liệu sai, sai trạng thái, đơn không còn `paid`, khoản hoàn đang chờ, thiếu phiên `PAID`) và các DTO.
 - Nhiều lần trả hàng của một đơn cộng lại đúng số đã nhận (ba lần trả một món chia không tròn) nằm trong `return.service.spec.ts`.
-- Khoản hoàn từ yêu cầu trả hàng (hoàn xong → `REFUNDED`, từ chối → về `APPROVED`, `prorateRefundAmount`) nằm trong `payment/refund.service.spec.ts`; `delivered_at` khi admin chuyển `delivered` nằm trong `order/order-status.service.spec.ts`.
+- Khoản hoàn từ yêu cầu trả hàng (hoàn xong → `REFUNDED`, từ chối → về `APPROVED`, `prorateRefundAmount`) nằm trong `refund/refund.service.spec.ts`; `delivered_at` khi admin chuyển `delivered` nằm trong `order/order-status.service.spec.ts`.
 - Flow test trên Postgres thật (`test/flows/return/`, dùng `steps.ts`: đơn đã trả và đã giao):
   - `return-customer.flow.ts` — điều kiện trả hàng (`ORDER_NOT_PAID`, `ORDER_NOT_DELIVERED`, `RETURN_WINDOW_EXPIRED`, `NOTHING_TO_RETURN`, hạn 30 ngày), tạo yêu cầu (snapshot sản phẩm, trả phần còn lại bằng yêu cầu thứ hai, 1802/1803, đơn của người khác → 1301, validation từng field), danh sách (chỉ yêu cầu của mình, lọc `status`/`orderId`, `sort`, phân trang, tham số sai), chi tiết (1801), huỷ ở `REQUESTED`/`APPROVED` và từ chối ở các trạng thái còn lại (1804).
   - `return-admin.flow.ts` — danh sách admin (shape có `order`/`requestedBy`, lọc, tìm theo mã yêu cầu, mã đơn, SĐT, tên; `sort`; tham số sai), chi tiết, duyệt/từ chối (ghi chú khách thấy, 1804, 1801, validation), nhận hàng (mặc định nhận đủ, nhận một phần, hoàn phí ship, cộng dồn nhiều lần trả, làm tròn luỹ kế khi tiền nhận khác tổng đơn, phí ship chỉ một lần mỗi đơn, khoản hoàn đang chờ → 1712 và rollback, 1805 từng dạng), hợp đồng khoá đơn (chờ khoá rồi quyết định trên dữ liệu mới), hai thao tác cùng lúc, khoản hoàn xong → `REFUNDED` và bị từ chối → quay về `APPROVED` rồi nhận lại.

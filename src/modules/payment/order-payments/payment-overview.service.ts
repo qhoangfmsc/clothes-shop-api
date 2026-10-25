@@ -5,9 +5,9 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Order } from '../../order/order.entity';
-import { resolveAttemptStatus } from '../attempt/payment-attempt-status.util';
 import { presentAmount } from '../shared/payment.presenter';
 import { PaymentAttempt } from '../shared/payment-attempt.entity';
+import { resolveAttemptStatus } from '../shared/payment-attempt-status.util';
 import { PaymentTransaction } from '../shared/payment-transaction.entity';
 
 @Injectable()

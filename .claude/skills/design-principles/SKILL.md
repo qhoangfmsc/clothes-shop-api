@@ -106,7 +106,7 @@ Singleton tự viết (DI đã quản lý vòng đời), Abstract Factory/Factor
 | **O** | "Thêm giá trị mới có phải sửa logic cũ?" | `@SortField([...])`, `ORDER_STATUSES`, `sortValues` | Thêm phương thức giao/cổng thanh toán phải sửa service |
 | **L** | "Lớp con thay lớp cha có vỡ không?" | `BaseEntity`; `PaginationQueryDto` (có test ép) | — |
 | **I** | "Có bị ép nhận thứ không dùng?" | `presentOrder` nhận `OrderLike` (4 field), không nhận cả `Order` | Hàm nhận entity đầy đủ chỉ để đọc 1–2 field |
-| **D** | "Logic nghiệp vụ biết tên chi tiết cụ thể nào?" | Nest DI tiêm service | `PaymentService`/`SepayWebhookService` biết thẳng SePay; `OrderStatusService` / `OrderQueryService` gọi trực tiếp `PaymentService` + `RefundService` (có chủ đích vì cần cùng transaction) |
+| **D** | "Logic nghiệp vụ biết tên chi tiết cụ thể nào?" | Nest DI tiêm service | `SepayWebhookService` (cell `payment/sepay/`) biết thẳng SePay; `OrderStatusService` / `OrderQueryService` gọi trực tiếp `PaymentAttemptService` + `RefundService` (có chủ đích vì cần cùng transaction) |
 
 Cách đếm nhanh SRP: **số dependency của constructor** và **số mock cần cho một unit test**.
 

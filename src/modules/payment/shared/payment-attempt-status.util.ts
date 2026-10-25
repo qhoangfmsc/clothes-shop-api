@@ -1,4 +1,4 @@
-import { PaymentAttemptStatus } from '../shared/payment.constant';
+import { PaymentAttemptStatus } from './payment.constant';
 
 /**
  * Trạng thái hiệu lực của một phiên thanh toán khi đọc (không phụ thuộc việc DB đã được cập nhật chưa):

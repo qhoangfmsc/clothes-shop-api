@@ -9,10 +9,10 @@ import { In, Repository } from 'typeorm';
 import { Order } from '../../order/order.entity';
 import { PaymentAttemptStatus } from '../shared/payment.constant';
 import { PaymentAttempt } from '../shared/payment-attempt.entity';
+import { resolveAttemptStatus } from '../shared/payment-attempt-status.util';
 import { PaymentTransaction } from '../shared/payment-transaction.entity';
 import { AdminPaymentAttemptQueryDto } from './dtos/admin-payment-attempt-query.dto';
 import { PaymentAttemptService } from './payment-attempt.service';
-import { resolveAttemptStatus } from './payment-attempt-status.util';
 
 /** Trạng thái hiệu lực của phiên trong SQL (cùng quy tắc với `resolveAttemptStatus`): alias `a` = payment_attempts, `o` = orders */
 const EFFECTIVE_ATTEMPT_STATUS_SQL = `(CASE WHEN a.status <> 'PENDING' THEN a.status WHEN o.status = 'cancelled' THEN 'CANCELLED' WHEN a.expires_at <= now() THEN 'EXPIRED' ELSE 'PENDING' END)`;

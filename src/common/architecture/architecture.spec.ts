@@ -1,4 +1,4 @@
-import { join } from 'node:path';
+import { dirname, join, normalize } from 'node:path';
 import { MODULE_METADATA } from '@nestjs/common/constants';
 import {
   COMMON_IMPORTS_MODULES,
@@ -169,6 +169,28 @@ describe('Architecture rules', () => {
       }
     }
     expect(violations).toEqual([]);
+  });
+
+  it('keeps cells of a module independent: a cell imports only itself and shared/, and shared/ imports no cell', () => {
+    const problems: string[] = [];
+    for (const file of listFiles('src/modules', (f) => f.endsWith('.ts'))) {
+      const [, , module, cell] = file.split('/');
+      if (!cell || cell.endsWith('.ts') || cell === 'dtos') continue;
+      const moduleDir = `src/modules/${module}/`;
+      if (!listFiles(`src/modules/${module}`, (f) => f.startsWith(`${moduleDir}shared/`)).length) continue;
+
+      for (const [, spec] of read(file).matchAll(/from\s+'(\.[^']*)'/g)) {
+        const target = normalize(join(dirname(file), spec))
+          .split('\\')
+          .join('/');
+        if (!target.startsWith(moduleDir)) continue;
+        const targetCell = target.slice(moduleDir.length).split('/')[0];
+        const allowed = cell === 'shared' ? ['shared'] : [cell, 'shared'];
+        if (targetCell.endsWith('.module') || allowed.includes(targetCell)) continue;
+        problems.push(`${file}: import ${spec} sang cell ${targetCell} — cell chỉ được import chính nó và shared/`);
+      }
+    }
+    expect(problems).toEqual([]);
   });
 
   it(`keeps services within ${SERVICE_MAX_LINES} lines and ${SERVICE_MAX_DEPENDENCIES} constructor dependencies`, () => {

@@ -15,6 +15,8 @@ src/
 │   ├── category/    # controller + admin controller + service + entity + dtos
 │   ├── collection/  # controller + admin controller + service + entity + dtos
 │   ├── order/       # controller + admin controller + service + entity + dtos
+│   ├── payment/     # cell: attempt/ transaction/ order-payments/ sepay/ shared/ (VietQR + SePay)
+│   ├── refund/      # hoàn tiền (module riêng, chỉ đọc entity của payment)
 │   ├── cart/
 │   ├── address/
 │   ├── wishlist/
@@ -139,6 +141,7 @@ Luật đầy đủ: `.claude/rules/engineering-principles.md` · Kiến thức,
 - **Pattern là công cụ, không phải mục tiêu**: chỉ dùng khi gọi tên được vấn đề cụ thể; "không dùng pattern" là hợp lệ; rule of three (lần 3 mới gom). Ghi pattern và cái giá ở spec mục 3.3 và một dòng comment ở chỗ định nghĩa.
 - **Kiến trúc**: Controller (mỏng) → Service (use case) → Repository/EntityManager, Presenter map response; phụ thuộc một chiều, không vòng, `common/` không import `modules/`; module khác dùng nhau qua service được export; logic thuần tách thành `*.util.ts`; ghi tiền/trạng thái trong một transaction với thứ tự khoá cố định; service > ~300 dòng hoặc > ~5 dependency thì dừng và cân nhắc tách.
 - **Convention**: lỗi luôn `throwAppError` + error code; trạng thái/enum là `as const` + type union dùng chung DTO ↔ entity; không magic value, không code chết; comment ít và ngắn theo `.claude/rules/comments.md` (mặc định không comment, một dòng cho "vì sao"); Biome là nguồn sự thật format; quy ước quan trọng phải được test/lint ép (kiến trúc: `src/common/architecture/architecture.spec.ts`, allowlist chỉ co lại).
+- **Cell**: module có nhiều nhóm chức năng thì mỗi nhóm là một thư mục (`<module>/<cell>/` chứa controller, service, dto, util, spec của nhóm đó) cộng `shared/` cho entity/hằng/presenter dùng chung; cell chỉ import chính nó và `shared/` (ép bởi `architecture.spec.ts`); thực thể độc lập (vòng đời, bảng, route riêng) thì tách thành module cấp cao. Quy ước: `docs/specs/common/0011-module-cells.md`.
 - **SOLID**: S (một lý do để đổi), O (thêm dữ liệu thay vì thêm nhánh `if`), L (kế thừa chỉ để dùng chung cột/DTO), I (nhận kiểu hẹp đúng nhu cầu), D (phụ thuộc interface ở biên ngoài như cổng thanh toán/storage). Mỗi spec điền bảng SOLID.
 - Code cũ lệch chuẩn: sửa phần mình chạm tới, không refactor hàng loạt ngoài phạm vi; điểm còn lệch ghi ở `docs/modules/common.md` mục 4.13.
 

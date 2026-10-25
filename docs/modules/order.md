@@ -1,6 +1,6 @@
 # order (`src/modules/order`)
 
-> Cập nhật lần cuối: 2026-10-24
+> Cập nhật lần cuối: 2026-10-25
 
 ## 1. Tổng quan
 
@@ -11,10 +11,10 @@ Module đơn hàng: khách checkout từ giỏ hàng, xem lịch sử/chi tiết
 | Thư mục | `src/modules/order` |
 | Route prefix | `/api/orders` (khách), `/api/admin/orders` (admin) |
 | Bảng DB | `orders`, `order_items` |
-| Module phụ thuộc | `cart` (entity `Cart`, `CartItem`), `address` (entity `Address`) — đọc trực tiếp qua `EntityManager` trong transaction; `product` (qua quan hệ của `CartItem`); `shipping` (`ShippingConfigService` — phí ship và ngưỡng miễn phí); `currency` (`CurrencyService.getVndPerUsd` — tỷ giá chốt lúc đặt và dùng cho báo giá, xem [currency](currency.md)); `payment` (`PaymentQueryService.listAttemptsForCustomer`/`cancelPendingAttempts` — các phiên thanh toán của đơn; `RefundQueryService.listForCustomer`/`createForCancelledOrder` — hoàn tiền) |
+| Module phụ thuộc | `cart` (entity `Cart`, `CartItem`), `address` (entity `Address`) — đọc trực tiếp qua `EntityManager` trong transaction; `product` (qua quan hệ của `CartItem`); `shipping` (`ShippingConfigService` — phí ship và ngưỡng miễn phí); `currency` (`CurrencyService.getVndPerUsd` — tỷ giá chốt lúc đặt và dùng cho báo giá, xem [currency](currency.md)); `payment` (`PaymentAttemptQueryService.listAttemptsForCustomer`, `PaymentAttemptService.cancelPendingAttempts` — các phiên thanh toán của đơn); `refund` (`RefundQueryService.listForCustomer`, `RefundService.createForCancelledOrder` — hoàn tiền) |
 | Export | `OrderQueryService` (module [pending-count](pending-count.md) dùng `countNeedsAction`) |
 
-Thanh toán (VietQR/SePay) và hoàn tiền của đơn do module [payment](payment.md) xử lý; module này chỉ giữ hai cột `payment_status`, `paid_at` trên bảng `orders` và tạo yêu cầu hoàn tiền khi đơn đã trả bị huỷ.
+Thanh toán (VietQR/SePay) của đơn do module [payment](payment.md) xử lý và hoàn tiền do module [refund](refund.md); module này chỉ giữ hai cột `payment_status`, `paid_at` trên bảng `orders` và tạo yêu cầu hoàn tiền khi đơn đã trả bị huỷ.
 
 ## 2. Mục đích & nghiệp vụ phục vụ
 
@@ -52,7 +52,7 @@ Thanh toán (VietQR/SePay) và hoàn tiền của đơn do module [payment](paym
 
 **GET `/api/orders/:orderId`** → `{ data: Order(+items) + paymentAttempts + refunds }`; đơn không thuộc user hoặc không có → `404` / `1301` `Order not found` (khi đó không truy vấn phiên thanh toán).
 
-`data.paymentAttempts` là mọi nội dung chuyển khoản đã cấp cho đơn, **mới nhất trước**, kể cả mã đã hết hạn (`[]` nếu đơn chưa từng tạo QR). Do [payment](payment.md) (`PaymentQueryService.listAttemptsForCustomer`) cung cấp:
+`data.paymentAttempts` là mọi nội dung chuyển khoản đã cấp cho đơn, **mới nhất trước**, kể cả mã đã hết hạn (`[]` nếu đơn chưa từng tạo QR). Do [payment](payment.md) (`PaymentAttemptQueryService.listAttemptsForCustomer`) cung cấp:
 
 ```json
 "paymentAttempts": [
@@ -70,7 +70,7 @@ Thanh toán (VietQR/SePay) và hoàn tiền của đơn do module [payment](paym
 
 Không trả số tài khoản nhận, `raw_payload`, id nội bộ hay id đơn trong từng phiên. Danh sách đơn `GET /api/orders` không có field này.
 
-`data.refunds` là các khoản hoàn tiền của đơn, mới nhất trước (`[]` nếu chưa có). Do [payment](payment.md) (`RefundQueryService.listForCustomer`) cung cấp:
+`data.refunds` là các khoản hoàn tiền của đơn, mới nhất trước (`[]` nếu chưa có). Do [refund](refund.md) (`RefundQueryService.listForCustomer`) cung cấp:
 
 ```json
 "refunds": [
@@ -205,7 +205,7 @@ Bảng `order_items` (entity `OrderItem`, không extends `BaseEntity`, chỉ có
 | `paid` hoặc `refunded`, đã `cancelled` | `400 Order has already been cancelled` |
 | `paid`, mọi trạng thái còn lại | `400` `ORDER_CANCEL_PAID_NOT_ALLOWED (1307)`: khách không tự huỷ đơn đã trả, phải liên hệ cửa hàng (admin huỷ và hoàn tiền) |
 
-Khi khách huỷ: đơn → `cancelled`, rồi `PaymentService.cancelPendingAttempts` đổi các mã chuyển khoản còn chờ của đơn sang `CANCELLED` (không có khoản hoàn vì chưa thu tiền). Thanh toán thành công tự chuyển đơn `pending` sang `confirmed` ([payment](payment.md)), nên đơn đã trả không còn `pending` và khách không tự huỷ được. Admin huỷ đơn đã trả (xem bên dưới) thì hệ thống tạo yêu cầu hoàn tiền **trước** khi đổi đơn sang `cancelled` (đơn đã trả mà không có phiên `PAID` → `REFUND_NOT_ALLOWED (1712)` và không đổi gì); đơn giữ `payment_status = paid` cho tới khi admin ghi đã chuyển tiền hoàn (khi đó `refunded`).
+Khi khách huỷ: đơn → `cancelled`, rồi `PaymentAttemptService.cancelPendingAttempts` đổi các mã chuyển khoản còn chờ của đơn sang `CANCELLED` (không có khoản hoàn vì chưa thu tiền). Thanh toán thành công tự chuyển đơn `pending` sang `confirmed` ([payment](payment.md)), nên đơn đã trả không còn `pending` và khách không tự huỷ được. Admin huỷ đơn đã trả (xem bên dưới) thì hệ thống tạo yêu cầu hoàn tiền **trước** khi đổi đơn sang `cancelled` (đơn đã trả mà không có phiên `PAID` → `REFUND_NOT_ALLOWED (1712)` và không đổi gì); đơn giữ `payment_status = paid` cho tới khi admin ghi đã chuyển tiền hoàn (khi đó `refunded`).
 
 **Đổi trạng thái (admin)** — `ORDER_TRANSITIONS` (`order.constant.ts`, kiểu `Record<OrderStatus, readonly OrderStatus[]>` nên thiếu một trạng thái là lỗi biên dịch). Bảng chỉ mô tả cạnh do admin thực hiện; cạnh do hệ thống (thanh toán tự `pending → confirmed`, khách huỷ `pending → cancelled`) nằm ở nơi gây ra chúng:
 
@@ -241,7 +241,7 @@ Không hợp lệ → `ORDER_STATUS_INVALID_TRANSITION (1302)` với message nê
 
 ### 4.6 Phụ thuộc & cấu hình
 
-- `TypeOrmModule.forFeature([Order, OrderItem])`; ba service (xem 4.9): `OrderCheckoutService` inject `DataSource`, `ShippingConfigService`, `CurrencyService`, đọc `Cart`, `CartItem`, `Address` qua `manager`; `OrderStatusService` chạy huỷ/đổi trạng thái trong `DataSource.transaction` và gọi `PaymentService`, `RefundService` (từ `PaymentModule`) với cùng `manager`; `OrderQueryService` đọc qua repository và gọi `PaymentService`, `RefundService` để kèm phiên thanh toán/khoản hoàn.
+- `TypeOrmModule.forFeature([Order, OrderItem])`; ba service (xem 4.9): `OrderCheckoutService` inject `DataSource`, `ShippingConfigService`, `CurrencyService`, đọc `Cart`, `CartItem`, `Address` qua `manager`; `OrderStatusService` chạy huỷ/đổi trạng thái trong `DataSource.transaction` và gọi `PaymentAttemptService` (từ `PaymentModule`), `RefundService` (từ `RefundModule`) với cùng `manager`; `OrderQueryService` đọc qua repository và gọi `PaymentAttemptQueryService`, `RefundQueryService` để kèm phiên thanh toán/khoản hoàn.
 - Phí ship và ngưỡng miễn phí không còn là hằng số trong module này: lấy từ `SHIPPING_CONFIG` qua `ShippingConfigService` (`OrderModule` import `ShippingModule`). `CreateOrderDto.shippingMethod` dùng `SHIPPING_METHOD_IDS` từ `shipping/shipping-config.ts`.
 - Tỷ giá lấy từ `CurrencyService` (`OrderModule` import `CurrencyModule`); `order.presenter.ts` (`presentOrder`, `presentOrderItem`) đổi field tiền của entity thành cặp `...Vnd`/`...Usd`.
 - Không có biến môi trường.
@@ -253,7 +253,7 @@ Không hợp lệ → `ORDER_STATUS_INVALID_TRANSITION (1302)` với message nê
 - `order-checkout.service.spec.ts` (tiếp) — tổ hợp phương thức/địa chỉ/`pickupContact` (tạo được, snapshot `{ fullName, phone }`, không tra địa chỉ, các tổ hợp bị từ chối với 1304/1305/1306 và không ghi gì), tổng tiền từng phương thức dưới/đạt ngưỡng và ngưỡng `null`, cộng VND nguyên, `quote` (số liệu VND/USD, mặc định, `cartItemIds`, `freeShipping`, ngưỡng `null`, trùng kết quả checkout, USD theo tỷ giá hiện tại, không còn `vndPerUnit`/`amountVnd`, không tác dụng phụ, kiểm tra giỏ như checkout, `totalVnd` bằng số tiền QR tạo cho đơn cùng đầu vào), checkout chốt `exchangeRate` và trả đủ field `...Vnd`/`...Usd`, và số tiền QR của đơn `express` = `subtotal + phí express` (qua `PaymentService.createQr`).
 - `order-status.service.spec.ts` — luật huỷ với thanh toán: khách huỷ đơn chưa trả thì các mã chờ bị huỷ theo, đơn đã trả (mọi trạng thái) → 1307 và không đổi gì, đơn đã `confirmed` chưa trả vẫn lỗi thường, admin chuyển `cancelled` thì huỷ các mã chờ còn các chuyển khác thì không.
 - `order-query.service.spec.ts` / `order-status.service.spec.ts` — `findOne`/`cancel` kèm `paymentAttempts`: trả đúng thứ tự do payment cung cấp, `[]` khi chưa có phiên, đơn của người khác/không tồn tại → 404 và không truy vấn phiên, `cancel` trả cùng shape.
-- `order-status.service.spec.ts` (tiếp) — luật huỷ với hoàn tiền (dùng `RefundService` thật trên manager giả): khách huỷ đơn chưa trả (không có hoàn tiền, mã chờ → `CANCELLED`), khách không huỷ được đơn đã trả ở bất kỳ trạng thái nào (1307, không tạo hoàn), đơn đã huỷ không tạo hoàn lần hai, đơn của người khác → 404, admin huỷ đơn đã trả không có phiên `PAID` → 1712 và trạng thái giữ nguyên, admin huỷ đơn đã trả (`ADMIN_CANCELLED`, `requested_by` admin), admin huỷ đơn chưa trả, chuyển trạng thái khác không đụng thanh toán, bước chuyển sai (huỷ từ `shipping`) → 1302 không tạo hoàn, đơn lạ → 1301.
+- `order-status.service.spec.ts` (tiếp) — luật huỷ với hoàn tiền (dùng `RefundService` thật trên manager giả (module [refund](refund.md))): khách huỷ đơn chưa trả (không có hoàn tiền, mã chờ → `CANCELLED`), khách không huỷ được đơn đã trả ở bất kỳ trạng thái nào (1307, không tạo hoàn), đơn đã huỷ không tạo hoàn lần hai, đơn của người khác → 404, admin huỷ đơn đã trả không có phiên `PAID` → 1712 và trạng thái giữ nguyên, admin huỷ đơn đã trả (`ADMIN_CANCELLED`, `requested_by` admin), admin huỷ đơn chưa trả, chuyển trạng thái khác không đụng thanh toán, bước chuyển sai (huỷ từ `shipping`) → 1302 không tạo hoàn, đơn lạ → 1301.
 - `dtos/order.dto.spec.ts` — `CreateOrderDto` và `QuoteOrderDto`: `cartItemIds` hợp lệ/không hợp lệ, từng `shippingMethod`, phương thức lạ → 400, `pickupContact` hợp lệ/trim/thiếu/rỗng/quá dài/key lạ.
 - Flow test trên Postgres thật (`test/flows/order-payment/`, xem `test/README.md`): `checkout-and-pay.flow.ts` — báo giá (2 × 350.000 + phí ship tiêu chuẩn 30.000 = 730.000), checkout tạo đơn `pending`/`unpaid` và dọn giỏ, đơn sang `confirmed`/`paid` sau webhook SePay; `cancel-and-refund.flow.ts` — khách huỷ đơn chưa trả, khách huỷ đơn đã trả → 1307, admin huỷ đơn đã trả → yêu cầu hoàn đủ tiền → đơn `refunded`. Chưa có flow test cho đổi trạng thái đơn theo chuỗi `pending → … → completed` và cho checkout với `store-pickup`.
 - Flow test `test/flows/order-payment/order-errors.flow.ts` (Postgres thật): đơn lạ khi xem/huỷ → 404 / 1301; checkout với địa chỉ của người khác → 404 / 2101; giỏ rỗng → 1309; `cartItemIds` không thuộc giỏ → 1308 (giỏ và đơn không đổi); sản phẩm `disabled` → 1310 kèm tên; huỷ đơn không còn `pending` → 1311; huỷ đơn đã trả mà cửa hàng đã huỷ → 1312.

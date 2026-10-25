@@ -41,6 +41,8 @@ Cấu trúc: `docs/specs/<module>/NNNN-slug.md` (số tăng dần theo từng mo
 | product | [0002 — Tách `ProductService` thành đọc và ghi](product/0002-split-product-service.md) | Implemented | ProductQueryService + ProductService; allowlist kích thước service về rỗng |
 | category | [0002 — Tách `CategoryService` thành đọc và ghi](category/0002-split-category-service.md) | Implemented | CategoryQueryService + CategoryService |
 | media | [0002 — Tách logic thuần của ảnh khỏi `MediaService`](media/0002-extract-media-file-util.md) | Implemented | media-file.util: sniff mime, tên key, tên hiển thị |
+| payment | [0004 — `payment` chia cell, `refund` thành module riêng](payment/0004-payment-cells-and-refund-module.md) | Implemented | attempt/transaction/order-payments/sepay/shared + RefundModule |
+| common | [0011 — Quy ước cell](common/0011-module-cells.md) | Implemented | module lớn chia thư mục chức năng, test kiến trúc ép |
 | payment | [0003 — Tách `RefundService` thành đọc và ghi](payment/0003-split-refund-service.md) | Implemented | RefundQueryService + RefundService |
 | return | [0002 — Tách `ReturnService` thành đọc và ghi](return/0002-split-return-service.md) | Implemented | ReturnQueryService + ReturnService + activeReturnQuantities |
 | payment | [0002 — Tách `PaymentService` theo use case](payment/0002-split-payment-service.md) | Implemented | PaymentService (QR) + PaymentConfirmService + PaymentQueryService + assertOrderPayable |

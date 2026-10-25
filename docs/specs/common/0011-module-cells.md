@@ -1,6 +1,6 @@
 # 0011 — Quy ước "cell": module lớn chia thành thư mục chức năng
 
-> Module: `common` (quy ước kiến trúc) · Trạng thái: Approved · Ngày: 2026-10-25
+> Module: `common` (quy ước kiến trúc) · Trạng thái: Implemented · Ngày: 2026-10-25
 
 ## 1. Bối cảnh & vấn đề
 
@@ -77,4 +77,6 @@ Rủi ro: di chuyển file làm hỏng import hoặc route table. Giảm thiểu
 
 ## 6. Kết quả triển khai
 
-_Điền sau khi làm xong._
+- **Máy ép:** test `keeps cells of a module independent` trong `architecture.spec.ts`: module có `shared/` thì mỗi cell chỉ import chính nó và `shared/`, `shared/` không import cell. Không cần allowlist (không vi phạm nào sau khi sửa).
+- **Áp dụng:** `payment` (spec payment/0004). Các module còn lại giữ cấu trúc phẳng và sẽ được chia theo từng spec riêng khi đến lượt.
+- **Docs:** `CLAUDE.md`, `.claude/rules/engineering-principles.md`, `docs/modules/common.md` (4.12, 4.13).

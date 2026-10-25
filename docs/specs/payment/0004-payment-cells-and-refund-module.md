@@ -1,6 +1,6 @@
 # 0004 — `payment` chia cell, `refund` thành module riêng
 
-> Module: `payment`, `refund` (mới) (+ `order`, `return`, `pending-count` đổi import/module) · Trạng thái: Approved · Ngày: 2026-10-25 · Theo quy ước common/0011
+> Module: `payment`, `refund` (mới) (+ `order`, `return`, `pending-count` đổi import/module) · Trạng thái: Implemented · Ngày: 2026-10-25 · Theo quy ước common/0011
 
 ## 1. Bối cảnh & vấn đề
 
@@ -82,4 +82,8 @@ Rủi ro: hỏng import, thứ tự đăng ký route, DI. Giảm thiểu: công 
 
 ## 6. Kết quả triển khai
 
-_Điền sau khi làm xong._
+- **File:** 41 file di chuyển bằng công cụ viết lại import tự động (`git mv`, quét `src/` và `test/`); mới: `refund/refund.module.ts`, `refund/refund.constant.ts`, `payment/order-payments/*` (`PaymentOverviewService`, `AdminPaymentOverviewController`, spec), `payment/transaction/payment-transaction-query.service.ts`, `admin-payment-transaction.controller.ts`; `PaymentQueryService` tách ba, `AdminPaymentController` tách ba; `payment-attempt-status.util.ts` chuyển sang `shared/` (cell `order-payments` cần nó, test cell bắt ngay lần đầu).
+- **Đổi tên:** `PaymentService` → `PaymentAttemptService`, `PaymentController` → `PaymentAttemptController`; `RefundModule` import ở `OrderModule`, `ReturnModule`, `PendingCountModule`, `MainModule`.
+- **Khác thiết kế:** hằng `REFUND_STATUSES`, `REFUND_REASONS` chuyển sang `refund.constant.ts`; `PaymentModule` bỏ entity `Refund` khỏi `forFeature`. Hai guard quét DTO (`list-query.dto.spec.ts`, `update-dto.spec.ts`) chỉ đọc `modules/*/dtos` nên **im lặng bỏ qua 12 test** khi DTO vào thư mục cell (841 → 829); phát hiện nhờ so số test trước/sau, đã sửa để quét `dtos/` ở mọi cấp.
+- **Kiểm chứng:** `tsc`, biome, 842 unit (841 + 1 test kiến trúc cell), 883 flow (snapshot route–quyền không đổi), độ phủ route 98/98 và 82/82, `nest build`.
+- **Docs:** `payment.md` (cell), `refund.md` (mới), `order.md`, `return.md`, `pending-count.md`, `docs/README.md`, `common.md`, `test/README.md`, `CLAUDE.md`, rule `engineering-principles.md`, hai skill.
