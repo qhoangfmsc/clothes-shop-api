@@ -3,19 +3,19 @@ import { Permissions } from '@common/decorator/permissions.decorator';
 import { Permission } from '@common/permissions/permissions.constant';
 import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { User } from '../user/user.entity';
+import { User } from '../../user/user.entity';
 import { CreateReturnDto } from './dtos/create-return.dto';
 import { PublicReturnQueryDto } from './dtos/public-return-query.dto';
-import { ReturnService } from './return.service';
-import { ReturnQueryService } from './return-query.service';
+import { ReturnRequestService } from './return-request.service';
+import { ReturnRequestQueryService } from './return-request-query.service';
 
 @ApiTags('Returns')
 @Controller('api/returns')
 @ApiBearerAuth()
 export class ReturnController {
   constructor(
-    private readonly returnService: ReturnService,
-    private readonly queryService: ReturnQueryService,
+    private readonly returnService: ReturnRequestService,
+    private readonly queryService: ReturnRequestQueryService,
   ) {}
 
   @Get('eligibility/:orderId')

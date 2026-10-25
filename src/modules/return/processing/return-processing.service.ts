@@ -1,23 +1,20 @@
 import { findLocked } from '@common/base/lock.util';
 import { throwAppError } from '@common/exceptions/app.exception';
-import { EOrderErrorCode, EReturnErrorCode } from '@common/exceptions/error-codes';
+import { EReturnErrorCode } from '@common/exceptions/error-codes';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In } from 'typeorm';
-import { Order } from '../order/shared/order.entity';
-import { OrderItem } from '../order/shared/order-item.entity';
-import { RefundService } from '../refund/refund.service';
-import { ShippingConfigService } from '../shipping/shipping-config.service';
+import { Order } from '../../order/shared/order.entity';
+import { OrderItem } from '../../order/shared/order-item.entity';
+import { RefundService } from '../../refund/refund.service';
+import { REJECTABLE_RETURN_STATUSES } from '../shared/return.constant';
+import { ReturnRequest } from '../shared/return-request.entity';
+import { ReturnRequestItem } from '../shared/return-request-item.entity';
+import { assertReturnStatus } from '../shared/return-status.util';
 import { ApproveReturnDto } from './dtos/approve-return.dto';
-import { CreateReturnDto } from './dtos/create-return.dto';
 import { ReceiveReturnDto } from './dtos/receive-return.dto';
 import { RejectReturnDto } from './dtos/reject-return.dto';
-import { CUSTOMER_CANCELLABLE_RETURN_STATUSES, REJECTABLE_RETURN_STATUSES, ReturnReason, ReturnStatus } from './return.constant';
-import { activeReturnQuantities } from './return-active-quantities.util';
-import { computeReturnEligibility, RETURN_INELIGIBLE_MESSAGES } from './return-eligibility.util';
-import { ReturnQueryService } from './return-query.service';
-import { ReturnRequest } from './return-request.entity';
-import { ReturnRequestItem } from './return-request-item.entity';
+import { ReturnProcessingQueryService } from './return-processing-query.service';
 
 /**
  * Trả hàng sau khi giao. Luồng: khách gửi yêu cầu (REQUESTED) → cửa hàng duyệt (APPROVED) → khách gửi hàng về → cửa hàng nhận và
@@ -27,106 +24,18 @@ import { ReturnRequestItem } from './return-request-item.entity';
  * Mọi thao tác ghi khoá theo thứ tự `orders` → `return_requests` (order trước, như payment).
  */
 @Injectable()
-export class ReturnService {
+export class ReturnProcessingService {
   constructor(
     @InjectDataSource()
     private readonly dataSource: DataSource,
-    private readonly shippingConfigService: ShippingConfigService,
     private readonly refundService: RefundService,
-    private readonly queryService: ReturnQueryService,
+    private readonly queryService: ReturnProcessingQueryService,
   ) {}
-
-  async create(userId: string, dto: CreateReturnDto) {
-    const returnWindowDays = (await this.shippingConfigService.get()).returnPolicy.days;
-
-    const created = await this.dataSource.transaction(async (manager) => {
-      // Khoá đơn: hai yêu cầu đồng thời cho cùng một dòng hàng phải tuần tự, nên không thể trả quá số lượng đã mua
-      const order = await findLocked(manager, Order, { id: dto.orderId, userId });
-      if (!order) throwAppError(EOrderErrorCode.ORDER_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
-
-      const items = await manager.find(OrderItem, { where: { orderId: order.id } });
-      const eligibility = computeReturnEligibility({
-        order,
-        items,
-        activeQuantities: await activeReturnQuantities(manager, order.id),
-        returnWindowDays,
-      });
-      if (!eligibility.eligible) {
-        throwAppError(
-          EReturnErrorCode.RETURN_NOT_ALLOWED,
-          RETURN_INELIGIBLE_MESSAGES[eligibility.reason as keyof typeof RETURN_INELIGIBLE_MESSAGES],
-        );
-      }
-
-      const returnable = new Map(eligibility.items.map((item) => [item.orderItemId, item.returnableQuantity]));
-      const seen = new Set<string>();
-      for (const item of dto.items) {
-        if (seen.has(item.orderItemId))
-          throwAppError(EReturnErrorCode.RETURN_ITEM_INVALID, `Item ${item.orderItemId} appears more than once`);
-        seen.add(item.orderItemId);
-        const max = returnable.get(item.orderItemId);
-        if (max === undefined)
-          throwAppError(EReturnErrorCode.RETURN_ITEM_INVALID, `Item ${item.orderItemId} does not belong to this order`);
-        if (item.quantity > max) {
-          throwAppError(
-            EReturnErrorCode.RETURN_ITEM_INVALID,
-            `Item ${item.orderItemId}: only ${max} can still be returned, requested ${item.quantity}`,
-          );
-        }
-      }
-
-      const request = await manager.save(
-        manager.create(ReturnRequest, {
-          orderId: order.id,
-          status: 'REQUESTED',
-          reason: dto.reason as ReturnReason,
-          note: dto.note ?? '',
-          adminNote: null,
-          requestedBy: userId,
-          processedBy: null,
-          approvedAt: null,
-          receivedAt: null,
-          shippingRefunded: false,
-        }),
-      );
-      await manager.save(
-        dto.items.map((item) =>
-          manager.create(ReturnRequestItem, {
-            returnRequestId: request.id,
-            orderItemId: item.orderItemId,
-            quantity: item.quantity,
-            acceptedQuantity: null,
-          }),
-        ),
-      );
-      return request;
-    });
-
-    return { data: await this.queryService.getView(created.id, false) };
-  }
-
-  /** Khách huỷ yêu cầu của mình khi chưa gửi hàng tới cửa hàng (REQUESTED hoặc APPROVED) */
-  async cancel(userId: string, returnId: string) {
-    await this.dataSource.transaction(async (manager) => {
-      const found = await manager.findOne(ReturnRequest, { where: { id: returnId } });
-      const order = found && (await findLocked(manager, Order, { id: found.orderId, userId }));
-      if (!found || !order) throwAppError(EReturnErrorCode.RETURN_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
-      const request = await findLocked(manager, ReturnRequest, { id: returnId });
-      this.assertStatus(request, CUSTOMER_CANCELLABLE_RETURN_STATUSES);
-      request.status = 'CANCELLED';
-      await manager.save(request);
-    });
-    return this.queryService.findOne(userId, returnId);
-  }
-
-  // ============================================
-  // ADMIN
-  // ============================================
 
   /** Duyệt: khách được phép gửi hàng về. `note` (hướng dẫn gửi hàng) khách thấy */
   async approve(adminId: string, returnId: string, dto: ApproveReturnDto) {
     await this.withLockedRequest(returnId, async (manager, request) => {
-      this.assertStatus(request, ['REQUESTED']);
+      assertReturnStatus(request, ['REQUESTED']);
       request.status = 'APPROVED';
       request.approvedAt = new Date();
       request.processedBy = adminId;
@@ -139,7 +48,7 @@ export class ReturnService {
   /** Từ chối (REQUESTED hoặc APPROVED, tức chưa nhận hàng); `note` là lý do khách thấy */
   async reject(adminId: string, returnId: string, dto: RejectReturnDto) {
     await this.withLockedRequest(returnId, async (manager, request) => {
-      this.assertStatus(request, REJECTABLE_RETURN_STATUSES);
+      assertReturnStatus(request, REJECTABLE_RETURN_STATUSES);
       request.status = 'REJECTED';
       request.processedBy = adminId;
       request.adminNote = dto.note;
@@ -154,7 +63,7 @@ export class ReturnService {
    */
   async receive(adminId: string, returnId: string, dto: ReceiveReturnDto) {
     await this.withLockedRequest(returnId, async (manager, request, order) => {
-      this.assertStatus(request, ['APPROVED']);
+      assertReturnStatus(request, ['APPROVED']);
       if (order.paymentStatus !== 'paid') {
         throwAppError(EReturnErrorCode.RETURN_RECEIVE_INVALID, 'The order is not in a refundable payment state');
       }
@@ -230,16 +139,6 @@ export class ReturnService {
       if (!order || !request) throwAppError(EReturnErrorCode.RETURN_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
       await work(manager, request, order);
     });
-  }
-
-  private assertStatus(request: ReturnRequest | null, allowed: readonly ReturnStatus[]): asserts request is ReturnRequest {
-    if (!request) throwAppError(EReturnErrorCode.RETURN_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
-    if (!allowed.includes(request.status)) {
-      throwAppError(
-        EReturnErrorCode.RETURN_INVALID_STATE,
-        `The return request is ${request.status}; allowed only when ${allowed.join(' or ')}`,
-      );
-    }
   }
 
   /** Số lượng chấp nhận theo `return_request_items.id`: mặc định đủ số xin trả, `dto` ghi đè từng dòng (0..số xin trả) */

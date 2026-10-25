@@ -8,7 +8,7 @@ import { Order } from '../order/shared/order.entity';
 import { markOrderRefunded } from '../order/shared/order-payment-state.util';
 import { PaymentAttempt } from '../payment/shared/payment-attempt.entity';
 import { PaymentTransaction } from '../payment/shared/payment-transaction.entity';
-import { markReturnRefunded, reopenReturnAfterRefundRejected } from '../return/return-refund-state.util';
+import { markReturnRefunded, reopenReturnAfterRefundRejected } from '../return/shared/return-refund-state.util';
 import { CompleteRefundDto } from './dtos/complete-refund.dto';
 import { CreateRefundDto } from './dtos/create-refund.dto';
 import { RejectRefundDto } from './dtos/reject-refund.dto';

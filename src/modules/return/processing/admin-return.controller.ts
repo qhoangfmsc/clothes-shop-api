@@ -3,21 +3,21 @@ import { Permissions } from '@common/decorator/permissions.decorator';
 import { Permission } from '@common/permissions/permissions.constant';
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { User } from '../user/user.entity';
+import { User } from '../../user/user.entity';
 import { AdminReturnQueryDto } from './dtos/admin-return-query.dto';
 import { ApproveReturnDto } from './dtos/approve-return.dto';
 import { ReceiveReturnDto } from './dtos/receive-return.dto';
 import { RejectReturnDto } from './dtos/reject-return.dto';
-import { ReturnService } from './return.service';
-import { ReturnQueryService } from './return-query.service';
+import { ReturnProcessingService } from './return-processing.service';
+import { ReturnProcessingQueryService } from './return-processing-query.service';
 
 @ApiTags('Admin — Returns')
 @Controller('api/admin/returns')
 @ApiBearerAuth()
 export class AdminReturnController {
   constructor(
-    private readonly returnService: ReturnService,
-    private readonly queryService: ReturnQueryService,
+    private readonly returnService: ReturnProcessingService,
+    private readonly queryService: ReturnProcessingQueryService,
   ) {}
 
   @Get()

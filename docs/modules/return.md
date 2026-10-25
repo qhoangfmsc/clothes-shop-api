@@ -12,7 +12,7 @@ Module trả hàng sau khi giao: khách gửi yêu cầu trả một phần ho�
 | Route prefix | `/api/returns` (khách), `/api/admin/returns` (admin) |
 | Bảng DB | `return_requests`, `return_request_items`; thêm cột `delivered_at` vào `orders` ([order](order.md)) và `return_request_id` vào `refunds` ([refund](refund.md)) |
 | Module phụ thuộc | `order` (entity `Order`, `OrderItem` qua `EntityManager`); `refund` (`RefundService.createForReturn` — tạo khoản hoàn); `shipping` (`ShippingConfigService` — số ngày đổi trả `returnPolicy.days`) |
-| Export | `ReturnQueryService` (module [pending-count](pending-count.md) dùng `countRequested`); các entity `ReturnRequest`, `ReturnRequestItem` được module [refund](refund.md) cập nhật (qua `return-refund-state.util.ts`) khi khoản hoàn xong/bị từ chối |
+| Export | `ReturnProcessingQueryService` (module [pending-count](pending-count.md) dùng `countRequested`); các entity `ReturnRequest`, `ReturnRequestItem` được module [refund](refund.md) cập nhật (qua `shared/return-refund-state.util.ts`) khi khoản hoàn xong/bị từ chối |
 
 ## 2. Mục đích & nghiệp vụ phục vụ
 
@@ -22,11 +22,13 @@ Module trả hàng sau khi giao: khách gửi yêu cầu trả một phần ho�
 
 ## 3. Submodule & chức năng
 
-| Submodule | Controller | Route prefix | Truy cập | Chức năng |
-|---|---|---|---|---|
-| Khách | `return.controller.ts` | `/api/returns` | JWT + permission | Tra cứu đơn trả được không, tạo yêu cầu, list, chi tiết, huỷ |
-| Admin | `admin-return.controller.ts` | `/api/admin/returns` | JWT + permission | List, chi tiết, duyệt, từ chối, xác nhận đã nhận hàng |
-| Điều kiện | `return-eligibility.util.ts` | — | nội bộ | Hàm thuần tính đơn có trả được không và số lượng còn trả được từng dòng |
+Mỗi nhóm chức năng là một thư mục (cell, quy ước `docs/specs/common/0011`); hai cell không import nhau.
+
+| Cell | Thư mục | Controller | Route prefix | Truy cập | Chức năng |
+|---|---|---|---|---|---|
+| Yêu cầu của khách | `request/` | `return.controller.ts` | `/api/returns` | JWT + permission | Tra cứu đơn trả được không, tạo yêu cầu, list, chi tiết, huỷ |
+| Xử lý của cửa hàng | `processing/` | `admin-return.controller.ts` | `/api/admin/returns` | JWT + permission | List, chi tiết, duyệt, từ chối, xác nhận đã nhận hàng, `countRequested` |
+| Dùng chung | `shared/` | — | — | — | Entity `ReturnRequest`, `ReturnRequestItem`, hằng số, `return-eligibility.util.ts` (hàm thuần tính đơn có trả được không và số lượng còn trả được từng dòng), `return-active-quantities.util.ts`, `return-status.util.ts`, `return-view.util.ts` (dựng view tiền VND/USD), `shared/return-refund-state.util.ts` |
 
 ## 4. Chi tiết
 
@@ -168,15 +170,15 @@ Sau đó admin chuyển khoản và ghi khoản hoàn ở `/api/admin/refunds` (
 
 ### 4.6 Phụ thuộc & cấu hình
 
-- `TypeOrmModule.forFeature([Order, OrderItem, ReturnRequest, ReturnRequestItem])`; `ReturnModule` import `RefundModule` (`RefundService`) và `ShippingModule` (`ShippingConfigService`); `DataSource` cho transaction. `ReturnQueryService` inject `DataSource`, `Repository<ReturnRequest>`, `ShippingConfigService`; `ReturnService` inject `DataSource`, `ShippingConfigService`, `RefundService`, `ReturnQueryService`. Module export `ReturnQueryService`.
+- `TypeOrmModule.forFeature([Order, OrderItem, ReturnRequest, ReturnRequestItem])`; `ReturnModule` import `RefundModule` (`RefundService`) và `ShippingModule` (`ShippingConfigService`); `DataSource` cho transaction. `ReturnRequestQueryService` inject `DataSource`, `Repository<ReturnRequest>`, `ShippingConfigService`; `ReturnRequestService` inject `DataSource`, `ShippingConfigService`, `ReturnRequestQueryService`; `ReturnProcessingQueryService` inject `DataSource`, `Repository<ReturnRequest>`; `ReturnProcessingService` inject `DataSource`, `RefundService`, `ReturnProcessingQueryService`. Module export `ReturnProcessingQueryService`.
 - Module [refund](refund.md) dùng `markReturnRefunded`/`reopenReturnAfterRefundRejected` của module này (không import `ReturnModule`) để cập nhật trạng thái khi khoản hoàn xong/bị từ chối.
 - Quyền: `RETURN_CREATE 15000`, `RETURN_VIEW 15001` (trong `DEFAULT_USER_PERMISSIONS`), `RETURN_ADMIN_VIEW 16000`, `RETURN_ADMIN_PROCESS 16001` (admin tự có). Không có biến môi trường.
 
 ### 4.7 Test
 
-- `return-eligibility.util.spec.ts` — điều kiện trả hàng (đã giao/đã trả, biên hạn, trừ số lượng đang trả, không âm).
-- `return.service.spec.ts` (dựng `ReturnQueryService` và `ReturnService`) — tra cứu điều kiện (hạn theo chính sách, đơn người khác), tạo yêu cầu (snapshot sản phẩm, khoá đơn, từng lý do bị từ chối, vượt số lượng, trùng dòng, số lượng được trả lại khi `REJECTED`/`CANCELLED`), khách xem/list/huỷ, admin duyệt/từ chối/list, nhận hàng (số tiền theo tỷ lệ, số lượng chấp nhận từng dòng, phí ship một lần mỗi đơn, trần theo phần còn lại, dữ liệu sai, sai trạng thái, đơn không còn `paid`, khoản hoàn đang chờ, thiếu phiên `PAID`) và các DTO.
-- Nhiều lần trả hàng của một đơn cộng lại đúng số đã nhận (ba lần trả một món chia không tròn) nằm trong `return.service.spec.ts`.
+- `shared/return-eligibility.util.spec.ts` — điều kiện trả hàng (đã giao/đã trả, biên hạn, trừ số lượng đang trả, không âm).
+- `request/return-request.service.spec.ts` (`ReturnRequestService`, `ReturnRequestQueryService`) và `processing/return-processing.service.spec.ts` (`ReturnProcessingService`; fixture ở `shared/return.test-utils.ts`) — tra cứu điều kiện (hạn theo chính sách, đơn người khác), tạo yêu cầu (snapshot sản phẩm, khoá đơn, từng lý do bị từ chối, vượt số lượng, trùng dòng, số lượng được trả lại khi `REJECTED`/`CANCELLED`), khách xem/list/huỷ, admin duyệt/từ chối/list, nhận hàng (số tiền theo tỷ lệ, số lượng chấp nhận từng dòng, phí ship một lần mỗi đơn, trần theo phần còn lại, dữ liệu sai, sai trạng thái, đơn không còn `paid`, khoản hoàn đang chờ, thiếu phiên `PAID`) và các DTO.
+- Nhiều lần trả hàng của một đơn cộng lại đúng số đã nhận (ba lần trả một món chia không tròn) nằm trong `processing/return-processing.service.spec.ts` (đặt sẵn ba yêu cầu `REQUESTED` rồi duyệt/nhận lần lượt).
 - Khoản hoàn từ yêu cầu trả hàng (hoàn xong → `REFUNDED`, từ chối → về `APPROVED`, `prorateRefundAmount`) nằm trong `refund/refund.service.spec.ts`; `delivered_at` khi admin chuyển `delivered` nằm trong `order/order-status.service.spec.ts`.
 - Flow test trên Postgres thật (`test/flows/return/`, dùng `steps.ts`: đơn đã trả và đã giao):
   - `return-customer.flow.ts` — điều kiện trả hàng (`ORDER_NOT_PAID`, `ORDER_NOT_DELIVERED`, `RETURN_WINDOW_EXPIRED`, `NOTHING_TO_RETURN`, hạn 30 ngày), tạo yêu cầu (snapshot sản phẩm, trả phần còn lại bằng yêu cầu thứ hai, 1802/1803, đơn của người khác → 1301, validation từng field), danh sách (chỉ yêu cầu của mình, lọc `status`/`orderId`, `sort`, phân trang, tham số sai), chi tiết (1801), huỷ ở `REQUESTED`/`APPROVED` và từ chối ở các trạng thái còn lại (1804).
@@ -199,7 +201,7 @@ Spec: `docs/specs/common/0006` (ranh giới ghi giữa các module).
 
 | Pattern / nguyên lý | Chỗ dùng | Vì sao |
 |---|---|---|
-| Module chủ viết chuyển trạng thái của mình | `return-refund-state.util.ts`: `markReturnRefunded` (`RECEIVED` → `REFUNDED`), `reopenReturnAfterRefundRejected` (`RECEIVED` → `APPROVED`, xoá `receivedAt`, `shippingRefunded`, `acceptedQuantity`) | Hai bước cuối của vòng đời yêu cầu trả hàng do payment kích hoạt nhưng quy tắc thuộc về return; điều kiện `status = 'RECEIVED'` nằm trong mệnh đề `WHERE` nên gọi lặp là no-op (unit test ghim) |
+| Module chủ viết chuyển trạng thái của mình | `shared/return-refund-state.util.ts`: `markReturnRefunded` (`RECEIVED` → `REFUNDED`), `reopenReturnAfterRefundRejected` (`RECEIVED` → `APPROVED`, xoá `receivedAt`, `shippingRefunded`, `acceptedQuantity`) | Hai bước cuối của vòng đời yêu cầu trả hàng do payment kích hoạt nhưng quy tắc thuộc về return; điều kiện `status = 'RECEIVED'` nằm trong mệnh đề `WHERE` nên gọi lặp là no-op (unit test ghim) |
 
 Tách `ReturnService` (spec [return/0002](../specs/return/0002-split-return-service.md)):
 
@@ -207,3 +209,5 @@ Tách `ReturnService` (spec [return/0002](../specs/return/0002-split-return-serv
 |---|---|---|
 | Tách command/query theo use case | `ReturnQueryService` (`getEligibility`, `findAll`, `findOne`, `findAllAdmin`, `countRequested`, `findOneAdmin`, `getView` + dựng view tiền VND/USD) và `ReturnService` (`create`, `cancel`, `approve`, `reject`, `receive`) | Đọc/hiển thị và luật chuyển trạng thái + hoàn tiền có lý do đổi khác nhau; ghi gọi đọc một chiều để trả view sau khi ghi |
 | Hàm tiện ích nhận `manager` | `activeReturnQuantities` (`return-active-quantities.util.ts`) | `getEligibility` (đọc) và `create` (trong transaction đã khoá đơn) cùng cần số lượng đã nằm trong yêu cầu còn hiệu lực, không phụ thuộc lẫn nhau |
+
+Chia cell (spec [return/0003](../specs/return/0003-return-cells.md), quy ước [common/0011](../specs/common/0011-module-cells.md)): `ReturnService` cũ thành `ReturnRequestService` (`create`, `cancel`) và `ReturnProcessingService` (`approve`, `reject`, `receive`); `ReturnQueryService` cũ thành `ReturnRequestQueryService` (`getEligibility`, `findAll`, `findOne`) và `ReturnProcessingQueryService` (`findAllAdmin`, `countRequested`, `findOneAdmin`). Dựng view dùng chung là hàm nhận `EntityManager` (`presentReturnViews`, `findReturnView`) ở `shared/`, nên hai cell không phụ thuộc nhau.

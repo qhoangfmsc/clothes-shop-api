@@ -1,8 +1,8 @@
 import { Order } from '../../order/shared/order.entity';
 import { OrderItem } from '../../order/shared/order-item.entity';
 import { Refund } from '../../refund/refund.entity';
-import { ReturnRequest } from '../../return/return-request.entity';
-import { ReturnRequestItem } from '../../return/return-request-item.entity';
+import { ReturnRequest } from '../../return/shared/return-request.entity';
+import { ReturnRequestItem } from '../../return/shared/return-request-item.entity';
 import { PaymentAttempt } from './payment-attempt.entity';
 import { PaymentTransaction } from './payment-transaction.entity';
 

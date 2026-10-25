@@ -14,7 +14,7 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
-import { RETURN_REASONS } from '../return.constant';
+import { RETURN_REASONS } from '../../shared/return.constant';
 
 const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
 
