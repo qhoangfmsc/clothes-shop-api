@@ -1,23 +1,18 @@
-import * as fs from 'node:fs';
-import * as path from 'node:path';
+import { join } from 'node:path';
 import { plainToInstance } from 'class-transformer';
 import { getMetadataStorage } from 'class-validator';
+import { listFiles, ROOT } from '../architecture/source-scan.test-utils';
 
 type DtoClass = new () => object;
 
-// Mọi cặp Create<X>Dto / Update<X>Dto trong modules/*/dtos: update phải giữ ràng buộc của create và không có khoá "ma" (xem spec common/0007)
-const modulesDir = path.join(__dirname, '..', '..', 'modules');
-const exported = fs
-  .readdirSync(modulesDir)
-  .flatMap((mod) => {
-    const dtoDir = path.join(modulesDir, mod, 'dtos');
-    return fs.existsSync(dtoDir) ? fs.readdirSync(dtoDir).map((file) => path.join(dtoDir, file)) : [];
-  })
-  .filter((file) => file.endsWith('.dto.ts'))
-  .flatMap(
-    (file) =>
-      Object.entries(require(file) as Record<string, unknown>).filter(([, value]) => typeof value === 'function') as [string, DtoClass][],
-  );
+// Mọi cặp Create<X>Dto / Update<X>Dto trong thư mục dtos/ bất kỳ cấp nào của modules/: update phải giữ ràng buộc của create và không có khoá "ma" (xem spec common/0007)
+const exported = listFiles('src/modules', (file) => file.includes('/dtos/') && file.endsWith('.dto.ts')).flatMap(
+  (file) =>
+    Object.entries(require(join(ROOT, file)) as Record<string, unknown>).filter(([, value]) => typeof value === 'function') as [
+      string,
+      DtoClass,
+    ][],
+);
 
 const byName = new Map(exported);
 const pairs = exported

@@ -4,8 +4,8 @@ import { EOrderErrorCode } from '@common/exceptions/error-codes';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager } from 'typeorm';
-import { PaymentService } from '../payment/payment.service';
-import { RefundService } from '../payment/refund.service';
+import { PaymentAttemptService } from '../payment/attempt/payment-attempt.service';
+import { RefundService } from '../refund/refund.service';
 import { UpdateOrderStatusDto } from './dtos/admin-order.dto';
 import { ORDER_TRANSITIONS } from './order.constant';
 import { Order } from './order.entity';
@@ -17,7 +17,7 @@ export class OrderStatusService {
   constructor(
     @InjectDataSource()
     private readonly dataSource: DataSource,
-    private readonly paymentService: PaymentService,
+    private readonly paymentService: PaymentAttemptService,
     private readonly refundService: RefundService,
     private readonly queryService: OrderQueryService,
   ) {}

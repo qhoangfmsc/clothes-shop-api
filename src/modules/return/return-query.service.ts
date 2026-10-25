@@ -8,7 +8,7 @@ import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
 import { Order } from '../order/order.entity';
 import { OrderItem } from '../order/order-item.entity';
-import { Refund } from '../payment/refund.entity';
+import { Refund } from '../refund/refund.entity';
 import { ShippingConfigService } from '../shipping/shipping-config.service';
 import { AdminReturnQueryDto } from './dtos/admin-return-query.dto';
 import { PublicReturnQueryDto } from './dtos/public-return-query.dto';

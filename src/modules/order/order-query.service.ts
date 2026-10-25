@@ -5,8 +5,8 @@ import { EOrderErrorCode } from '@common/exceptions/error-codes';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, SelectQueryBuilder } from 'typeorm';
-import { PaymentQueryService } from '../payment/payment-query.service';
-import { RefundQueryService } from '../payment/refund-query.service';
+import { PaymentAttemptQueryService } from '../payment/attempt/payment-attempt-query.service';
+import { RefundQueryService } from '../refund/refund-query.service';
 import { AdminOrderQueryDto } from './dtos/admin-order-query.dto';
 import { PublicOrderQueryDto } from './dtos/public-order-query.dto';
 import { ORDER_RELATIONS } from './order.constant';
@@ -27,7 +27,7 @@ export class OrderQueryService {
   constructor(
     @InjectRepository(Order)
     private readonly orderRepo: Repository<Order>,
-    private readonly paymentService: PaymentQueryService,
+    private readonly paymentService: PaymentAttemptQueryService,
     private readonly refundService: RefundQueryService,
   ) {}
 

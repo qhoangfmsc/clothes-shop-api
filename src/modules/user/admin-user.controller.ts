@@ -3,9 +3,9 @@ import { Permissions } from '@common/decorator/permissions.decorator';
 import { Permission } from '@common/permissions/permissions.constant';
 import { Body, Controller, Get, Param, Patch, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { User } from '../user/user.entity';
 import { AdminUserQueryDto } from './dtos/admin-user-query.dto';
 import { UpdateUserDto } from './dtos/user.dto';
+import { User } from './user.entity';
 import { UserService } from './user.service';
 
 @ApiTags('Admin — Users')

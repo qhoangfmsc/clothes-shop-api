@@ -1,8 +1,8 @@
-import { createFakeManager } from '../payment/payment.test-utils';
-import { PaymentAttempt } from '../payment/payment-attempt.entity';
-import { Refund } from '../payment/refund.entity';
-import { RefundService } from '../payment/refund.service';
-import { RefundQueryService } from '../payment/refund-query.service';
+import { createFakeManager } from '../payment/shared/payment.test-utils';
+import { PaymentAttempt } from '../payment/shared/payment-attempt.entity';
+import { Refund } from '../refund/refund.entity';
+import { RefundService } from '../refund/refund.service';
+import { RefundQueryService } from '../refund/refund-query.service';
 import { Order } from './order.entity';
 import { OrderQueryService } from './order-query.service';
 import { OrderStatusService } from './order-status.service';

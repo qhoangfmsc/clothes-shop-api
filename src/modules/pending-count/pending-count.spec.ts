@@ -3,9 +3,9 @@ import { ValidationPipe } from '@nestjs/common';
 import { AdminOrderQueryDto } from '../order/dtos/admin-order-query.dto';
 import { ORDER_NEEDS_ACTION_SQL } from '../order/order-needs-action.util';
 import { OrderQueryService } from '../order/order-query.service';
-import { AdminPaymentTransactionQueryDto } from '../payment/dtos/admin-payment-transaction-query.dto';
-import { TRANSACTION_NEEDS_REVIEW_SQL } from '../payment/payment-needs-review.util';
-import { PaymentQueryService } from '../payment/payment-query.service';
+import { AdminPaymentTransactionQueryDto } from '../payment/transaction/dtos/admin-payment-transaction-query.dto';
+import { TRANSACTION_NEEDS_REVIEW_SQL } from '../payment/transaction/payment-needs-review.util';
+import { PaymentTransactionQueryService } from '../payment/transaction/payment-transaction-query.service';
 import { PendingCountService } from './pending-count.service';
 
 /** Query builder giả ghi lại các điều kiện được thêm vào */
@@ -158,7 +158,7 @@ describe('the list filters and the counts share one condition', () => {
     const listQb = fakeQb();
     const countQb = fakeQb(2);
     const transactionRepo: any = { createQueryBuilder: jest.fn().mockReturnValueOnce(listQb).mockReturnValueOnce(countQb) };
-    const service = new PaymentQueryService({} as any, {} as any, transactionRepo, { getVndPerUsd: async () => 25000 } as any, {} as any);
+    const service = new PaymentTransactionQueryService(transactionRepo, { getVndPerUsd: async () => 25000 } as any);
 
     await service.findTransactionsAdmin({ needsReview: true, verificationStatus: 'LATE' });
     expect(listQb.wheres.map(([sql]: any) => sql)).toEqual(
@@ -171,13 +171,7 @@ describe('the list filters and the counts share one condition', () => {
 
   it('transactions: no needsReview → the list is not filtered', async () => {
     const qb = fakeQb();
-    const service = new PaymentQueryService(
-      {} as any,
-      {} as any,
-      { createQueryBuilder: () => qb } as any,
-      { getVndPerUsd: async () => 25000 } as any,
-      {} as any,
-    );
+    const service = new PaymentTransactionQueryService({ createQueryBuilder: () => qb } as any, { getVndPerUsd: async () => 25000 } as any);
     await service.findTransactionsAdmin({});
     expect(qb.wheres.map(([sql]: any) => sql)).not.toContain(TRANSACTION_NEEDS_REVIEW_SQL);
   });

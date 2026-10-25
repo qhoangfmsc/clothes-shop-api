@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Order } from '../order/order.entity';
 import { OrderItem } from '../order/order-item.entity';
-import { PaymentModule } from '../payment/payment.module';
+import { RefundModule } from '../refund/refund.module';
 import { ShippingModule } from '../shipping/shipping.module';
 import { AdminReturnController } from './admin-return.controller';
 import { ReturnController } from './return.controller';
@@ -12,7 +12,7 @@ import { ReturnRequest } from './return-request.entity';
 import { ReturnRequestItem } from './return-request-item.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Order, OrderItem, ReturnRequest, ReturnRequestItem]), PaymentModule, ShippingModule],
+  imports: [TypeOrmModule.forFeature([Order, OrderItem, ReturnRequest, ReturnRequestItem]), RefundModule, ShippingModule],
   controllers: [ReturnController, AdminReturnController],
   providers: [ReturnService, ReturnQueryService],
   exports: [ReturnQueryService],

@@ -18,6 +18,7 @@ import { OrderModule } from './modules/order/order.module';
 import { PaymentModule } from './modules/payment/payment.module';
 import { PendingCountModule } from './modules/pending-count/pending-count.module';
 import { ProductModule } from './modules/product/product.module';
+import { RefundModule } from './modules/refund/refund.module';
 import { ReturnModule } from './modules/return/return.module';
 import { ReviewModule } from './modules/review/review.module';
 import { ShippingModule } from './modules/shipping/shipping.module';
@@ -46,6 +47,7 @@ import { WishlistModule } from './modules/wishlist/wishlist.module';
     CartModule,
     OrderModule,
     PaymentModule,
+    RefundModule,
     ReturnModule,
     PendingCountModule,
   ],

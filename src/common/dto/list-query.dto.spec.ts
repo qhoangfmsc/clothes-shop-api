@@ -1,8 +1,8 @@
-import * as fs from 'node:fs';
-import * as path from 'node:path';
+import { basename, join } from 'node:path';
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '@common/base/pagination.util';
 import { ValidationPipe } from '@nestjs/common';
 import { getMetadataStorage } from 'class-validator';
+import { listFiles, ROOT } from '../architecture/source-scan.test-utils';
 import { PaginationQueryDto } from './pagination-query.dto';
 
 // Same options as main.ts
@@ -17,20 +17,15 @@ const NOT_LIST_DTO_FILES = [
   'my-review-votes-query.dto.ts',
 ];
 
-// Mọi file *-query.dto.ts trong modules/*/dtos là DTO của API list → phải theo chuẩn chung (xem CLAUDE.md "List API Standards")
-const modulesDir = path.join(__dirname, '..', '..', 'modules');
-const listDtos: [string, new () => object][] = fs
-  .readdirSync(modulesDir)
-  .flatMap((mod) => {
-    const dtoDir = path.join(modulesDir, mod, 'dtos');
-    return fs.existsSync(dtoDir) ? fs.readdirSync(dtoDir).map((file) => path.join(dtoDir, file)) : [];
-  })
-  .filter((file) => file.endsWith('-query.dto.ts') && !NOT_LIST_DTO_FILES.includes(path.basename(file)))
-  .flatMap((file) =>
-    Object.entries(require(file) as Record<string, new () => object>)
-      .filter(([, value]) => typeof value === 'function')
-      .map(([name, value]): [string, new () => object] => [name, value]),
-  );
+// Mọi file *-query.dto.ts trong thư mục dtos/ bất kỳ cấp nào của modules/ (kể cả trong cell) là DTO của API list → phải theo chuẩn chung (xem CLAUDE.md "List API Standards")
+const listDtos: [string, new () => object][] = listFiles(
+  'src/modules',
+  (file) => file.includes('/dtos/') && file.endsWith('-query.dto.ts') && !NOT_LIST_DTO_FILES.includes(basename(file)),
+).flatMap((file) =>
+  Object.entries(require(join(ROOT, file)) as Record<string, new () => object>)
+    .filter(([, value]) => typeof value === 'function')
+    .map(([name, value]): [string, new () => object] => [name, value]),
+);
 
 // DTO có sort: whitelist field → thử 1 giá trị sort hợp lệ lấy từ metadata Swagger
 // (đọc từ metadata của class-validator: DTO không còn thuộc tính rỗng do khai báo field, xem tsconfig `useDefineForClassFields`)

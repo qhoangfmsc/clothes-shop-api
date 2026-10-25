@@ -1,8 +1,8 @@
 import { ValidationPipe } from '@nestjs/common';
 import { Order } from '../order/order.entity';
-import { createFakeManager } from '../payment/payment.test-utils';
-import { Refund } from '../payment/refund.entity';
-import { RefundService } from '../payment/refund.service';
+import { createFakeManager } from '../payment/shared/payment.test-utils';
+import { Refund } from '../refund/refund.entity';
+import { RefundService } from '../refund/refund.service';
 import { CreateReturnDto } from './dtos/create-return.dto';
 import { ReceiveReturnDto } from './dtos/receive-return.dto';
 import { RejectReturnDto } from './dtos/reject-return.dto';

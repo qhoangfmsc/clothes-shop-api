@@ -3,8 +3,8 @@ import { In } from 'typeorm';
 import { Address } from '../address/address.entity';
 import { Cart } from '../cart/cart.entity';
 import { CartItem } from '../cart/cart-item.entity';
-import { PaymentService } from '../payment/payment.service';
-import { createFakeManager } from '../payment/payment.test-utils';
+import { PaymentAttemptService } from '../payment/attempt/payment-attempt.service';
+import { createFakeManager } from '../payment/shared/payment.test-utils';
 import { DEFAULT_SHIPPING_CONFIG, ShippingConfig } from '../shipping/shipping-config';
 import { Order } from './order.entity';
 import { OrderCheckoutService } from './order-checkout.service';
@@ -363,7 +363,7 @@ describe('OrderCheckoutService.checkout', () => {
         total: c.savedOrders[0].total,
         exchangeRate: 25_000,
       };
-      const paymentService = new PaymentService(
+      const paymentService = new PaymentAttemptService(
         { transaction: async (fn: any) => fn(createFakeManager({ orders: [order] })) } as any,
         {} as any,
         {
@@ -407,7 +407,7 @@ describe('OrderCheckoutService.checkout', () => {
 
     const order = { id: 'o1', userId: 'u1', status: 'pending', paymentStatus: 'unpaid', total: savedOrders[0].total, exchangeRate: 25_000 };
     const manager = createFakeManager({ orders: [order] });
-    const paymentService = new PaymentService(
+    const paymentService = new PaymentAttemptService(
       { transaction: async (fn: any) => fn(manager) } as any,
       {} as any,
       {
