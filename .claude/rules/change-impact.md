@@ -68,7 +68,7 @@ Ngoại lệ (không đổi hành vi: đổi tên nội bộ, format, comment, t
 | Bước | Việc | Bằng chứng |
 |---|---|---|
 | Đọc | `docs/modules/payment.md`, `order.md`, `refund.md`; spec `payment/0001–0004`, `common/0006` (ranh giới ghi) | — |
-| Spec | `docs/specs/payment/NNNN-paypal-gateway.md`: phương án (cell `payment/paypal/`; Strategy khi có 2 nhà cung cấp — `design-patterns.md` 4.1), SOLID, dữ liệu (cột `provider` đã có), luồng, **mục 3.9** | file spec |
+| Spec | `docs/specs/payment/<NNNN>-paypal-gateway.md`: phương án (cell `payment/paypal/`; Strategy khi có 2 nhà cung cấp — `design-patterns.md` 4.1), SOLID, dữ liệu (cột `provider` đã có), luồng, **mục 3.9** | file spec |
 | Impact | `yarn impact --files src/modules/payment/paypal/x.service.ts` → payment (đổi), order/refund/pending-count (trực tiếp), return/review (gián tiếp) | báo cáo |
 | Code | Cell `paypal/`, tái dùng `assertOrderPayable`, `applyOrderPaid`; không sao chép logic; env mới → `core/env.validation.ts` + `test/support/test-env.ts` | `architecture.spec.ts` xanh |
 | Test payment | Unit: parse/verify callback PayPal (hàm thuần), từng nhánh trạng thái. Flow: tạo phiên, callback khớp/sai tiền/trùng/trễ, idempotency | `test/flows/payment/…` |

@@ -29,6 +29,7 @@ src/
 │   └── size-guide/  # Static data, no DB
 └── migrations/      # TypeORM migrations
 tools/               # Công cụ kiểm tra của repo: impact (phạm vi ảnh hưởng), check-docs, check-change
+scripts/             # smoke-prod.sh (boot bản build ở production)
 test/                # Flow test (Postgres thật): flows/<module>/*.flow.ts, support/, README.md = test matrix
 docs/
 ├── modules/         # Docs hiện trạng, mỗi module một file (viết SAU khi code)
@@ -155,6 +156,15 @@ Kiến thức, mẫu code, checklist: skill `design-principles`. Tóm tắt nh�
 - **SOLID**: S (một lý do để đổi), O (thêm dữ liệu thay vì thêm nhánh `if`), L (kế thừa chỉ để dùng chung cột/DTO), I (nhận kiểu hẹp đúng nhu cầu), D (phụ thuộc interface ở biên ngoài như cổng thanh toán/storage). Mỗi spec điền bảng SOLID.
 - Code cũ lệch chuẩn: sửa phần mình chạm tới, không refactor hàng loạt ngoài phạm vi; điểm còn lệch ghi ở `docs/modules/common.md` mục 4.13.
 
+## Cổng trước khi lên `main` (production) (BẮT BUỘC)
+
+Luật: `.claude/rules/release-gate.md` · Phạm vi kiểm lại: `.claude/rules/change-impact.md`.
+
+- Không commit thẳng lên `main`: PR từ nhánh `<loại>/<slug>`, merge khi check **`CI gate`** xanh (job `check`: audit, tsc, lint không cảnh báo, `check:docs --strict`, build, unit · `change`: đổi code phải đổi test + docs · `flows`: Postgres thật + ratchet độ phủ · `boot`: migrate từ trống + chạy bản build ở production).
+- Hook cục bộ: `pre-commit` (Biome), `commit-msg` (mẫu `<loại>(<module>): <mệnh đề>`), `pre-push` (`yarn verify:quick`). Trước khi xin merge chạy `yarn verify`.
+- Miễn test/docs chỉ khi thay đổi không đổi hành vi, bằng trailer `No-Test: <lý do>` / `No-Docs: <lý do>` ở một commit.
+- Bảo vệ nhánh `main` và Render "After CI Checks Pass" là cài đặt ngoài repo — lệnh và các bước ở `release-gate.md` mục 4.
+
 ## Test (BẮT BUỘC đi kèm mọi thay đổi hành vi)
 
 - **Unit** (`yarn test`): `src/**/*.spec.ts` cạnh code, mock, không DB.
@@ -182,5 +192,9 @@ yarn test             # Unit test (mock)
 yarn test:flows       # Flow test (tự bật Postgres test bằng docker; cần Docker chạy)
 yarn test:db:down     # Tắt Postgres test
 yarn impact           # Module/flow bị ảnh hưởng bởi thay đổi hiện tại (--run unit|flows)
+yarn check:docs       # Docs/spec/test matrix/migration/route khớp code (--strict trước khi vào main)
+yarn check:change     # PR: đổi code thì phải đổi test và docs (hoặc trailer No-Test:/No-Docs: kèm lý do)
+yarn smoke:prod       # Migrate từ DB trống, chạy bản build ở production, kiểm /health
+yarn verify           # Toàn bộ cổng như CI (cần Docker)
 npx typeorm migration:run -d data-source.ts  # Run migrations
 ```

@@ -1,0 +1,11 @@
+# Mẫu commit: <loại>(<module>): <mệnh đề ngắn> (xem .claude/rules/coding-conventions.md mục 11)
+subject="$(head -1 "$1")"
+case "$subject" in
+  Merge* | Revert* | fixup!* | squash!*) exit 0 ;;
+esac
+if ! echo "$subject" | grep -Eq '^(feat|fix|refactor|docs|test|chore|ci|build|perf|docs\+test)(\([a-z0-9,/-]+\))?!?: .{3,}'; then
+  echo "Commit bị từ chối: tiêu đề phải theo mẫu '<loại>(<module>): <mệnh đề>'"
+  echo "  loại: feat | fix | refactor | docs | test | chore | ci | build | perf | docs+test"
+  echo "  ví dụ: fix(payment): late webhook is recorded, not paid (spec payment/0005)"
+  exit 1
+fi

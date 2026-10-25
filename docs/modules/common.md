@@ -263,7 +263,7 @@ Entity **không** extends `BaseEntity` (tự khai báo id nanoid16): `Wishlist` 
 yarn dev                       # dev server (nest start --watch)
 npx nest build                  # build
 npx tsc --noEmit                # type check
-yarn lint                       # biome check ./src ./test
+yarn lint                       # biome check ./src ./test ./tools, cảnh báo cũng là lỗi
 yarn test                       # unit test: jest (rootDir src, regex *.spec.ts / *e2e-spec.ts), mock, không cần DB
 yarn test:db:up                 # bật Postgres test (docker compose đọc .env.test; mặc định cổng 55432, DB clothes_shop_test)
 yarn test:flows                 # flow test trên Postgres thật (tự gọi test:db:up rồi test:flows:run)
@@ -272,9 +272,22 @@ yarn test:coverage              # báo cáo độ phủ endpoint + ratchet từ 
 yarn test:coverage:update       # gỡ khỏi test/coverage-baseline.json các route đã đủ ca
 yarn test:db:down               # tắt Postgres test
 yarn migration:run              # chạy migration
+yarn impact                     # module/flow bị ảnh hưởng bởi thay đổi hiện tại (--run unit|flows)
+yarn check:docs [--strict]      # docs, spec, test matrix, migration, route khớp code (strict: spec không kẹt Draft/Approved)
+yarn check:change [--base ref]  # PR: đổi code thì phải đổi test và docs (hoặc trailer miễn có lý do)
+yarn smoke:prod                 # migrate từ DB trống, chạy bản build ở production, kiểm /health (cần Docker test DB)
+yarn verify:quick               # tsc + lint + check:docs + unit (pre-push)
+yarn verify                     # toàn bộ: verify:quick + check:docs --strict + build + flow + smoke:prod
 ```
 
-**CI** (`.github/workflows/ci.yml`, GitHub Actions, chạy khi push lên `main` và ở mọi pull request): hai job song song. `check` — `tsc --noEmit`, `yarn lint`, `yarn build`, `yarn test`. `flows` — Postgres 16 làm service container khớp `.env.test` (cổng 55432, DB `clothes_shop_test`), rồi `yarn test:flows:run` và `yarn test:coverage` (ratchet độ phủ endpoint). Đỏ ở bất kỳ bước nào thì PR không nên merge.
+**CI** (`.github/workflows/ci.yml`, GitHub Actions, chạy khi push lên `main` và ở mọi pull request; thiết kế ở spec 0015, quy trình ở `.claude/rules/release-gate.md`): năm job.
+- `check` — audit phụ thuộc (chặn khi có lỗ hổng critical), `tsc --noEmit`, `yarn lint` (Biome, cảnh báo cũng là lỗi), `yarn check:docs --strict`, `yarn build`, `yarn test`.
+- `change` (chỉ PR) — `yarn check:change --base origin/<nhánh gốc>`: đổi code phải đổi test (C1) và docs của module (C2) / `common.md` (C3), trừ khi có trailer `No-Test:` / `No-Docs:` kèm lý do ở một commit.
+- `flows` — Postgres 16 làm service container khớp `.env.test` (cổng 55432, DB `clothes_shop_test`), rồi `yarn test:flows:run` và `yarn test:coverage` (ratchet độ phủ endpoint).
+- `boot` — Postgres sạch, `yarn smoke:prod` (`scripts/smoke-prod.sh`): build, migrate từ DB trống, cấu hình production thiếu `JWT_SECRET` phải bị từ chối khởi động, chạy `node dist/src/main.js` ở `NODE_ENV=production` với cấu hình giả hợp lệ, `GET /health` trả `status: ok` + `db: connected`, route admin không đăng nhập trả 401. Script chỉ chạy trên DB có tên kết thúc `_test` hoặc `_smoke`.
+- `gate` (`CI gate`) — tổng hợp bốn job trên (`change` được phép bị bỏ qua khi push vào `main`); là check duy nhất cần đặt "required" khi bảo vệ nhánh.
+
+Hook cục bộ (husky, cài bởi `prepare`): `pre-commit` chạy `lint-staged` (`biome check --fix` trên `*.ts` đã stage), `commit-msg` kiểm tiêu đề theo mẫu `<loại>(<module>): <mệnh đề>`, `pre-push` chạy `yarn verify:quick`. Bảo vệ nhánh `main` và Render "After CI Checks Pass" là cài đặt ngoài repo (xem `release-gate.md` mục 4).
 
 ### 4.12 Test
 
@@ -296,6 +309,7 @@ yarn migration:run              # chạy migration
   - không `console.*` trong code ứng dụng; module nghiệp vụ không đọc `process.env` (dùng `ConfigService`).
   Thêm vi phạm mới hoặc để vi phạm cũ lớn thêm → đỏ; sửa xong mà chưa giảm allowlist → đỏ. `src/common/dto/list-query.dto.spec.ts` là guard chuẩn list cho mọi `*-query.dto.ts` (xem 4.5); `src/common/utils/money.util.spec.ts` cho helper tiền. Test của từng module: xem file module tương ứng.
 - **Công cụ phạm vi ảnh hưởng** (`yarn impact`, spec 0014): `tools/impact.ts` + `tools/lib/*`. Đồ thị module suy ra từ import thật của `src/modules` (alias `@/…` và đường dẫn tương đối, bỏ spec/test-utils); flow được gắn với module qua tiền tố `@Controller` mà URL trong flow (và file `steps` cùng thư mục) khớp; thư mục `access`, `rate-limit`, `health` là flow toàn cục. Từ `git diff` (so với `main`, thêm thay đổi chưa commit) in ra: module đổi, phụ thuộc trực tiếp / gián tiếp, docs phải cập nhật / cần rà, unit và flow cần chạy lại; `--run unit|flows` chạy hộ. Đổi `src/common`, `src/core`, migration, `package.json`, cấu hình → mọi module. Gợi ý cho vòng lặp phát triển, không thay chạy toàn bộ. Unit test: `tools/impact.spec.ts` (jest `roots` có thêm `tools/`), gồm kiểm tra trên repo thật: cạnh tiền (`order → payment, refund`, `refund → return`...), mọi module có route đều có flow, mọi flow thuộc module hoặc thư mục toàn cục.
+- **Kiểm tra docs và kỷ luật thay đổi** (spec 0015): `tools/check-docs.ts` + `tools/lib/docs-checks.ts` (D1 module ↔ docs ↔ README, D2 chỉ mục spec/trạng thái/số liên tục/strict, D3 mục 6 spec Implemented, D4 liên kết markdown, D5 đường dẫn file được nhắc (kể cả dạng tương đối theo thư mục module và tham chiếu spec theo số), D6 mọi route có trong docs module sở hữu, D7 mọi flow có trong test matrix, D8 mọi migration có trong 4.9, D9 mọi rule được liệt kê); `tools/check-change.ts` + `tools/lib/change-checks.ts` (C1–C3, trailer miễn). Unit: `tools/check-docs.spec.ts` (mỗi mục một ca đúng và một ca vi phạm, cộng ca "repo thật không có vấn đề") và `tools/check-change.spec.ts`.
 - **Flow** (`yarn test:flows`): `test/flows/<module>/*.flow.ts`, đi qua HTTP thật (`MainModule` + `configureApp`) trên Postgres thật. Config riêng `test/jest.flows.config.js` (rootDir repo, chỉ nhận `*.flow.ts`, chạy tuần tự).
   - Mỗi lần chạy: lấy khoá advisory (`pg_try_advisory_lock`; lần chạy thứ hai cùng DB bị chặn), `DROP SCHEMA public` → chạy toàn bộ migration → `TRUNCATE` dữ liệu seed; sau mỗi test `truncateAll`.
   - Cấu hình: file `.env.test` ở root chỉ chứa kết nối Postgres test (`POSTGRES_*`; thiếu khoá thì dùng mặc định trong `test/support/test-env.ts`); `docker-compose.test.yml` và jest cùng đọc. Secret giả của JWT/SePay là hằng số trong `test-env.ts`, `SUPABASE_*`/`GOOGLE_*` luôn rỗng. Giá trị gán thẳng vào `process.env`, thắng `.env` của app. Khoá lạ trong file làm global-setup dừng với thông báo lỗi.
@@ -326,3 +340,4 @@ yarn migration:run              # chạy migration
 - Không còn service nào vượt 300 dòng hay 5 dependency: cả hai allowlist (`OVERSIZED_SERVICES`, `MANY_DEPENDENCIES_SERVICES`) đều rỗng, vi phạm mới làm `architecture.spec.ts` đỏ. Các service từng vượt đã được tách: `OrderService` thành `OrderQueryService`, `OrderCheckoutService`, `OrderStatusService` thành `OrderQueryService`, `OrderCheckoutService`, `OrderStatusService` (xem `order.md` 4.9); `ReviewService` thành `ReviewQueryService` + `ReviewService` (xem `review.md` 4.9); `PaymentService` thành `PaymentService`, `PaymentConfirmService`, `PaymentQueryService` (xem `payment.md` 4.9); `ReturnService` thành `ReturnQueryService` + `ReturnService` (xem `return.md` 4.9); `RefundService` thành `RefundQueryService` + `RefundService` (xem `payment.md` 4.9); logic thuần của `MediaService` sang `media-file.util.ts` (xem `media.md` 4.9); `CategoryService` thành `CategoryQueryService` + `CategoryService` (xem `category.md` 4.9); `ProductService` thành `ProductQueryService` + `ProductService` (xem `product.md` 4.9).
 - Trạng thái dùng type union cho mọi cột `status` (xem 4.5). Chuyển trạng thái chỉ có bảng tường minh cho đơn (`ORDER_TRANSITIONS`, cạnh do admin thực hiện); `return` kiểm theo hành động (`assertStatus` với danh sách trạng thái xuất phát từng hành động) và có thêm cạnh do hệ thống (`RECEIVED → APPROVED` khi khoản hoàn bị từ chối, `RECEIVED → REFUNDED` khi hoàn xong); `refund`, `payment attempt`, `review` kiểm trực tiếp trong service.
 - Entity `Order` được import và đăng ký `TypeOrmModule.forFeature` trực tiếp ở module `payment`, `return`, `review`; entity `Product` ở `cart`, `wishlist`, `collection` (bên cạnh module `product`). Các module này truy cập bảng của nhau không qua service.
+- Cổng production: kiểm lệch giữa entity TypeORM và schema do migration không bật được (`migration:generate --check` báo toàn bộ FK/CHECK vì entity không mô tả chúng); nguồn sự thật là migration và flow test chạy trên schema dựng từ migration. `.agent/skills/nest-best-practices` là mẫu NestJS chung không khớp dự án; rule trong `.claude/rules/` thắng khi mâu thuẫn.

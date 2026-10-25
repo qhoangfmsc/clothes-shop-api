@@ -7,12 +7,12 @@
   "license": "UNLICENSED",
   "scripts": {
     "build": "nest build",
-    "format": "biome format --write ./src ./test",
+    "format": "biome format --write ./src ./test ./tools",
     "dev": "nest start --watch",
     "start": "node dist/src/main.js",
     "start:prod": "yarn typeorm migration:run -d data-source.ts && node dist/src/main.js",
-    "lint": "biome check ./src ./test",
-    "lint:fix": "biome check --fix ./src ./test",
+    "lint": "biome check --error-on-warnings ./src ./test ./tools",
+    "lint:fix": "biome check --fix ./src ./test ./tools",
     "typeorm": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js",
     "migration:generate": "bash -c 'yarn typeorm migration:generate src/migrations/$1 -d data-source.ts' --",
     "migration:create": "bash -c 'yarn typeorm migration:create src/migrations/$1' --",
@@ -26,7 +26,12 @@
     "test:flows:run": "jest --config test/jest.flows.config.js --runInBand --forceExit",
     "test:coverage": "ts-node --transpile-only test/support/coverage-report.ts",
     "test:coverage:update": "ts-node --transpile-only test/support/coverage-report.ts --update-baseline",
-    "impact": "ts-node --transpile-only tools/impact.ts"
+    "impact": "ts-node --transpile-only tools/impact.ts",
+    "check:docs": "ts-node --transpile-only tools/check-docs.ts",
+    "check:change": "ts-node --transpile-only tools/check-change.ts",
+    "smoke:prod": "bash scripts/smoke-prod.sh",
+    "verify:quick": "npx tsc --noEmit && yarn lint && yarn check:docs && yarn test",
+    "verify": "yarn verify:quick && yarn check:docs --strict && yarn build && yarn test:flows && yarn smoke:prod"
   },
   "dependencies": {
     "@nestjs/cli": "^11.0.0",

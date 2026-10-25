@@ -80,6 +80,7 @@ describe('flowModules', () => {
   it('finds modules from URLs in the flow, in template strings, and in helper files of the same folder', () => {
     const map = flowModules(
       [
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: nguồn flow có URL dạng template
         flow('test/flows/x/a.flow.ts', 't.api.get(`/api/orders/${id}`)'),
         flow('test/flows/x/b.flow.ts', 'await placeOrder()', "post('/api/admin/refunds/1/complete')"),
       ],

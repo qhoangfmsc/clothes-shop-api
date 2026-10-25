@@ -12,6 +12,7 @@ Mỗi chủ đề có một rule riêng, mô tả: là gì, vì sao, áp dụng 
 | Coding convention | [`coding-conventions.md`](coding-conventions.md) | Đặt tên, bố cục, lỗi, log, cấu hình, API, test, comment, git |
 | Comment | [`comments.md`](comments.md) | Khi nào comment, dài bao nhiêu |
 | Phạm vi ảnh hưởng | [`change-impact.md`](change-impact.md) | Đổi một chỗ thì phải kiểm lại những bên liên quan nào, bằng cách nào |
+| Cổng lên production | [`release-gate.md`](release-gate.md) | Hook, CI, kiểm docs/test/build, bảo vệ nhánh `main`, deploy, hậu kiểm |
 
 Giáo trình mở rộng và mẫu code: skill `design-principles`. Quy trình làm việc: `feature-workflow.md`. Test: `testing.md`. Docs: `module-docs.md`.
 

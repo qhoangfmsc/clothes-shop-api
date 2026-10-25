@@ -1,0 +1,2 @@
+# Cổng nhanh trước khi đẩy: type check, lint (không warning), docs, unit. Flow test + smoke chạy ở CI (hoặc `yarn verify`).
+yarn verify:quick

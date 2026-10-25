@@ -66,7 +66,7 @@ export function dependentsByDepth(graph: Record<string, string[]>, seeds: string
     const next = Object.keys(graph)
       .filter((module) => !seen.has(module) && graph[module].some((dep) => frontier.includes(dep)))
       .sort();
-    next.forEach((module) => seen.add(module));
+    for (const module of next) seen.add(module);
     if (next.length) levels.push(next);
     frontier = next;
   }

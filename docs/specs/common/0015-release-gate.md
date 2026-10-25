@@ -1,6 +1,6 @@
 # 0015 — Cổng trước khi lên `main` (production)
 
-> Module: `common` (CI + quy trình) · Trạng thái: Draft · Ngày: 2026-10-26
+> Module: `common` (CI + quy trình) · Trạng thái: Implemented · Ngày: 2026-10-26
 
 ## 1. Bối cảnh & vấn đề
 
@@ -46,9 +46,11 @@ CI hiện có (`.github/workflows/ci.yml`): audit, `tsc`, `lint`, `build`, `test
 tools/check-docs.ts      yarn check:docs     đối chiếu docs/spec/test matrix ↔ code (không DB)
 tools/check-change.ts    yarn check:change   PR: đổi src → phải có test + docs (hoặc trailer miễn có lý do)
 scripts/smoke-prod.sh    yarn smoke:prod     migrate từ trống → chạy dist ở NODE_ENV=production → GET /health
+
 .husky/pre-commit        lint-staged (Biome --fix trên file đổi)
+.husky/commit-msg        tiêu đề theo mẫu <loại>(<module>): <mệnh đề>
 .husky/pre-push          yarn verify:quick
-.github/workflows/ci.yml thêm job docs, job change (PR), job boot; lint thêm --error-on-warnings
+.github/workflows/ci.yml thêm job change (PR), boot, gate; check:docs nằm trong job check; lint coi cảnh báo là lỗi
 .github/pull_request_template.md
 ```
 
@@ -60,7 +62,7 @@ scripts/smoke-prod.sh    yarn smoke:prod     migrate từ trống → chạy dis
 | D2 | Mọi spec `docs/specs/<m>/NNNN-*.md`: có trong `docs/specs/README.md`, số duy nhất trong module, header có trạng thái hợp lệ, **không ở Draft/Approved trên `main`** (chế độ `--strict`, CI nhánh `main`/PR vào `main`) | "chưa đủ 5 bước = chưa xong" |
 | D3 | Spec Implemented có mục `## 6.` không còn placeholder `(điền sau khi xong)` | spec không bỏ lửng |
 | D4 | Liên kết markdown tương đối trỏ đúng file | docs không chết link |
-| D5 | Đường dẫn file trong `` ` `` bắt đầu bằng `src/`, `test/`, `docs/`, `tools/`, `.claude/` phải tồn tại (bỏ qua dòng ghi "đã xoá/cũ" và spec đã Implemented, vì spec là lịch sử) | docs khớp cây thư mục |
+| D5 | Đường dẫn file trong `` ` `` bắt đầu bằng `src/`, `test/`, `docs/`, `tools/`, `.claude/` phải tồn tại (chỉ docs module, README, test/README, CLAUDE.md, rule, skill; spec không kiểm vì là lịch sử quyết định) | docs khớp cây thư mục |
 | D6 | Mỗi route (method + path đầy đủ) của controller có mặt trong `docs/modules/<module sở hữu>.md` | docs API không thiếu endpoint |
 | D7 | Mỗi file `test/flows/**/*.flow.ts` có trong `test/README.md` | test matrix không thiếu |
 | D8 | Mỗi migration có trong bảng migration của `docs/modules/common.md` | `module-docs.md` yêu cầu |
@@ -74,11 +76,9 @@ Các mục không đạt trên hiện trạng: sửa **docs** (docs lệch code 
 |---|---|---|
 | C1 | Đổi `src/modules/**`, `src/common/**`, `src/core/**` (không tính spec/test-utils) thì phải đổi ít nhất một file test (`*.spec.ts` hoặc `test/flows/**`) | Trailer `No-Test: <lý do>` ở một commit của PR |
 | C2 | Đổi `src/modules/<m>/**` thì phải đổi `docs/modules/<m>.md` | Trailer `No-Docs: <lý do>` |
-| C3 | Đổi `src/migrations/**` thì phải đổi `docs/modules/common.md` | `No-Docs` |
-| C4 | Thêm spec mới thì phải có dòng trong `docs/specs/README.md` (đã có D2) | — |
-| C5 | Đổi hạ tầng test (`test/support/**`) hoặc route mới thì `test/README.md` đổi | `No-Docs` |
+| C3 | Đổi `src/migrations/**` hoặc `src/common`, `src/core` thì phải đổi `docs/modules/common.md` | `No-Docs` |
 
-Trailer miễn là cách ghi nhận ngoại lệ (đổi tên nội bộ, format…) có dấu vết, đúng tinh thần ngoại lệ trong `feature-workflow.md`.
+C4/C5 trong bản nháp (spec mới có dòng chỉ mục, flow mới có dòng test matrix) đã được `check:docs` D2/D7 phủ nên không lặp ở đây. Trailer miễn là cách ghi nhận ngoại lệ (đổi tên nội bộ, format…) có dấu vết, đúng tinh thần ngoại lệ trong `feature-workflow.md`.
 
 ### 3.3 Design pattern áp dụng
 
@@ -106,12 +106,12 @@ Không đổi. Smoke chỉ gọi `GET /health`.
 ### 3.7 Luồng CI
 
 ```
-PR / push main ─┬─ check  (audit, tsc, lint --error-on-warnings, build, unit)
-                ├─ docs   (yarn check:docs --strict)
-                ├─ change (chỉ PR: yarn check:change --base origin/main)
+PR / push main ─┬─ check  (audit, tsc, lint (cảnh báo = lỗi), check:docs --strict, build, unit)
+                ├─ change (chỉ PR: yarn check:change --base origin/<base>)
                 ├─ flows  (Postgres, flow test + ratchet độ phủ)
-                └─ boot   (Postgres trống: migrate → node dist → /health)
-Bảo vệ nhánh main: bắt buộc cả 5 job xanh + PR + branch up-to-date (cài tay, xem rule release-gate.md)
+                ├─ boot   (Postgres trống: migrate → node dist → /health)
+                └─ gate   (tổng hợp 4 job; "CI gate" là check required duy nhất)
+Bảo vệ nhánh main: bắt buộc PR + CI gate xanh + branch up-to-date (cài tay, xem rule release-gate.md)
 ```
 
 ### 3.8 Lỗi & biên
@@ -137,4 +137,14 @@ Rủi ro: `check:docs` quá chặt gây nhiễu → mọi mục có danh sách m
 
 ## 6. Kết quả triển khai
 
-_(điền sau khi xong)_
+- **File:** `tools/check-docs.ts`, `tools/lib/docs-checks.ts`, `tools/check-docs.spec.ts` (D1–D9); `tools/check-change.ts`, `tools/lib/change-checks.ts`, `tools/check-change.spec.ts` (C1–C3); `scripts/smoke-prod.sh`; `.husky/pre-commit`, `commit-msg`, `pre-push`; `.github/workflows/ci.yml` (job `change`, `boot`, `gate`; `check` thêm `check:docs --strict`); `.github/pull_request_template.md`; `package.json` (`lint` coi cảnh báo là lỗi và quét `tools`; script `check:docs`, `check:change`, `smoke:prod`, `verify:quick`, `verify`); rule mới `.claude/rules/release-gate.md`; `README.md` (bỏ liên kết tương đối tới repo FE khiến D4 đỏ).
+- **Khác thiết kế:**
+  1. Bỏ C4 và C5: đã được D2 (spec ↔ chỉ mục) và D7 (flow ↔ test matrix) phủ chính xác hơn.
+  2. Thêm hook `commit-msg` (mẫu tiêu đề) và job `gate` tổng hợp để branch protection chỉ cần một check bắt buộc.
+  3. D5 hiểu đường dẫn tương đối theo thư mục module (docs module viết `shared/order.constant.ts`) bằng khớp hậu tố, và tham chiếu spec theo số (`docs/specs/payment/0003`).
+  4. Kiểm lệch entity ↔ migration: thử `migration:generate --check`, báo nhiễu toàn bộ FK/CHECK (entity không mô tả) nên **không bật**, ghi ở `release-gate.md` mục 7 và `common.md` 4.13.
+  5. Không sửa `render.yaml` / không đặt bảo vệ nhánh: là cài đặt production ngoài repo, đưa lệnh cụ thể ở `release-gate.md` mục 4 để người dùng tự bật.
+- **Phát hiện:** `lint-staged` đã cấu hình nhưng thiếu file `.husky/pre-commit` nên chưa từng chạy; `README.md` có liên kết hỏng tới `../clothes-shop`. Đã sửa cả hai.
+- **Thử phá (trên bản commit, rồi khôi phục):** bỏ dòng chỉ mục spec, đổi tên file được docs nhắc, thêm route không có trong docs, đổi tên flow trong test matrix, thêm migration không ghi docs, thêm liên kết hỏng, thêm module không docs → `check:docs` đỏ đúng mục D2/D5/D6/D7/D8/D4/D1. Vô hiệu hoá validate production → smoke boot đỏ. Hook: commit tiêu đề sai bị chặn; file có lỗi lint không tự sửa được bị chặn, file chỉ sai format được tự sửa rồi commit.
+- **Chưa chạy được ở đây:** các job GitHub Actions (chưa đẩy lên); sẽ chạy lần đầu khi người dùng đẩy nhánh/mở PR. Mọi bước của chúng đã chạy cục bộ: `tsc`, `lint`, `check:docs --strict`, `build`, `test`, `test:flows`, `smoke:prod`.
+- **Docs/test:** `docs/modules/common.md` (4.11, 4.12, 4.13), `test/README.md`, `docs/specs/README.md`, `CLAUDE.md`.

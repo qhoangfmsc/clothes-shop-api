@@ -106,7 +106,7 @@ Lấy danh sách thay đổi bằng `git diff` / `git status` thay vì nhớ.
 Chỉ được báo hoàn thành khi tick đủ:
 
 - [ ] Giai đoạn A đã làm: đã đọc docs + code của mọi module trong phạm vi trước khi sửa.
-- [ ] Type check, lint, unit test, flow test, build qua.
+- [ ] Type check, lint, unit test, flow test, build qua; `yarn check:docs` (máy đối chiếu route, migration, flow, spec, liên kết, đường dẫn với docs) xanh.
 - [ ] Spec của việc này (nếu thuộc cỡ cần spec) ở trạng thái Implemented, mục 6 đã điền.
 - [ ] `test/README.md` có dòng cho test mới/đổi; mục 4.7 của module khớp.
 - [ ] Mục 4.9 (thiết kế & pattern) của module phản ánh đúng code vừa làm.
@@ -115,6 +115,7 @@ Chỉ được báo hoàn thành khi tick đủ:
 - [ ] Mọi error code / permission / env mới hoặc đổi đã có trong docs (module + `common.md` nếu dùng chung).
 - [ ] Module mới: có file `docs/modules/<module>.md` đủ 4 phần và dòng trong `docs/README.md`.
 - [ ] `Cập nhật lần cuối` đã đổi; không có nội dung kế hoạch hay tài liệu FE.
-- [ ] Báo cáo cuối cho người dùng **liệt kê file spec, docs, test đã tạo/sửa** và 1–3 dòng về pattern/nguyên lý đã áp dụng.
+- [ ] Docs của bên liên quan (module phụ thuộc, `yarn impact`) đã rà và còn đúng (`.claude/rules/change-impact.md`).
+- [ ] Báo cáo cuối cho người dùng **liệt kê file spec, docs, test đã tạo/sửa**, 1–3 dòng về pattern/nguyên lý đã áp dụng và dòng Phạm vi ảnh hưởng.
 
 Ngoại lệ không cần docs (phải nói rõ trong báo cáo): đổi tên biến nội bộ, format, sửa comment, thêm test thuần không đổi code chạy.
