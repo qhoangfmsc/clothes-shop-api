@@ -5,7 +5,7 @@ import { EAuthErrorCode } from '@common/exceptions/error-codes';
 import { DEFAULT_USER_PERMISSIONS } from '@common/permissions/permissions.constant';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { JwtService } from '@nestjs/jwt';
+import { JwtService, JwtSignOptions } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../user/user.entity';
@@ -140,7 +140,7 @@ export class AuthService {
     const expiresIn =
       type === 'access' ? this.configService.get('JWT_EXPIRES_IN', '1d') : this.configService.get('JWT_REFRESH_EXPIRES_IN', '30d');
     const payload: JwtPayload = { sub: user.id, email: user.email, role: user.role, type };
-    return this.jwtService.sign(payload, { secret: this.jwtSecret, expiresIn: expiresIn as any });
+    return this.jwtService.sign(payload, { secret: this.jwtSecret, expiresIn: expiresIn as JwtSignOptions['expiresIn'] });
   }
 
   private sanitizeUser(user: User) {

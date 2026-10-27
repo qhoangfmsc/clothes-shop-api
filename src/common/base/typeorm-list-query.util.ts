@@ -22,7 +22,7 @@ export interface TypeormListQueryProps {
   /** `field` = ASC, `-field` = DESC — DTO đã whitelist bằng @SortField */
   sort?: string;
   /** Filter map, values may include operator prefix like "gt:10", "in:1,2,3" */
-  filter?: Record<string, any>;
+  filter?: Record<string, unknown>;
 }
 
 export interface TypeormListQueryOptions {
@@ -40,7 +40,13 @@ export interface TypeormListQueryOptions {
  * Supported:  lt:v  lte:v  gt:v  gte:v  ne:v  eq:v  in:a,b,c  range:a,b
  * Plain value → eq
  */
-function applyFilterCondition(qb: SelectQueryBuilder<any>, alias: string, column: string, value: any, paramIndex: number): number {
+function applyFilterCondition<T extends ObjectLiteral>(
+  qb: SelectQueryBuilder<T>,
+  alias: string,
+  column: string,
+  value: unknown,
+  paramIndex: number,
+): number {
   const paramName = `filter_${column}_${paramIndex}`;
   const colRef = `${alias}.${column}`;
 

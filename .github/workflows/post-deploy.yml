@@ -1,0 +1,28 @@
+name: Post-deploy check
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Sau mỗi push vào main: chờ Render đưa bản mới lên, rồi kiểm sống (docs/specs/common/0018, .claude/rules/release-gate.md mục 5).
+# Cần đặt repository variable PRODUCTION_URL (Settings → Secrets and variables → Actions → Variables), vd https://clothes-shop-api.onrender.com.
+# Đỏ ở đây = deploy hỏng hoặc bản mới không lên; GitHub gửi thông báo theo cài đặt của bạn.
+jobs:
+  verify:
+    name: Wait for the new version and check it is alive
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      PRODUCTION_URL: ${{ vars.PRODUCTION_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Skip when PRODUCTION_URL is not configured
+        if: env.PRODUCTION_URL == ''
+        run: echo "::warning::PRODUCTION_URL chưa được đặt nên chưa kiểm tra sau deploy. Đặt biến này để bật."
+      - name: Check production
+        if: env.PRODUCTION_URL != ''
+        run: bash scripts/post-deploy-check.sh "$PRODUCTION_URL" "${{ github.sha }}"

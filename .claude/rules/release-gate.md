@@ -21,6 +21,7 @@
 | CI job `change` | mỗi PR | Đổi code mà không đổi test hoặc docs (trừ trailer miễn có lý do) | tự chạy |
 | CI job `flows` | mỗi PR / push main | Flow test trên Postgres thật + ratchet độ phủ endpoint | tự chạy |
 | CI job `boot` | mỗi PR / push main | Bản build **chạy được**: migrate từ DB trống, từ chối cấu hình production sai, `/health` ok, route admin 401 | tự chạy |
+| Workflow `post-deploy` | mỗi push vào `main` (sau khi Render deploy) | Bản mới không lên, `/health` đỏ, DB mất kết nối, route công khai lỗi, route admin để hở | tự chạy (cần biến repo `PRODUCTION_URL`, xem 4.4) |
 | CI job `gate` (`CI gate`) | cuối cùng | Tổng hợp 4 job trên; là check duy nhất cần đặt "required" | tự chạy |
 | Bảo vệ nhánh `main` + Render | merge / deploy | Chỉ merge khi `CI gate` xanh; chỉ deploy khi CI qua | **cài tay**, xem mục 4 |
 
@@ -35,7 +36,7 @@
 | `yarn check:docs` | **D1** module thiếu docs/dòng README · **D2** spec thiếu trong chỉ mục / sai trạng thái / số không liên tục / (strict) còn Draft-Approved · **D3** spec Implemented thiếu mục 6 · **D4** liên kết markdown hỏng · **D5** đường dẫn file được nhắc không tồn tại · **D6** route chưa có trong docs module · **D7** flow thiếu trong test matrix · **D8** migration thiếu trong `common.md` · **D9** rule mồ côi | Sửa **docs** cho khớp code (code là sự thật); đừng nới kiểm tra |
 | `yarn check:change` | **C1** đổi code mà không đổi test · **C2** đổi module mà không đổi `docs/modules/<module>.md` · **C3** đổi `common`/`core`/migration mà không đổi `common.md` | Bổ sung test/docs, hoặc thay đổi thật sự không đổi hành vi thì thêm trailer ở một commit: `No-Test: <lý do>` / `No-Docs: <lý do>` (lý do ≥ 3 ký tự, có nghĩa) |
 | `yarn build` | Biên dịch production (loại `test`, `tools`) | Sửa code |
-| `yarn smoke:prod` | Migration từ DB trống hỏng; app build không khởi động; cấu hình production sai vẫn chạy; thiếu guard | Xem log in ra; chạy cục bộ cần Docker test DB đang chạy |
+| `yarn smoke:prod` | Migration từ DB trống hỏng; app build không khởi động; cấu hình production sai vẫn chạy; thiếu guard; log production không phải JSON hoặc lộ query; script kiểm tra sau deploy sai | Xem log in ra; chạy cục bộ cần Docker test DB đang chạy |
 | `yarn audit` (job `check`) | Lỗ hổng **critical** ở phụ thuộc production | Nâng/ghim bản vá (xem `common.md` 4.13 về `resolutions`) |
 
 `yarn check:docs --strict` khác bản thường ở một điểm: spec còn **Draft/Approved** là lỗi (trên `main` mọi spec phải Implemented hoặc Superseded). Khi đang làm dở trên nhánh, dùng bản thường.
@@ -65,6 +66,10 @@ JSON
 
 **4.3 Biến môi trường production** (Render → Environment): đặt đủ các biến bắt buộc mà `core/env.validation.ts` kiểm (`JWT_SECRET` ≥ 32 ký tự và không phải giá trị mặc định, `POSTGRES_*`, `GOOGLE_CLIENT_ID`, `SEPAY_WEBHOOK_SECRET`, `SEPAY_RECEIVING_ACCOUNT`, `CORS_ORIGINS` là URL http(s)). Thêm biến mới vào code ⇒ thêm trên Render **trước** khi merge, nếu không app từ chối khởi động (đúng thiết kế, nhưng deploy sẽ hỏng).
 
+**4.4 Kiểm tra sau deploy** (GitHub → Settings → Secrets and variables → Actions → **Variables** → `PRODUCTION_URL` = URL gốc của dịch vụ trên Render, không có `/` cuối). Chưa đặt thì workflow `post-deploy.yml` chỉ in cảnh báo, không giả vờ đã kiểm. Có thể chạy tay: `bash scripts/post-deploy-check.sh https://<url> [commit]`.
+
+**4.5 Redis cho rate limit (chỉ khi chạy nhiều instance)**: tạo Redis (Render Key Value) và đặt `REDIS_URL` (`redis://` hoặc `rediss://`). Không đặt thì mỗi instance đếm riêng như trước; Redis lỗi thì tự rơi về đếm in-memory, API không lỗi.
+
 ## 5. Quy trình từ nhánh đến production
 
 1. Làm theo `feature-workflow.md` (Đọc → Spec → Code + Test → Docs) trên nhánh `<loại>/<slug>`.
@@ -72,8 +77,8 @@ JSON
 3. `yarn verify` xanh cục bộ (cần Docker).
 4. Mở PR (template `.github/pull_request_template.md`: điền spec, docs, phạm vi ảnh hưởng, rủi ro production).
 5. CI chạy; đỏ thì sửa trên nhánh, không merge. `CI gate` xanh mới merge (squash hoặc merge commit; giữ tiêu đề theo mẫu).
-6. Render tự deploy (khi đã bật 4.2). Chạy `start:prod`: migration rồi app.
-7. **Sau deploy** (1–2 phút): `GET /health` trả `status: ok`, `db: connected`; thử một luồng đọc công khai (`GET /api/products`); nếu đụng thanh toán thì xác nhận cấu hình SePay (webhook secret, tài khoản nhận) trước khi mở bán.
+6. Render tự deploy (khi đã bật 4.2). Chạy `start:prod`: migration có khoá advisory (nhiều instance an toàn) rồi app.
+7. **Sau deploy**: workflow `post-deploy.yml` tự chạy `scripts/post-deploy-check.sh` (cần đặt biến repo `PRODUCTION_URL`, xem 4.4): chờ `/health.commit` khớp commit vừa merge, kiểm `status: ok`, `db: connected`, route công khai 200, route admin 401; đỏ là deploy hỏng, GitHub thông báo. Thủ công thêm khi đụng thanh toán: xác nhận cấu hình SePay (webhook secret, tài khoản nhận) trước khi mở bán.
 8. **Hỏng thì**: redeploy bản trước trên Render (nhanh nhất). Nếu migration mới đã chạy, đánh giá `down` (`yarn migration:revert`) cẩn thận với dữ liệu; migration phải có `down` đúng và idempotent khi có thể (xem `coding-conventions.md` mục 8).
 
 ## 6. Miễn trừ có dấu vết
@@ -91,10 +96,9 @@ JSON
 |---|---|
 | Tích hợp thật với SePay, Google, Supabase | Flow test chạy offline, đầu vào ngoài được giả. Cần thử trên staging với khoá thật trước khi mở bán lần đầu |
 | Lệch giữa entity TypeORM và schema do migration | Không kiểm tự động được: entity không mô tả FK/CHECK nên `migration:generate --check` báo nhiễu. Nguồn sự thật là migration; flow test chạy trên schema dựng từ migration nên lệch lộ ra khi chạy |
-| Nhiều instance cùng chạy migration khi khởi động (`start:prod`) | Chưa có khoá; production hiện một instance. Cần xử lý trước khi scale ngang |
-| Rate limit dùng bộ nhớ từng instance | Đủ cho một instance; scale ngang cần kho dùng chung |
+| Rate limit khi chạy nhiều instance mà chưa có Redis | Không đặt `REDIS_URL` thì mỗi instance đếm riêng (giới hạn thực tế nhân số instance); đặt `REDIS_URL` để dùng chung (4.5). Cửa sổ cố định: sát ranh giới có thể qua tối đa ~2× |
 | Hiệu năng, tải | Không có kiểm tra |
-| Quan sát sau deploy (log, cảnh báo) | Chưa có; kiểm tay ở bước 7 |
+| Quan sát vận hành | Có log JSON mỗi request và kiểm tra sống sau deploy; chưa có gom log, đo lường, cảnh báo theo ngưỡng lỗi (cần dịch vụ giám sát ngoài) |
 | Chất lượng thiết kế, tên, phản ví dụ | Chỉ review người (checklist cuối các rule) |
 
 ## 8. Checklist trước khi merge

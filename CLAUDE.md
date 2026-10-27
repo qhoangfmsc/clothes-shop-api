@@ -163,7 +163,8 @@ Luật: `.claude/rules/release-gate.md` · Phạm vi kiểm lại: `.claude/rule
 - Không commit thẳng lên `main`: PR từ nhánh `<loại>/<slug>`, merge khi check **`CI gate`** xanh (job `check`: audit, tsc, lint không cảnh báo, `check:docs --strict`, build, unit · `change`: đổi code phải đổi test + docs · `flows`: Postgres thật + ratchet độ phủ · `boot`: migrate từ trống + chạy bản build ở production).
 - Hook cục bộ: `pre-commit` (Biome), `commit-msg` (mẫu `<loại>(<module>): <mệnh đề>`), `pre-push` (`yarn verify:quick`). Trước khi xin merge chạy `yarn verify`.
 - Miễn test/docs chỉ khi thay đổi không đổi hành vi, bằng trailer `No-Test: <lý do>` / `No-Docs: <lý do>` ở một commit.
-- Bảo vệ nhánh `main` và Render "After CI Checks Pass" là cài đặt ngoài repo — lệnh và các bước ở `release-gate.md` mục 4.
+- Sau merge: workflow `post-deploy` kiểm bản mới đã lên và còn sống (cần biến repo `PRODUCTION_URL`). Migration khi khởi động có khoá (`yarn migration:run`); rate limit dùng Redis nếu đặt `REDIS_URL`; production log JSON mỗi request.
+- Bảo vệ nhánh `main`, Render "After CI Checks Pass", `PRODUCTION_URL` là cài đặt ngoài repo — lệnh và các bước ở `release-gate.md` mục 4.
 
 ## Test (BẮT BUỘC đi kèm mọi thay đổi hành vi)
 
@@ -194,7 +195,7 @@ yarn test:db:down     # Tắt Postgres test
 yarn impact           # Module/flow bị ảnh hưởng bởi thay đổi hiện tại (--run unit|flows)
 yarn check:docs       # Docs/spec/test matrix/migration/route khớp code (--strict trước khi vào main)
 yarn check:change     # PR: đổi code thì phải đổi test và docs (hoặc trailer No-Test:/No-Docs: kèm lý do)
-yarn smoke:prod       # Migrate từ DB trống, chạy bản build ở production, kiểm /health
+yarn smoke:prod       # Migrate từ DB trống (có khoá), chạy bản build ở production, kiểm /health + log JSON
 yarn verify           # Toàn bộ cổng như CI (cần Docker)
 npx typeorm migration:run -d data-source.ts  # Run migrations
 ```

@@ -6,7 +6,17 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
  * Static size guide data — no DB needed for now.
  * Matches FE SizeGuide type.
  */
-const SIZE_GUIDES: Record<string, any> = {
+interface SizeGuide {
+  category: string;
+  title: string;
+  description: string;
+  unit: string;
+  columns: string[];
+  rows: Record<string, string>[];
+  tips: string[];
+}
+
+const SIZE_GUIDES: Record<string, SizeGuide> = {
   tops: {
     category: 'tops',
     title: 'Tops Size Guide',

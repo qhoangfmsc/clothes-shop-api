@@ -13,7 +13,7 @@ Cập nhật lần cuối: 2026-10-23 · Luật: `.claude/rules/testing.md` · T
 
 ## Chạy flow test
 
-**Cấu hình ở [`.env.test`](../.env.test) (root)**: chỉ có kết nối Postgres test (`POSTGRES_*`), docker và jest cùng đọc. Chỉnh khi cổng 55432 bị chiếm hoặc muốn dùng Postgres có sẵn (rồi chạy `yarn test:flows:run`). Đổi xong: `yarn test:db:down && yarn test:db:up`. `POSTGRES_DATABASE` phải kết thúc `_test`. Phần còn lại là hằng số giả trong `test/support/test-env.ts` (JWT, SePay) hoặc luôn rỗng (`SUPABASE_*`, `GOOGLE_*`), không cấu hình.
+**Cấu hình ở [`.env.test`](../.env.test) (root)**: chỉ có kết nối Postgres test (`POSTGRES_*`), docker và jest cùng đọc. Chỉnh khi cổng 55432 bị chiếm hoặc muốn dùng Postgres có sẵn (rồi chạy `yarn test:flows:run`). Đổi xong: `yarn test:db:down && yarn test:db:up`. `POSTGRES_DATABASE` phải kết thúc `_test`. Phần còn lại là hằng số giả trong `test/support/test-env.ts` (JWT, SePay) hoặc luôn rỗng (`SUPABASE_*`, `GOOGLE_*`, `REDIS_URL`), không cấu hình. `yarn test:db:up` bật thêm một Redis test (cổng 56379) chỉ cho flow kho đếm rate limit; đổi URL bằng biến `REDIS_TEST_URL` của chính test đó (app flow khác không dùng Redis).
 
 ```bash
 yarn test:flows        # bật Postgres test (docker compose), dựng schema từ migration, chạy mọi flow
@@ -22,7 +22,7 @@ yarn test:coverage     # in lại báo cáo độ phủ + ratchet từ lần ch�
 yarn test:coverage:update  # gỡ khỏi baseline các mục đã đủ ca
 yarn test:db:down      # tắt DB test khi xong
 yarn check:docs        # docs/spec/test matrix/migration/route khớp code (D1–D9); --strict trước khi vào main
-yarn smoke:prod        # migrate từ DB trống, chạy bản build ở production, kiểm /health
+yarn smoke:prod        # migrate từ DB trống (có khoá), chạy bản build ở production, kiểm /health, kiểm tra sau deploy, log JSON
 yarn impact            # flow/unit bị ảnh hưởng bởi thay đổi hiện tại (--run unit|flows để chạy hộ); xem .claude/rules/change-impact.md
 yarn -s jest --config test/jest.flows.config.js --runInBand -t "<tên test>"   # chạy một test (DB đã up)
 ```
@@ -113,7 +113,9 @@ Trạng thái: **Có** = đã có test cover luồng · **Unit** = chỉ có uni
 | wishlist | Thêm (idempotent, 404 / 1001), danh sách (chỉ của mình, Vnd/Usd), kiểm tra, bỏ (idempotent), dọn khi xoá sản phẩm | Flow | `flows/wishlist/wishlist.flow.ts` | Có (batch 19) |
 | media (admin) | Ping, danh sách thư viện (chỉ `LIBRARY`), upload (key an toàn, loại theo byte, lỗi storage 1601/1605/1606, 413), xoá (storage trước rồi mới dòng DB, 1604) | Flow | `flows/media/media.flow.ts` | Có (batch 24) |
 | pending-count | Số việc chờ theo quyền, khớp `total` của các danh sách, giảm khi xử lý xong | Flow | `flows/pending-count/pending-count.flow.ts` | Có (batch 24) |
-| health | `GET /` và `GET /health` (cả khi DB lỗi) | Flow | `flows/health/health.flow.ts` | Có (batch 25) |
+| health | `GET /` và `GET /health` (cả khi DB lỗi), trường `commit` theo `RENDER_GIT_COMMIT` | Flow | `flows/health/health.flow.ts` | Có (batch 25) |
+| rate limit (kho Redis dùng chung) | Hai instance cộng dồn một bộ đếm, đếm đồng thời chính xác, tách theo throttler/tracker, hết hạn sau cửa sổ, không để khoá vô hạn, Redis không với tới thì đếm in-memory không ném lỗi (cần Redis test cổng 56379) | Flow | `flows/rate-limit/rate-limit-redis.flow.ts` | Có |
+| migration | Hai runner khởi động đồng thời trên DB trống: đủ migration, không trùng; chạy lại là no-op; khoá nhả khi migration lỗi; runner thứ hai chờ khi khoá đang bị giữ | Flow | `flows/migration/migration-lock.flow.ts` (DB tạm `clothes_shop_lock_test`) | Có |
 | rate limit | Giới hạn mặc định, chặt hơn cho đăng nhập/refresh/upload, đếm theo route và theo IP (`TRUST_PROXY`), 429 trước xác thực, webhook và health không bị chặn | Flow | `flows/rate-limit/rate-limit.flow.ts` (app riêng, giới hạn thấp) | Có |
 | site-config | Danh sách key, tạo/thay/xoá cấu hình (1501/1502/1503), chuẩn hoá `SHIPPING_CONFIG`, `EXCHANGE_RATE` có hiệu lực ngay, đọc công khai | Flow | `flows/site-config/site-config.flow.ts` | Có (batch 22) |
 | shipping | `GET /api/shipping` theo cấu hình admin (mặc định, ngưỡng, USD), cùng nguồn với báo giá và hạn đổi trả | Flow | `flows/shipping/shipping.flow.ts` | Có (batch 23) |
@@ -123,7 +125,7 @@ Trạng thái: **Có** = đã có test cover luồng · **Unit** = chỉ có uni
 
 | Module | File spec |
 |---|---|
-| common | `common/dto/list-query.dto.spec.ts` (ép chuẩn list cho mọi `*-query.dto.ts`), `common/dto/update-dto.spec.ts` (mọi cặp `Create<X>Dto`/`Update<X>Dto`: không khoá "ma", giữ ràng buộc của create), `common/base/provided-fields.util.spec.ts`, `common/base/db-error.util.spec.ts`, `common/utils/rate-limit.config.spec.ts` + `common/guards/rate-limit.guard.spec.ts`, `core/env.validation.spec.ts` + `core/core.module.spec.ts` (app từ chối khởi động khi cấu hình production sai), `common/filter/exception.filter.spec.ts` (lưới an toàn lỗi toàn vẹn DB), `common/utils/money.util.spec.ts`, `common/base/lock.util.spec.ts`, `common/architecture/architecture.spec.ts` (luật kiến trúc: hướng phụ thuộc, vòng module, export thừa, exception thô, kích thước service, cell), `common/architecture/conventions.spec.ts` (convention: tên file + hậu tố vai trò, tên class, DTO trong `dtos/`, controller không chạm DB, không exception HTTP thô, không `console.*`, không `process.env` trong module) |
+| common | `common/dto/list-query.dto.spec.ts` (ép chuẩn list cho mọi `*-query.dto.ts`), `common/dto/update-dto.spec.ts` (mọi cặp `Create<X>Dto`/`Update<X>Dto`: không khoá "ma", giữ ràng buộc của create), `common/base/provided-fields.util.spec.ts`, `common/base/db-error.util.spec.ts`, `common/utils/rate-limit.config.spec.ts` + `common/guards/rate-limit.guard.spec.ts`, `core/env.validation.spec.ts` + `core/core.module.spec.ts` (app từ chối khởi động khi cấu hình production sai), `common/filter/exception.filter.spec.ts` (lưới an toàn lỗi toàn vẹn DB), `common/utils/money.util.spec.ts`, `common/base/lock.util.spec.ts`, `common/architecture/architecture.spec.ts` (luật kiến trúc: hướng phụ thuộc, vòng module, export thừa, exception thô, kích thước service, cell), `common/utils/rate-limit.storage.spec.ts` (Redis storage, fallback, factory), `common/middleware/request-log.middleware.spec.ts` (log request: trường cố định, không lộ query, mức theo status, bỏ qua probe), `common/architecture/conventions.spec.ts` (convention: tên file + hậu tố vai trò, tên class, DTO trong `dtos/`, controller không chạm DB, không exception HTTP thô, không `console.*`, không `process.env` trong module) |
 | tools | `tools/impact.spec.ts` (đồ thị module từ import, gắn flow với module qua route, báo cáo ảnh hưởng; kiểm trên repo thật), `tools/check-docs.spec.ts` (D1–D9 + repo thật không có vấn đề), `tools/check-change.spec.ts` (C1–C3, trailer miễn) |
 | auth | `modules/auth/auth.service.spec.ts`, `modules/auth/google-auth.service.spec.ts` |
 | cart | `modules/cart/cart.service.spec.ts` |

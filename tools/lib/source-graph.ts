@@ -68,7 +68,7 @@ export interface FlowFile extends SourceFile {
 }
 
 /** Flow kiểm toàn hệ thống (bảng route–quyền, ma trận 401/403, rate limit, health): không thuộc module nào, chạy mỗi khi có thay đổi runtime */
-export const GLOBAL_FLOW_DIRS = ['access', 'rate-limit', 'health'];
+export const GLOBAL_FLOW_DIRS = ['access', 'rate-limit', 'health', 'migration'];
 
 /** Flow → các module nó gọi qua HTTP (theo URL xuất hiện trong flow và file `steps` cùng thư mục) */
 export function flowModules(flows: FlowFile[], prefixes: RoutePrefix[], modules: string[]): Record<string, string[]> {

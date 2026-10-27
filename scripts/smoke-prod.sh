@@ -15,6 +15,7 @@ case "$POSTGRES_DATABASE" in
 esac
 
 PORT="${SMOKE_PORT:-7999}"
+SMOKE_COMMIT="smoke0123456789abcdef"
 LOG="$(mktemp)"
 APP_PID=""
 cleanup() {
@@ -24,12 +25,18 @@ cleanup() {
 trap cleanup EXIT
 
 # Cấu hình production hợp lệ nhưng giả: không phải secret thật
+# exec: tiến trình chạy nền chính là node, để cleanup kill đúng nó (không để app mồ côi chiếm cổng)
 prod_env() {
-  env NODE_ENV=production PORT="$PORT" \
+  exec env NODE_ENV=production PORT="$PORT" \
     JWT_SECRET="smoke-secret-smoke-secret-smoke-secret-0123456789" \
     GOOGLE_CLIENT_ID="smoke-client-id" SEPAY_WEBHOOK_SECRET="smoke-webhook-secret" \
-    SEPAY_RECEIVING_ACCOUNT="0000000000" CORS_ORIGINS="https://example.com" "$@"
+    SEPAY_RECEIVING_ACCOUNT="0000000000" CORS_ORIGINS="https://example.com" \
+    RENDER_GIT_COMMIT="$SMOKE_COMMIT" "$@"
 }
+
+if curl -s -o /dev/null --max-time 2 "http://127.0.0.1:$PORT/health"; then
+  echo "[smoke] FAIL: cổng $PORT đang có tiến trình khác trả lời (app cũ còn sót?). Tắt nó hoặc đặt SMOKE_PORT khác." >&2; exit 2
+fi
 
 if [ "${SKIP_BUILD:-0}" != "1" ]; then echo "[smoke] build"; yarn -s build; fi
 
@@ -67,6 +74,22 @@ for _ in $(seq 1 60); do
 done
 echo "${body:-}" | grep -q '"status":"ok"' || { echo "[smoke] FAIL: /health không ok: ${body:-<rỗng>}" >&2; cat "$LOG"; exit 1; }
 echo "${body}" | grep -q '"db":"connected"' || { echo "[smoke] FAIL: DB không kết nối: $body" >&2; exit 1; }
-code="$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT/api/admin/orders")"
-[ "$code" = "401" ] || { echo "[smoke] FAIL: route admin không đăng nhập phải 401, nhận $code" >&2; exit 1; }
-echo "[smoke] OK: migrate từ trống, từ chối cấu hình sai, /health ok, route admin 401"
+echo "[smoke] kiểm tra sau deploy (cùng script production dùng)"
+TIMEOUT_SECONDS=20 INTERVAL_SECONDS=1 bash scripts/post-deploy-check.sh "http://127.0.0.1:$PORT" "$SMOKE_COMMIT" >/dev/null || { echo "[smoke] FAIL: post-deploy-check với đúng commit" >&2; exit 1; }
+if TIMEOUT_SECONDS=2 INTERVAL_SECONDS=1 bash scripts/post-deploy-check.sh "http://127.0.0.1:$PORT" "not-the-deployed-commit" >/dev/null 2>&1; then
+  echo "[smoke] FAIL: post-deploy-check phải đỏ khi commit đang chạy khác commit mong đợi" >&2; exit 1
+fi
+
+echo "[smoke] log production là JSON, có requestId, không lộ query"
+curl -s -o /dev/null -H 'x-request-id: smoke-req-1' "http://127.0.0.1:$PORT/api/size-guides/tops?secret=do-not-log"
+sleep 1
+node -e "
+const lines = require('fs').readFileSync(process.argv[1], 'utf8').split('\n').filter(Boolean);
+const bad = lines.filter((line) => { try { JSON.parse(line); return false; } catch { return true; } });
+if (bad.length) { console.error('dòng log không phải JSON:', bad[0]); process.exit(1); }
+const entry = lines.map((l) => JSON.parse(l)).find((l) => l.message && l.message.event === 'request' && l.message.requestId === 'smoke-req-1');
+if (!entry) { console.error('không thấy dòng log request có requestId'); process.exit(1); }
+if (entry.message.path !== '/api/size-guides/tops' || JSON.stringify(entry).includes('do-not-log')) { console.error('log lộ query hoặc sai path:', JSON.stringify(entry)); process.exit(1); }
+if (lines.some((l) => JSON.parse(l).message === '/health' || (JSON.parse(l).message || {}).path === '/health')) { console.error('probe /health không được ghi log'); process.exit(1); }
+" "$LOG" || { echo "[smoke] FAIL: kiểm tra log" >&2; cat "$LOG"; exit 1; }
+echo "[smoke] OK: migrate từ trống (có khoá), từ chối cấu hình sai, /health ok + commit, kiểm tra sau deploy, route admin 401, log JSON"

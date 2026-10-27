@@ -45,6 +45,10 @@ Cấu trúc: `docs/specs/<module>/NNNN-slug.md` (số tăng dần theo từng mo
 | review | [0003 — `review` chia cell: public, authoring, vote, moderation](review/0003-review-cells.md) | Implemented | 4 cell + shared, 6 service, 6 controller |
 | return | [0003 — `return` chia cell: request, processing](return/0003-return-cells.md) | Implemented | 2 cell + shared, 4 service |
 | order | [0004 — `order` chia cell: checkout, status, query](order/0004-order-cells.md) | Implemented | 3 cell + shared, cạnh status → query |
+| common | [0019 — Dọn `any` cũ và dùng helper `isUniqueViolation`](common/0019-remove-leftover-any-and-reuse-unique-helper.md) | Implemented | Hết `any` trong code ứng dụng, Biome chặn `any` mới; SepayWebhookService dùng helper |
+| common | [0018 — Log có cấu trúc và kiểm tra sau deploy](common/0018-structured-logs-and-post-deploy-check.md) | Implemented | Log JSON ở production, log mỗi request kèm requestId, `/health.commit`, workflow `post-deploy` |
+| common | [0017 — Kho đếm rate limit dùng chung (Redis tuỳ chọn)](common/0017-shared-rate-limit-store.md) | Implemented | `REDIS_URL`, Lua INCR+PEXPIRE nguyên tử, fallback in-memory khi Redis lỗi |
+| common | [0016 — Chạy migration lúc khởi động có khoá](common/0016-locked-migration-runner.md) | Implemented | `scripts/migrate.ts` với advisory lock; `yarn migration:run` và `start:prod` dùng |
 | common | [0015 — Cổng trước khi lên `main`](common/0015-release-gate.md) | Implemented | `check:docs`, `check:change`, smoke boot production, hook, PR template, bảo vệ nhánh |
 | common | [0014 — Kiểm tra lại theo phạm vi ảnh hưởng](common/0014-change-impact-verification.md) | Implemented | `yarn impact`: đồ thị module từ import, flow gắn module qua route, mục 3.9 trong spec |
 | common | [0013 — Tách quy tắc kỹ thuật thành 4 rule chi tiết](common/0013-engineering-rules-split.md) | Implemented | architecture, design-patterns, solid, coding-conventions + `conventions.spec.ts` |

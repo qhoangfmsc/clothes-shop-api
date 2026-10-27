@@ -26,6 +26,9 @@ export function validateEnv(config: Record<string, unknown>): Record<string, unk
   if (!isBlank(config.TRUST_PROXY) && !/^\d+$/.test(String(config.TRUST_PROXY)))
     problems.push('TRUST_PROXY: phải là số nguyên không âm (số tầng reverse proxy)');
 
+  if (!isBlank(config.REDIS_URL) && !/^rediss?:\/\/\S+$/.test(String(config.REDIS_URL)))
+    problems.push('REDIS_URL: phải là URL redis:// hoặc rediss://');
+
   if (config.NODE_ENV === 'production') {
     const secret = config.JWT_SECRET;
     if (isBlank(secret)) problems.push('JWT_SECRET: bắt buộc ở production');

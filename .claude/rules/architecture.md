@@ -116,7 +116,8 @@ Hệ quả cho việc kiểm tra: đổi `payment` kéo theo `order`, `refund`, 
 - Gọi service/hàm của module khác trong cùng nghiệp vụ thì **truyền `EntityManager`**.
 - **Khoá dòng chỉ qua `findLocked`** (`common/base/lock.util.ts`); không viết `lock: { mode: ... }` rải rác (máy ép).
 - **Thứ tự khoá cố định**: `orders` trước, rồi bản ghi con (`payment_attempts`, `returns`...). Ghi thứ tự ở comment đầu method khi lấy ≥ 2 khoá. Hợp đồng khoá được flow `lock-contract.flow.ts` kiểm.
-- **Idempotency** cho đầu vào lặp (webhook): UNIQUE ở DB + bắt lỗi `23505` thành kết quả "đã xử lý".
+- **Idempotency** cho đầu vào lặp (webhook): UNIQUE ở DB + bắt lỗi `23505` (qua `isUniqueViolation`) thành kết quả "đã xử lý".
+- **Migration khi khởi động** chạy qua `yarn migration:run` (khoá advisory, `scripts/migrate.ts`): nhiều instance không chạy trùng; không chạy `typeorm migration:run` trực tiếp ở production.
 - **Eventual consistency** chỉ cho phản ứng phụ chấp nhận được (thông báo, cache). Không dùng event cho bước cần nguyên tử với tiền.
 
 ## 7. Tích hợp bên ngoài

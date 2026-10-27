@@ -33,7 +33,7 @@ export class Order extends BaseEntity {
   shippingMethod: string;
 
   @Column({ type: 'jsonb', default: {}, name: 'shipping_address' })
-  shippingAddress: Record<string, any>;
+  shippingAddress: Record<string, unknown>;
 
   @Column({ type: 'varchar', length: 500, default: '' })
   note: string;

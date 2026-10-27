@@ -36,7 +36,7 @@ Phần hạ tầng dùng chung cho mọi module: bootstrap ứng dụng, guard x
 | DTO chung | `src/common/dto` | `PaginationQueryDto` + spec guard cho mọi query DTO |
 | Exceptions | `src/common/exceptions` | `AppException`, `throwAppError`, `error-codes.ts` |
 | Filter | `src/common/filter/exception.filter.ts` | `AllExceptionFilter` |
-| Middleware | `src/common/middleware/request-id.middleware.ts` | Gắn `x-request-id` |
+| Middleware | `src/common/middleware/request-id.middleware.ts`, `request-log.middleware.ts` | Gắn `x-request-id`; ghi một dòng log mỗi request khi xong (spec 0018) |
 | Permissions | `src/common/permissions/permissions.constant.ts` | Enum `Permission`, `DEFAULT_USER_PERMISSIONS` |
 | Constants | `src/common/constants/enum-values.constant.ts` | Enum dùng chung giữa DTO |
 | Utils | `src/common/utils` | `money.util` (tiền VND/USD) |
@@ -54,6 +54,7 @@ Phần hạ tầng dùng chung cho mọi module: bootstrap ứng dụng, guard x
 | CORS | origin = `CORS_ORIGINS` (phân tách bằng dấu phẩy) hoặc `http://localhost:3000`; `credentials: true`; methods `GET, POST, PUT, PATCH, DELETE, OPTIONS`; headers `Content-Type, Authorization, X-Requested-With` |
 | Bảo mật header | `helmet()` |
 | Request id | `RequestIdMiddleware`: dùng `x-request-id` của request hoặc sinh `randomUUID()`, trả lại trong header response |
+| Log (spec 0018) | Production (`NODE_ENV=production`): `ConsoleLogger({ json: true })` mức `log/warn/error`, mỗi sự kiện một dòng JSON; dev: text, đủ mức. `RequestLogMiddleware` (đăng ký trong `main.ts`, không có trong flow test) ghi khi response `finish` một đối tượng `{ event: 'request', requestId, method, path (không query), route, status, durationMs, ip, userId }`; mức theo status (2xx/3xx `log`, 4xx `warn`, 5xx `error`); bỏ qua `GET /` và `GET /health`. Không bao giờ ghi body, header hay query. `AllExceptionFilter` ghi lỗi 5xx (một lần, kèm stack) và vi phạm ràng buộc DB kèm `requestId=` để nối với dòng request; `requestId` không đưa vào body response |
 | Body | JSON và urlencoded giới hạn `5mb`. Parser JSON có `verify` giữ bytes gốc vào `req.rawBody` cho request có đường dẫn bắt đầu `/api/webhooks/` (webhook ký trên raw body; xem [payment](payment.md)) |
 | ValidationPipe toàn cục | `transform: true`, `whitelist: true`, `forbidNonWhitelisted: true` (field lạ bị từ chối) |
 | Cờ compiler cho DTO | `tsconfig.json`: `useDefineForClassFields: false` — với `target: esnext` mặc định `true` làm mọi field khai báo thành thuộc tính `undefined` ngay khi `new Dto()`, nên `Object.assign(entity, dto)` ghi `undefined` lên entity (response thiếu field, `sku` sinh sai); `exposeUnsetFields: false` không sửa được (khoá sinh từ khai báo, không từ body) |
@@ -68,7 +69,7 @@ Phần hạ tầng dùng chung cho mọi module: bootstrap ứng dụng, guard x
 | Method | Path | Response |
 |---|---|---|
 | GET | `/` | chuỗi `Clothes Shop API is running` |
-| GET | `/health` | `{ status: 'ok', timestamp, uptime, db: 'connected' }`; lỗi DB: `{ status: 'error', timestamp, db: 'disconnected' }` (sau khi chạy `SELECT 1`; cả hai trường hợp đều HTTP 200). Flow test: `test/flows/health/health.flow.ts` |
+| GET | `/health` | `{ status: 'ok', timestamp, uptime, db: 'connected', commit }` (`commit` = `RENDER_GIT_COMMIT` hoặc `null`; kiểm tra sau deploy dùng nó); lỗi DB: `{ status: 'error', timestamp, db: 'disconnected' }` (sau khi chạy `SELECT 1`; cả hai trường hợp đều HTTP 200). Flow test: `test/flows/health/health.flow.ts` |
 
 ### 4.2 Cấu hình DB & CoreModule
 
@@ -76,7 +77,7 @@ Phần hạ tầng dùng chung cho mọi module: bootstrap ứng dụng, guard x
 - Biến môi trường đọc ở đây: `POSTGRES_HOST` (mặc định `127.0.0.1`), `POSTGRES_PORT` (`5432`), `POSTGRES_USERNAME` (`pguser`), `POSTGRES_PASSWORD` (rỗng), `POSTGRES_DATABASE` (`clothes-shop`).
 - `onModuleInit` log danh sách bảng schema `public` kèm số dòng; cảnh báo nếu chưa có bảng nào (chưa chạy migration).
 - `data-source.ts` (cho TypeORM CLI): cùng biến POSTGRES_*, `entities: src/**/*.entity.ts`, `migrations: src/migrations/*.ts`, bảng theo dõi `typeorm_migrations`.
-- `yarn start:prod` chạy `typeorm migration:run -d data-source.ts` rồi `node dist/src/main.js`.
+- `yarn start:prod` chạy `yarn migration:run` (= `scripts/migrate.ts`, migration có khoá advisory) rồi `node dist/src/main.js`.
 
 ### 4.3 Xác thực & phân quyền
 
@@ -98,7 +99,7 @@ Decorators:
 | `@CurrentUser(field?)` | Lấy `request.user` (entity `User` do `JwtStrategy.validate` trả về) hoặc 1 field của nó |
 | `@ApiEndpoint(summary, { method, auth })` | Gộp `ApiOperation` + `ApiOk/CreatedResponse` (+ `ApiBearerAuth`); hiện chưa module nào dùng |
 
-**Rate limit** (`RateLimitGuard`, spec common/0010): `APP_GUARD` **đầu tiên**, trước `JwtAuthGuard`, nên request chưa xác thực cũng bị đếm. Mỗi cặp (route, IP) có một bộ đếm trong cửa sổ 60 giây (kho in-memory của `@nestjs/throttler`, mỗi instance đếm riêng). Mặc định 120 request/phút; `@RateLimit('auth')` (10/phút) cho `POST /api/auth/google` và `/api/auth/refresh`; `@RateLimit('upload')` (20/phút) cho `POST /api/admin/media` và `POST /api/reviews/images`; `@SkipRateLimit()` cho `POST /api/webhooks/sepay`, `GET /`, `GET /health`. Vượt giới hạn → HTTP 429, `errorCode 9201`, header `Retry-After`, không chạm DB. IP lấy từ `req.ip` với `trust proxy = TRUST_PROXY`: sau Render phải ≥ 1, nếu không mọi client chung một bộ đếm; không có proxy thì phải là 0, nếu không client giả `X-Forwarded-For` để né giới hạn.
+**Rate limit** (`RateLimitGuard`, spec common/0010): `APP_GUARD` **đầu tiên**, trước `JwtAuthGuard`, nên request chưa xác thực cũng bị đếm. Mỗi cặp (route, IP) có một bộ đếm trong cửa sổ 60 giây (spec 0017: nếu đặt `REDIS_URL` thì kho Redis dùng chung giữa các instance — cửa sổ cố định, INCR + PEXPIRE nguyên tử qua Lua, `common/utils/rate-limit.storage.ts`; Redis lỗi thì đếm tạm in-memory theo từng instance, cảnh báo tối đa 1 lần/phút, API không lỗi; không đặt `REDIS_URL` thì kho in-memory của `@nestjs/throttler`, mỗi instance đếm riêng). Mặc định 120 request/phút; `@RateLimit('auth')` (10/phút) cho `POST /api/auth/google` và `/api/auth/refresh`; `@RateLimit('upload')` (20/phút) cho `POST /api/admin/media` và `POST /api/reviews/images`; `@SkipRateLimit()` cho `POST /api/webhooks/sepay`, `GET /`, `GET /health`. Vượt giới hạn → HTTP 429, `errorCode 9201`, header `Retry-After`, không chạm DB. IP lấy từ `req.ip` với `trust proxy = TRUST_PROXY`: sau Render phải ≥ 1, nếu không mọi client chung một bộ đếm; không có proxy thì phải là 0, nếu không client giả `X-Forwarded-For` để né giới hạn.
 
 ### 4.4 Permission (`Permission` enum)
 
@@ -208,6 +209,8 @@ Entity **không** extends `BaseEntity` (tự khai báo id nanoid16): `Wishlist` 
 
 Đặt tên `{timestamp}-{PascalCaseName}.ts` (timestamp từ `Date.now()`), constraint theo prefix: `PK_`, `FK_`, `UQ_`, `CK_`, `IDX_`. Lệnh: `yarn migration:run`, `yarn migration:revert`, `yarn migration:generate`, `yarn migration:create`.
 
+**Khoá khi chạy** (spec 0016): `yarn migration:run` chạy `runMigrationsWithLock` (`scripts/migrate.ts`): mở một kết nối riêng, `pg_advisory_lock(20261027)` (chờ nếu instance khác đang migrate), `runMigrations()`, rồi nhả khoá (kể cả khi migration lỗi). Hai instance khởi động cùng lúc nên không chạy trùng một migration; instance đến sau thấy không còn gì để chạy. Khoá theo phiên nên tiến trình chết là khoá tự nhả. Flow `test/flows/migration/migration-lock.flow.ts` chạy trên DB tạm `clothes_shop_lock_test`. `migration:revert`, `generate`, `create` vẫn là lệnh TypeORM CLI, không khoá.
+
 | Migration | Nội dung |
 |---|---|
 | `1783478828861-InitSchema` | users, products, categories, subcategories, collections, reviews + index/unique ban đầu |
@@ -248,6 +251,8 @@ Entity **không** extends `BaseEntity` (tự khai báo id nanoid16): `Wishlist` 
 | `PORT` | `main.ts` (mặc định 7001) |
 | `RATE_LIMIT_DEFAULT_PER_MINUTE` (120), `RATE_LIMIT_AUTH_PER_MINUTE` (10), `RATE_LIMIT_UPLOAD_PER_MINUTE` (20) | `common/utils/rate-limit.config.ts`; số nguyên dương, đọc mỗi request |
 | `TRUST_PROXY` | `core/app.setup.ts`: số tầng reverse proxy tin cậy (mặc định 1 ở production, 0 nơi khác) |
+| `REDIS_URL` (tuỳ chọn) | `main.module.ts` → `createRateLimitStorage`: kho đếm rate limit dùng chung; phải là `redis://` hoặc `rediss://`; trống = in-memory |
+| `RENDER_GIT_COMMIT` (Render tự đặt) | `main.controller.ts`: trường `commit` của `/health` |
 | `CORS_ORIGINS` | `main.ts` |
 | `POSTGRES_HOST/PORT/USERNAME/PASSWORD/DATABASE` | `core.module.ts`, `data-source.ts` |
 | `JWT_SECRET`, `JWT_EXPIRES_IN`, `JWT_REFRESH_EXPIRES_IN` | module auth |
@@ -255,7 +260,7 @@ Entity **không** extends `BaseEntity` (tự khai báo id nanoid16): `Wishlist` 
 | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET` | module media |
 | `SEPAY_RECEIVING_BANK_CODE`, `SEPAY_RECEIVING_BANK_NAME`, `SEPAY_RECEIVING_ACCOUNT`, `SEPAY_RECEIVING_ACCOUNT_NAME`, `SEPAY_WEBHOOK_SECRET`, `PAYMENT_TRANSFER_PREFIX` | module payment |
 
-**Kiểm tra khi khởi động** (`src/core/env.validation.ts`, `validateEnvForConfigModule` truyền vào `ConfigModule.forRoot({ validate })`, chạy ngay khi module được nạp; spec common/0009). Mọi môi trường: `PORT`, `POSTGRES_PORT` nếu có phải là số nguyên 1–65535; `RATE_LIMIT_*` số nguyên dương; `TRUST_PROXY` số nguyên không âm. Chỉ khi `NODE_ENV=production`: bắt buộc `JWT_SECRET` (≥ 32 ký tự và khác `DEFAULT_JWT_SECRET`, hằng số nay ở `common/constants/security.constant.ts`), `POSTGRES_HOST/USERNAME/PASSWORD/DATABASE`, `GOOGLE_CLIENT_ID`, `SEPAY_WEBHOOK_SECRET`, `SEPAY_RECEIVING_ACCOUNT`, và `CORS_ORIGINS` (mọi origin là URL http(s)). Sai thì app không khởi động (tiến trình thoát với lỗi), thông báo liệt kê mọi lỗi theo tên biến và lý do, không in giá trị. `SUPABASE_*`, `GOOGLE_CLIENT_SECRET`, `PAYMENT_TRANSFER_PREFIX`, `SEPAY_RECEIVING_BANK_*` không bắt buộc (tính năng tự trả 503 khi thiếu). Hàm chỉ trả phần cấu hình đến từ file `.env`: `ConfigService` ưu tiên bản đã validate hơn `process.env`, trả cả `process.env` sẽ đóng băng mọi biến lúc nạp. `render.yaml` không khai báo biến nào nên chúng nằm ở dashboard của dịch vụ: kiểm đủ trước khi deploy.
+**Kiểm tra khi khởi động** (`src/core/env.validation.ts`, `validateEnvForConfigModule` truyền vào `ConfigModule.forRoot({ validate })`, chạy ngay khi module được nạp; spec common/0009). Mọi môi trường: `PORT`, `POSTGRES_PORT` nếu có phải là số nguyên 1–65535; `RATE_LIMIT_*` số nguyên dương; `TRUST_PROXY` số nguyên không âm; `REDIS_URL` nếu có phải là URL `redis://` hoặc `rediss://`. Chỉ khi `NODE_ENV=production`: bắt buộc `JWT_SECRET` (≥ 32 ký tự và khác `DEFAULT_JWT_SECRET`, hằng số nay ở `common/constants/security.constant.ts`), `POSTGRES_HOST/USERNAME/PASSWORD/DATABASE`, `GOOGLE_CLIENT_ID`, `SEPAY_WEBHOOK_SECRET`, `SEPAY_RECEIVING_ACCOUNT`, và `CORS_ORIGINS` (mọi origin là URL http(s)). Sai thì app không khởi động (tiến trình thoát với lỗi), thông báo liệt kê mọi lỗi theo tên biến và lý do, không in giá trị. `SUPABASE_*`, `GOOGLE_CLIENT_SECRET`, `PAYMENT_TRANSFER_PREFIX`, `SEPAY_RECEIVING_BANK_*` không bắt buộc (tính năng tự trả 503 khi thiếu). Hàm chỉ trả phần cấu hình đến từ file `.env`: `ConfigService` ưu tiên bản đã validate hơn `process.env`, trả cả `process.env` sẽ đóng băng mọi biến lúc nạp. `render.yaml` không khai báo biến nào nên chúng nằm ở dashboard của dịch vụ: kiểm đủ trước khi deploy.
 
 ### 4.11 Lệnh
 
@@ -271,11 +276,11 @@ yarn test:flows:run             # chỉ chạy jest của flow test, không bậ
 yarn test:coverage              # báo cáo độ phủ endpoint + ratchet từ lần chạy gần nhất
 yarn test:coverage:update       # gỡ khỏi test/coverage-baseline.json các route đã đủ ca
 yarn test:db:down               # tắt Postgres test
-yarn migration:run              # chạy migration
+yarn migration:run              # chạy migration có khoá advisory (scripts/migrate.ts, spec 0016); start:prod dùng lệnh này
 yarn impact                     # module/flow bị ảnh hưởng bởi thay đổi hiện tại (--run unit|flows)
 yarn check:docs [--strict]      # docs, spec, test matrix, migration, route khớp code (strict: spec không kẹt Draft/Approved)
 yarn check:change [--base ref]  # PR: đổi code thì phải đổi test và docs (hoặc trailer miễn có lý do)
-yarn smoke:prod                 # migrate từ DB trống, chạy bản build ở production, kiểm /health (cần Docker test DB)
+yarn smoke:prod                 # migrate từ DB trống, chạy bản build ở production, kiểm /health, log JSON, script sau deploy (cần Docker test DB)
 yarn verify:quick               # tsc + lint + check:docs + unit (pre-push)
 yarn verify                     # toàn bộ: verify:quick + check:docs --strict + build + flow + smoke:prod
 ```
@@ -283,9 +288,11 @@ yarn verify                     # toàn bộ: verify:quick + check:docs --strict
 **CI** (`.github/workflows/ci.yml`, GitHub Actions, chạy khi push lên `main` và ở mọi pull request; thiết kế ở spec 0015, quy trình ở `.claude/rules/release-gate.md`): năm job.
 - `check` — audit phụ thuộc (chặn khi có lỗ hổng critical), `tsc --noEmit`, `yarn lint` (Biome, cảnh báo cũng là lỗi), `yarn check:docs --strict`, `yarn build`, `yarn test`.
 - `change` (chỉ PR) — `yarn check:change --base origin/<nhánh gốc>`: đổi code phải đổi test (C1) và docs của module (C2) / `common.md` (C3), trừ khi có trailer `No-Test:` / `No-Docs:` kèm lý do ở một commit.
-- `flows` — Postgres 16 làm service container khớp `.env.test` (cổng 55432, DB `clothes_shop_test`), rồi `yarn test:flows:run` và `yarn test:coverage` (ratchet độ phủ endpoint).
+- `flows` — Postgres 16 (cổng 55432, DB `clothes_shop_test`, khớp `.env.test`) và Redis 7 (cổng 56379, khớp `docker-compose.test.yml`) làm service container, rồi `yarn test:flows:run` và `yarn test:coverage` (ratchet độ phủ endpoint).
 - `boot` — Postgres sạch, `yarn smoke:prod` (`scripts/smoke-prod.sh`): build, migrate từ DB trống, cấu hình production thiếu `JWT_SECRET` phải bị từ chối khởi động, chạy `node dist/src/main.js` ở `NODE_ENV=production` với cấu hình giả hợp lệ, `GET /health` trả `status: ok` + `db: connected`, route admin không đăng nhập trả 401. Script chỉ chạy trên DB có tên kết thúc `_test` hoặc `_smoke`.
 - `gate` (`CI gate`) — tổng hợp bốn job trên (`change` được phép bị bỏ qua khi push vào `main`); là check duy nhất cần đặt "required" khi bảo vệ nhánh.
+
+Workflow `post-deploy.yml` (không thuộc `CI gate`): sau mỗi push vào `main`, nếu repository variable `PRODUCTION_URL` đã đặt thì chạy `scripts/post-deploy-check.sh <url> <github.sha>`: chờ tối đa 15 phút cho tới khi `/health.commit` khớp commit vừa push, rồi kiểm `status: ok`, `db: connected`, `GET /api/products?limit=1` = 200, `GET /api/admin/orders` không đăng nhập = 401; đỏ nghĩa là deploy hỏng hoặc bản mới không lên (GitHub thông báo). Chưa đặt `PRODUCTION_URL` thì chỉ in cảnh báo. Cùng script được `smoke:prod` dùng (cả ca đỏ khi commit không khớp).
 
 Hook cục bộ (husky, cài bởi `prepare`): `pre-commit` chạy `lint-staged` (`biome check --fix` trên `*.ts` đã stage), `commit-msg` kiểm tiêu đề theo mẫu `<loại>(<module>): <mệnh đề>`, `pre-push` chạy `yarn verify:quick`. Bảo vệ nhánh `main` và Render "After CI Checks Pass" là cài đặt ngoài repo (xem `release-gate.md` mục 4).
 
@@ -308,7 +315,7 @@ Hook cục bộ (husky, cài bởi `prepare`): `pre-commit` chạy `lint-staged`
   - không ném exception HTTP thô ngoài `RAW_HTTP_EXCEPTIONS` (`jwt.strategy.ts`, `typeorm-list-query.util.ts`);
   - không `console.*` trong code ứng dụng; module nghiệp vụ không đọc `process.env` (dùng `ConfigService`).
   Thêm vi phạm mới hoặc để vi phạm cũ lớn thêm → đỏ; sửa xong mà chưa giảm allowlist → đỏ. `src/common/dto/list-query.dto.spec.ts` là guard chuẩn list cho mọi `*-query.dto.ts` (xem 4.5); `src/common/utils/money.util.spec.ts` cho helper tiền. Test của từng module: xem file module tương ứng.
-- **Công cụ phạm vi ảnh hưởng** (`yarn impact`, spec 0014): `tools/impact.ts` + `tools/lib/*`. Đồ thị module suy ra từ import thật của `src/modules` (alias `@/…` và đường dẫn tương đối, bỏ spec/test-utils); flow được gắn với module qua tiền tố `@Controller` mà URL trong flow (và file `steps` cùng thư mục) khớp; thư mục `access`, `rate-limit`, `health` là flow toàn cục. Từ `git diff` (so với `main`, thêm thay đổi chưa commit) in ra: module đổi, phụ thuộc trực tiếp / gián tiếp, docs phải cập nhật / cần rà, unit và flow cần chạy lại; `--run unit|flows` chạy hộ. Đổi `src/common`, `src/core`, migration, `package.json`, cấu hình → mọi module. Gợi ý cho vòng lặp phát triển, không thay chạy toàn bộ. Unit test: `tools/impact.spec.ts` (jest `roots` có thêm `tools/`), gồm kiểm tra trên repo thật: cạnh tiền (`order → payment, refund`, `refund → return`...), mọi module có route đều có flow, mọi flow thuộc module hoặc thư mục toàn cục.
+- **Công cụ phạm vi ảnh hưởng** (`yarn impact`, spec 0014): `tools/impact.ts` + `tools/lib/*`. Đồ thị module suy ra từ import thật của `src/modules` (alias `@/…` và đường dẫn tương đối, bỏ spec/test-utils); flow được gắn với module qua tiền tố `@Controller` mà URL trong flow (và file `steps` cùng thư mục) khớp; thư mục `access`, `rate-limit`, `health`, `migration` là flow toàn cục. Từ `git diff` (so với `main`, thêm thay đổi chưa commit) in ra: module đổi, phụ thuộc trực tiếp / gián tiếp, docs phải cập nhật / cần rà, unit và flow cần chạy lại; `--run unit|flows` chạy hộ. Đổi `src/common`, `src/core`, migration, `package.json`, cấu hình → mọi module. Gợi ý cho vòng lặp phát triển, không thay chạy toàn bộ. Unit test: `tools/impact.spec.ts` (jest `roots` có thêm `tools/`), gồm kiểm tra trên repo thật: cạnh tiền (`order → payment, refund`, `refund → return`...), mọi module có route đều có flow, mọi flow thuộc module hoặc thư mục toàn cục.
 - **Kiểm tra docs và kỷ luật thay đổi** (spec 0015): `tools/check-docs.ts` + `tools/lib/docs-checks.ts` (D1 module ↔ docs ↔ README, D2 chỉ mục spec/trạng thái/số liên tục/strict, D3 mục 6 spec Implemented, D4 liên kết markdown, D5 đường dẫn file được nhắc (kể cả dạng tương đối theo thư mục module và tham chiếu spec theo số), D6 mọi route có trong docs module sở hữu, D7 mọi flow có trong test matrix, D8 mọi migration có trong 4.9, D9 mọi rule được liệt kê); `tools/check-change.ts` + `tools/lib/change-checks.ts` (C1–C3, trailer miễn). Unit: `tools/check-docs.spec.ts` (mỗi mục một ca đúng và một ca vi phạm, cộng ca "repo thật không có vấn đề") và `tools/check-change.spec.ts`.
 - **Flow** (`yarn test:flows`): `test/flows/<module>/*.flow.ts`, đi qua HTTP thật (`MainModule` + `configureApp`) trên Postgres thật. Config riêng `test/jest.flows.config.js` (rootDir repo, chỉ nhận `*.flow.ts`, chạy tuần tự).
   - Mỗi lần chạy: lấy khoá advisory (`pg_try_advisory_lock`; lần chạy thứ hai cùng DB bị chặn), `DROP SCHEMA public` → chạy toàn bộ migration → `TRUNCATE` dữ liệu seed; sau mỗi test `truncateAll`.
@@ -341,3 +348,5 @@ Hook cục bộ (husky, cài bởi `prepare`): `pre-commit` chạy `lint-staged`
 - Trạng thái dùng type union cho mọi cột `status` (xem 4.5). Chuyển trạng thái chỉ có bảng tường minh cho đơn (`ORDER_TRANSITIONS`, cạnh do admin thực hiện); `return` kiểm theo hành động (`assertStatus` với danh sách trạng thái xuất phát từng hành động) và có thêm cạnh do hệ thống (`RECEIVED → APPROVED` khi khoản hoàn bị từ chối, `RECEIVED → REFUNDED` khi hoàn xong); `refund`, `payment attempt`, `review` kiểm trực tiếp trong service.
 - Entity `Order` được import và đăng ký `TypeOrmModule.forFeature` trực tiếp ở module `payment`, `return`, `review`; entity `Product` ở `cart`, `wishlist`, `collection` (bên cạnh module `product`). Các module này truy cập bảng của nhau không qua service.
 - Cổng production: kiểm lệch giữa entity TypeORM và schema do migration không bật được (`migration:generate --check` báo toàn bộ FK/CHECK vì entity không mô tả chúng); nguồn sự thật là migration và flow test chạy trên schema dựng từ migration. `.agent/skills/nest-best-practices` là mẫu NestJS chung không khớp dự án; rule trong `.claude/rules/` thắng khi mâu thuẫn.
+- Từ spec 0019 `any` bị chặn bằng máy trong code ứng dụng: Biome `noExplicitAny` ở mức `warn` (= lỗi vì `yarn lint` có `--error-on-warnings`), tắt riêng cho `*.spec.ts`, `*.test-utils.ts` và `test/**` (`overrides` trong `biome.json`). Mã `23505`/`23503` của Postgres được nhận qua `isUniqueViolation`/`isDbError`, không so chuỗi.
+- Rate limit dùng chung nhiều instance cần `REDIS_URL` (Redis chưa được cấp trên Render); kho là cửa sổ cố định nên sát ranh giới cửa sổ có thể qua tối đa ~2× giới hạn. Log production hiện chỉ ra stdout dạng JSON; chưa có gom log, đo lường hay cảnh báo theo ngưỡng lỗi.

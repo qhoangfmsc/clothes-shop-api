@@ -1,3 +1,4 @@
+import { isUniqueViolation } from '@common/base/db-error.util';
 import { findLocked } from '@common/base/lock.util';
 import { throwAppError } from '@common/exceptions/app.exception';
 import { EPaymentErrorCode } from '@common/exceptions/error-codes';
@@ -22,7 +23,6 @@ export interface SepayWebhookInput {
 type Outcome = PaymentVerificationStatus | 'DUPLICATE';
 
 const MAX_CONTENT_LENGTH = 500;
-const UNIQUE_VIOLATION = '23505';
 
 @Injectable()
 export class SepayWebhookService {
@@ -62,7 +62,7 @@ export class SepayWebhookService {
     try {
       outcome = await this.dataSource.transaction((manager) => this.process(manager, payload, config));
     } catch (error) {
-      if ((error as { code?: string })?.code === UNIQUE_VIOLATION) {
+      if (isUniqueViolation(error)) {
         // Hai webhook cùng id chạy song song: bên thua bị rollback hoàn toàn, bên thắng đã lưu
         outcome = 'DUPLICATE';
       } else {

@@ -5,6 +5,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { RateLimitGuard } from './common/guards/rate-limit.guard';
 import { RATE_LIMIT_WINDOW_MS, rateLimitPerMinute } from './common/utils/rate-limit.config';
+import { createRateLimitStorage } from './common/utils/rate-limit.storage';
 import { CoreModule } from './core/core.module';
 import { MainController } from './main.controller';
 import { AddressModule } from './modules/address/address.module';
@@ -29,7 +30,13 @@ import { WishlistModule } from './modules/wishlist/wishlist.module';
 
 @Module({
   imports: [
-    ThrottlerModule.forRoot([{ name: 'default', ttl: RATE_LIMIT_WINDOW_MS, limit: () => rateLimitPerMinute('default') }]),
+    ThrottlerModule.forRootAsync({
+      useFactory: () => ({
+        throttlers: [{ name: 'default', ttl: RATE_LIMIT_WINDOW_MS, limit: () => rateLimitPerMinute('default') }],
+        // Có REDIS_URL thì bộ đếm dùng chung giữa các instance; không có thì kho in-memory mặc định
+        storage: createRateLimitStorage(process.env.REDIS_URL),
+      }),
+    }),
     CoreModule,
     AuthModule,
     UserModule,

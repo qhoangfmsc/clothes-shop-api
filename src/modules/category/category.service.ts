@@ -1,4 +1,4 @@
-import { throwOnConstraint } from '@common/base/db-error.util';
+import { isDbError, PG_FOREIGN_KEY_VIOLATION, throwOnConstraint } from '@common/base/db-error.util';
 import { pickProvided } from '@common/base/provided-fields.util';
 import { throwAppError } from '@common/exceptions/app.exception';
 import { ECategoryErrorCode } from '@common/exceptions/error-codes';
@@ -34,7 +34,7 @@ export class CategoryService {
         const category = manager.create(Category, { subcategories: [], ...pickProvided(dto, ['heroImage']), priority });
         return { data: await manager.save(category) };
       });
-    } catch (err: any) {
+    } catch (err) {
       throwOnConstraint(err, CATEGORY_UNIQUE_ERRORS);
       throw err;
     }
@@ -82,7 +82,7 @@ export class CategoryService {
         Object.assign(category, rest);
         return { data: await manager.save(category) };
       });
-    } catch (err: any) {
+    } catch (err) {
       throwOnConstraint(err, CATEGORY_UNIQUE_ERRORS);
       throw err;
     }
@@ -203,8 +203,8 @@ export class CategoryService {
     if (removed.length > 0) {
       try {
         await manager.remove(removed);
-      } catch (err: any) {
-        if (err.code === '23503') {
+      } catch (err) {
+        if (isDbError(err, PG_FOREIGN_KEY_VIOLATION)) {
           throwAppError(
             ECategoryErrorCode.CATEGORY_SUBCATEGORY_HAS_PRODUCTS,
             `Không thể xoá subcategory đang có sản phẩm tham chiếu: ${removed.map((s) => s.slug).join(', ')}`,
@@ -234,9 +234,9 @@ export class CategoryService {
           .execute();
       });
       return { message: 'Category deleted successfully' };
-    } catch (err: any) {
+    } catch (err) {
       // Catch FK RESTRICT error từ DB (còn products tham chiếu)
-      if (err.code === '23503') {
+      if (isDbError(err, PG_FOREIGN_KEY_VIOLATION)) {
         throwAppError(ECategoryErrorCode.CATEGORY_HAS_PRODUCTS);
       }
       throw err;

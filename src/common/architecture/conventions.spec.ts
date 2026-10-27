@@ -24,6 +24,7 @@ const ROLE_SUFFIXES = [
   'transform',
   'exception',
   'setup',
+  'storage',
 ];
 const TEST_SUFFIXES = ['spec', 'test-utils'];
 

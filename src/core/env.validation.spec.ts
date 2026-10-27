@@ -104,6 +104,16 @@ describe('validateEnv rate limit settings', () => {
     expect(message({ TRUST_PROXY: '0' })).toBeNull();
     expect(message({ TRUST_PROXY: '1' })).toBeNull();
   });
+
+  it('accepts an absent or redis URL for REDIS_URL, refuses anything else without printing it', () => {
+    for (const value of [undefined, '', 'redis://127.0.0.1:6379', 'rediss://cache.internal:6380/0'])
+      expect(message({ REDIS_URL: value })).toBeNull();
+    for (const value of ['127.0.0.1:6379', 'http://cache.internal', 'redis:// has space']) {
+      const text = message({ REDIS_URL: value }) as string;
+      expect(text).toContain('REDIS_URL: phải là URL redis://');
+      expect(text).not.toContain(value);
+    }
+  });
 });
 
 describe('validateEnvForConfigModule', () => {

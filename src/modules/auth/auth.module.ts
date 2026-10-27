@@ -1,7 +1,7 @@
 import { DEFAULT_JWT_SECRET } from '@common/constants/security.constant';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { JwtModule } from '@nestjs/jwt';
+import { JwtModule, JwtSignOptions } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { User } from '../user/user.entity';
@@ -19,7 +19,7 @@ import { JwtStrategy } from './jwt.strategy';
       useFactory: (configService: ConfigService) => ({
         secret: configService.get<string>('JWT_SECRET', DEFAULT_JWT_SECRET),
         signOptions: {
-          expiresIn: configService.get('JWT_EXPIRES_IN', '1d') as any,
+          expiresIn: configService.get('JWT_EXPIRES_IN', '1d') as JwtSignOptions['expiresIn'],
         },
       }),
     }),

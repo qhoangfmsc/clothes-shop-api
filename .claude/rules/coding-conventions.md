@@ -17,7 +17,7 @@ Cấu hình `biome.json`: thụt 2 dấu cách, rộng tối đa 140 cột, nhá
 | Đối tượng | Quy ước | Ví dụ |
 |---|---|---|
 | File | `kebab-case` + hậu tố vai trò `x.<vai trò>.ts` | `order-status.service.ts`, `payment.presenter.ts`, `sepay-payload.util.ts`, `admin-order-query.dto.ts` |
-| Hậu tố vai trò hợp lệ | controller, service, module, entity, dto, presenter, util, constant, decorator, guard, filter, middleware, strategy, scheduler, config, validators, validation, transform, exception, setup; test: `.spec.ts`, `.test-utils.ts` | — |
+| Hậu tố vai trò hợp lệ | controller, service, module, entity, dto, presenter, util, constant, decorator, guard, filter, middleware, strategy, scheduler, config, validators, validation, transform, exception, setup, storage; test: `.spec.ts`, `.test-utils.ts` | — |
 | Thư mục | `kebab-case`; `dtos/` cho DTO; `shared/` cho phần dùng chung của cell | `payment/attempt/dtos/` |
 | Class | `PascalCase`, **trùng tên file** (service/controller/module/scheduler/guard) | `order-status.service.ts` → `OrderStatusService` |
 | Hàm/biến | `camelCase`, hàm bắt đầu bằng **động từ** | `findLocked`, `assertOrderPayable`, `applyOrderPaid`, `presentOrder` |
@@ -43,7 +43,7 @@ Máy ép: tên file `kebab-case` + hậu tố vai trò, class đặt theo tên f
 ## 5. TypeScript
 
 - `strictNullChecks` bật: xử lý `null/undefined` rõ ràng; dùng `?.`, `??`. Tránh `!` trừ khi bất biến đã được kiểm ngay trước đó.
-- **Không thêm `any`** mới trong code nghiệp vụ (Biome tắt `noExplicitAny` để cho phép ở test/giả lập). Dùng kiểu hẹp, `unknown` + thu hẹp, hoặc generic. Hiện còn một ít `any` cũ (`catch (err: any)` ở `category.service.ts`, `as any` cho `expiresIn` của JWT, helper `typeorm-list-query.util.ts`); dọn khi chạm tới.
+- **Không dùng `any`** trong code ứng dụng: Biome `noExplicitAny` ở mức `warn` (= lỗi vì `yarn lint` có `--error-on-warnings`); chỉ `*.spec.ts`, `*.test-utils.ts` và `test/**` được dùng (cho giả lập). Dùng kiểu hẹp, `unknown` + thu hẹp, hoặc generic. `catch (err)` để `err` là `unknown` rồi nhận diện bằng helper (`isDbError`, `isUniqueViolation`), không ép `any`.
 - Trạng thái/enum: `as const` + type union dùng chung DTO ↔ entity; cột entity dùng đúng type union đó. **Không** khai báo `status: string` kèm comment liệt kê (máy ép).
 - `async/await`, không trộn `.then`. Không `Promise` trôi (không `await` thì phải có lý do ghi chú).
 - Không magic number/string: đưa vào hằng có tên (`PAYMENT_QR_TTL_MS`, `MAX_MONEY_VND`).
@@ -55,7 +55,7 @@ Máy ép: tên file `kebab-case` + hậu tố vai trò, class đặt theo tên f
 |---|---|---|
 | Lỗi nghiệp vụ | Luôn `throwAppError(errorCode, message?, status?)` với mã `[MM][EE]` ở `common/exceptions/error-codes.ts`. Không ném `BadRequestException`/`NotFoundException` thô (ngoại lệ trong allowlist có lý do). Mặc định HTTP 400; truyền status khi cần 404/403/409 | `conventions.spec.ts`, `architecture.spec.ts` |
 | Mã lỗi mới | Thêm vào enum module; thêm `ErrorMessages` nếu cần; ghi vào bảng lỗi docs module | review |
-| Log | `new Logger(Class.name)` của Nest; mức hợp lý (`log`, `warn`, `error`); không log dữ liệu nhạy cảm (token, secret, toàn bộ body) | `conventions.spec.ts` cấm `console.*` |
+| Log | `new Logger(Class.name)` của Nest; mức hợp lý (`log`, `warn`, `error`); không log dữ liệu nhạy cảm (token, secret, body, query). Production ghi JSON một dòng mỗi sự kiện; mỗi request có một dòng `event: 'request'` (`requestId`, `path` không query, `status`, `durationMs`); lỗi 5xx ghi kèm `requestId` | `conventions.spec.ts` cấm `console.*`; `request-log.middleware.spec.ts` và `smoke:prod` kiểm dạng JSON, không lộ query |
 | Cấu hình | Đọc qua `ConfigService`; **module nghiệp vụ không đọc `process.env` trực tiếp** | `conventions.spec.ts` |
 | Biến môi trường mới | (1) thêm vào `core/env.validation.ts` nếu bắt buộc ở production, (2) thêm vào `test/support/test-env.ts` (giá trị giả/rỗng), (3) ghi **tên** biến ở docs module (không ghi giá trị) | `env.validation.spec.ts`, review |
 | Secret | Không commit secret thật; `.env.test` chỉ chứa kết nối Postgres test | review, audit |
@@ -102,10 +102,11 @@ Theo `.claude/rules/comments.md`. Tóm tắt: mặc định không comment; ch�
 | Tên file `kebab-case` + hậu tố vai trò; class trùng tên file; DTO trong `dtos/` | `conventions.spec.ts` |
 | Controller không chạm DB; không exception HTTP thô; không `console.*`; module không đọc `process.env` | `conventions.spec.ts` |
 | `status` là type union, khoá qua `findLocked`, lỗi qua `throwAppError`, cell, kích thước service | `architecture.spec.ts` |
+| Không `any` trong code ứng dụng | Biome `noExplicitAny` (`yarn lint`, pre-commit, CI) |
 | Query DTO list, `Update*Dto` | `list-query.dto.spec.ts`, `update-dto.spec.ts` |
 | Route có quyền đúng | `test/flows/access` |
 | Docs/spec/test khớp code | `yarn check:docs`, `yarn check:change` (xem `release-gate.md`) |
-| Đặt tên động từ, hàm ≤ ~50 dòng, comment đúng luật, không `any` mới, tiền theo cặp Vnd/Usd | **Chỉ review** (chưa có máy ép) |
+| Đặt tên động từ, hàm ≤ ~50 dòng, comment đúng luật, tiền theo cặp Vnd/Usd | **Chỉ review** (chưa có máy ép) |
 
 ## 13. Checklist review convention
 

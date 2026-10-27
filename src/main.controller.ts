@@ -26,6 +26,8 @@ export class MainController {
         timestamp: new Date().toISOString(),
         uptime: process.uptime(),
         db: 'connected',
+        // Render đặt biến này; kiểm tra sau deploy dùng nó để biết bản mới đã lên chưa
+        commit: process.env.RENDER_GIT_COMMIT ?? null,
       };
     } catch {
       return {

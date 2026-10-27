@@ -59,7 +59,7 @@ jobs:
     name: Flow tests (real Postgres)
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # Khớp .env.test (cổng 55432, DB clothes_shop_test); runner dùng service container thay cho docker compose
+    # Khớp .env.test (cổng 55432, DB clothes_shop_test) và docker-compose.test.yml (Redis cổng 56379); runner dùng service container thay cho docker compose
     services:
       postgres:
         image: postgres:16-alpine
@@ -71,6 +71,15 @@ jobs:
           POSTGRES_DB: clothes_shop_test
         options: >-
           --health-cmd "pg_isready -U test -d clothes_shop_test"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 56379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
           --health-interval 2s
           --health-timeout 3s
           --health-retries 20
