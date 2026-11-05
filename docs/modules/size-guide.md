@@ -1,6 +1,6 @@
 # size-guide (`src/modules/size-guide`)
 
-> Cập nhật lần cuối: 2026-10-12
+> Cập nhật lần cuối: 2026-10-23
 
 ## 1. Tổng quan
 
@@ -66,6 +66,8 @@ Không có.
 Không có.
 
 ### 4.7 Test
+
+Flow test: `test/flows/size-guide/size-guide.flow.ts` (batch 23) — bốn nhóm `tops`, `skirts`, `bags`, `jewelry` (cột, các dòng size, 3 gợi ý, đơn vị `cm`), không cần token; nhóm không có hoặc sai chữ hoa/thường → 200 với `data: null`.
 
 Chưa có test.
 

@@ -1,6 +1,6 @@
 # auth (`src/modules/auth`)
 
-> Cập nhật lần cuối: 2026-10-12
+> Cập nhật lần cuối: 2026-10-24
 
 ## 1. Tổng quan
 
@@ -72,8 +72,8 @@ Dùng bảng `users` — xem [user](user.md). Module chỉ đọc/ghi các cột
    - `verifyIdToken`: `OAuth2Client.verifyIdToken` với `audience = GOOGLE_CLIENT_ID`; yêu cầu payload có `email`.
    - `exchangeAuthCode`: `getToken({ code, redirect_uri: 'postmessage' })` (luồng popup của `@react-oauth/google`); có `id_token` thì verify, không thì dùng `access_token` gọi userinfo; không có token nào → 401.
    - `fetchUserInfo`: `GET https://www.googleapis.com/oauth2/v3/userinfo` với Bearer access token; yêu cầu có `email`.
-   - Mọi lỗi được đổi thành `UnauthorizedException`.
-3. Upsert user theo `email`:
+   - Mọi lỗi được đổi thành `AppException` HTTP 401 (mã 2210–2212, xem 4.5).
+3. Upsert user theo `email` (user `disabled` → `AUTH_USER_DISABLED 2203` bị chặn ở đây, trước khi cập nhật hồ sơ; hai lần đăng nhập lần đầu đồng thời: bên thua `UQ_users_email` đọc lại user của bên thắng và đi tiếp nhánh cập nhật):
    - Chưa có → tạo với `provider='google'`, `providerId=sub`, `role='user'`, `permissions=DEFAULT_USER_PERMISSIONS`, `status='active'`.
    - Đã có → cập nhật `name`, `image` (giữ giá trị cũ nếu Google trả rỗng), `provider='google'`, `providerId`. Không đổi `role`, `permissions`, `status`.
 4. Ký `accessToken` và `refreshToken`.
@@ -91,18 +91,22 @@ Claim `type` (định nghĩa ở `auth.constant.ts`: `JwtTokenType`, `JwtPayload
 
 **Refresh (`refreshToken`)**: verify bằng `JWT_SECRET`, yêu cầu `payload.type === 'refresh'` (access token hoặc token không có `type` bị từ chối), tìm user theo `sub`, yêu cầu `status === 'active'`, ký access token mới.
 
+Giới hạn tần suất: `POST /api/auth/google` và `POST /api/auth/refresh` bị giới hạn chặt (`RATE_LIMIT_AUTH_PER_MINUTE`, mặc định 10/phút/IP); vượt → 429 / 9201 (xem [common](common.md) 4.3).
+
 ### 4.5 Error code
 
-Module không dùng `throwAppError`. Lỗi trả về là `UnauthorizedException` (HTTP 401) với message:
+Lỗi nghiệp vụ dùng `throwAppError` (HTTP 401, enum `EAuthErrorCode`, tiền tố 22xx):
 
-| Message | Khi nào |
-|---|---|
-| `Invalid Google token` / `Invalid Google token: missing email` | ID token sai hoặc thiếu email |
-| `Failed to exchange authorization code` / `No token received from Google` | Đổi auth code thất bại |
-| `Failed to fetch Google user info` / `Google user info missing email` / `Failed to verify Google access token` | Access token Google không hợp lệ |
-| `User not found` | `GET /me` với user không còn tồn tại |
-| `Invalid access token` | Gọi API bằng refresh token hoặc token không có `type: 'access'` |
-| `User not found or disabled` / `Invalid refresh token` | Refresh hoặc xác thực JWT với user không tồn tại/bị khoá; refresh bằng token không phải refresh token |
+| Code | Tên | Message | Khi nào |
+|---|---|---|---|
+| 2201 | `AUTH_USER_NOT_FOUND` | `User not found` | `GET /me` với user không còn tồn tại |
+| 2203 | `AUTH_USER_DISABLED` | `User account is disabled` | Đăng nhập Google của user `status = 'disabled'` — HTTP **403**, không phát hành token, không cập nhật hồ sơ (spec auth/0002) |
+| 2202 | `AUTH_REFRESH_TOKEN_INVALID` | `Invalid refresh token` | Refresh thất bại vì bất kỳ lý do nào: token hỏng/hết hạn/sai secret, không phải refresh token, user không tồn tại hoặc bị khoá, lỗi DB khi tra user |
+| 2210 | `AUTH_GOOGLE_TOKEN_INVALID` | `Invalid Google token` · `Invalid Google token: missing email` · `Google user info missing email` | ID token sai hoặc thiếu email; userinfo thiếu email |
+| 2211 | `AUTH_GOOGLE_EXCHANGE_FAILED` | `Failed to exchange authorization code` · `No token received from Google` | Đổi auth code thất bại hoặc không trả token nào |
+| 2212 | `AUTH_GOOGLE_VERIFY_FAILED` | `Failed to fetch Google user info` · `Failed to verify Google access token` | Access token Google không hợp lệ |
+
+`JwtStrategy.validate` (xác thực mỗi request) cố ý vẫn ném `UnauthorizedException` thô (HTTP 401, **không có** `errorCode`): `Invalid access token` khi gọi API bằng refresh token hoặc token không có `type: 'access'`; `User not found or disabled` khi user không tồn tại/bị khoá. Nhờ đó 401 của guard phân biệt được với 401 nghiệp vụ (có `errorCode`).
 
 Lỗi permission (9001/9002) do `PermissionsGuard` phát sinh — xem [common](common.md).
 
@@ -117,6 +121,10 @@ Lỗi permission (9001/9002) do `PermissionsGuard` phát sinh — xem [common](c
 `auth.service.spec.ts`:
 - `AuthService tokens`: access/refresh có claim `type` khác nhau; refresh token đổi được access token mới; access token và token cũ không có `type` bị từ chối khi refresh; user bị `disabled` bị từ chối.
 - `JwtStrategy.validate`: nhận access token; từ chối refresh token và payload không có `type`.
+- `AuthService tokens` (tiếp): mọi nguyên nhân refresh thất bại đều trả 401 / 2202 `Invalid refresh token` (access token, token cũ không có `type`, user bị khoá, user không tồn tại, chuỗi rác); `getMe` với user không còn tồn tại → 401 / 2201.
+- `google-auth.service.spec.ts` (Google giả bằng mock `OAuth2Client` và `fetch`): `verifyIdToken` (hợp lệ, thiếu email, lỗi thư viện → 2210), `exchangeAuthCode` (không có token, lỗi thư viện → 2211; lỗi của `id_token` giữ nguyên mã 2210, không bị bọc lại), `fetchUserInfo` (hợp lệ, phản hồi không OK và lỗi mạng → 2212, thiếu email → 2210); mọi lỗi HTTP 401.
+
+- Flow test trên Postgres thật: `test/flows/auth/auth.flow.ts` (batch 20; Google giả ở biên bằng `jest.spyOn(OAuth2Client.prototype, 'verifyIdToken' | 'getToken')` và `jest.spyOn(globalThis, 'fetch')`) — đăng nhập (tạo user lần đầu với role/permission/status mặc định và token đúng hạn 1 ngày/30 ngày, đăng nhập lại cập nhật tên/ảnh/providerId nhưng giữ role/permission/status, tên/ảnh rỗng từ Google không ghi đè, phân loại ID token / mã đổi token / access token, 2210/2211/2212 và không tạo user, validation); refresh (access token mới, không có refresh token mới, 2202 cho mọi nguyên nhân, dừng khi user bị khoá); `me` (hồ sơ, theo dõi đổi permission ngay, 401 không `errorCode` cho refresh token/user bị khoá/đã xoá, 403 / 9001); `permissions` (admin thấy toàn bộ, khách 403 / 9001).
 
 ### 4.8 Lưu ý hiện trạng
 

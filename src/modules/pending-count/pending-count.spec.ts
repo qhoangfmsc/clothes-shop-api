@@ -1,11 +1,11 @@
 import { Permission } from '@common/permissions/permissions.constant';
 import { ValidationPipe } from '@nestjs/common';
-import { AdminOrderQueryDto } from '../order/dtos/admin-order-query.dto';
-import { OrderService } from '../order/order.service';
-import { ORDER_NEEDS_ACTION_SQL } from '../order/order-needs-action.util';
-import { AdminPaymentTransactionQueryDto } from '../payment/dtos/admin-payment-transaction-query.dto';
-import { PaymentService } from '../payment/payment.service';
-import { TRANSACTION_NEEDS_REVIEW_SQL } from '../payment/payment-needs-review.util';
+import { AdminOrderQueryDto } from '../order/query/dtos/admin-order-query.dto';
+import { ORDER_NEEDS_ACTION_SQL } from '../order/query/order-needs-action.util';
+import { OrderQueryService } from '../order/query/order-query.service';
+import { AdminPaymentTransactionQueryDto } from '../payment/transaction/dtos/admin-payment-transaction-query.dto';
+import { TRANSACTION_NEEDS_REVIEW_SQL } from '../payment/transaction/payment-needs-review.util';
+import { PaymentTransactionQueryService } from '../payment/transaction/payment-transaction-query.service';
 import { PendingCountService } from './pending-count.service';
 
 /** Query builder giả ghi lại các điều kiện được thêm vào */
@@ -127,7 +127,7 @@ describe('the list filters and the counts share one condition', () => {
     const listQb = fakeQb();
     const countQb = fakeQb(5);
     const orderRepo: any = { createQueryBuilder: jest.fn().mockReturnValueOnce(listQb).mockReturnValueOnce(countQb) };
-    const service = new OrderService(orderRepo, {} as any, {} as any, {} as any, {} as any, {} as any);
+    const service = new OrderQueryService(orderRepo, {} as any, {} as any);
 
     await service.findAllAdmin({ needsAction: true });
     expect(listQb.wheres.map(([sql]: any) => sql)).toContain(ORDER_NEEDS_ACTION_SQL);
@@ -138,14 +138,14 @@ describe('the list filters and the counts share one condition', () => {
 
   it.each([[undefined], [false]])('orders: needsAction=%s does not filter', async (needsAction) => {
     const qb = fakeQb();
-    const service = new OrderService({ createQueryBuilder: () => qb } as any, {} as any, {} as any, {} as any, {} as any, {} as any);
+    const service = new OrderQueryService({ createQueryBuilder: () => qb } as any, {} as any, {} as any);
     await service.findAllAdmin({ needsAction });
     expect(qb.wheres.map(([sql]: any) => sql)).not.toContain(ORDER_NEEDS_ACTION_SQL);
   });
 
   it('orders: combines with the other filters instead of replacing them', async () => {
     const qb = fakeQb();
-    const service = new OrderService({ createQueryBuilder: () => qb } as any, {} as any, {} as any, {} as any, {} as any, {} as any);
+    const service = new OrderQueryService({ createQueryBuilder: () => qb } as any, {} as any, {} as any);
     await service.findAllAdmin({ needsAction: true, status: 'pending', paymentStatus: 'unpaid', search: 'abc', userId: 'u1' });
     const sqls = qb.wheres.map(([sql]: any) => sql);
     expect(sqls).toEqual(
@@ -158,14 +158,7 @@ describe('the list filters and the counts share one condition', () => {
     const listQb = fakeQb();
     const countQb = fakeQb(2);
     const transactionRepo: any = { createQueryBuilder: jest.fn().mockReturnValueOnce(listQb).mockReturnValueOnce(countQb) };
-    const service = new PaymentService(
-      {} as any,
-      {} as any,
-      {} as any,
-      transactionRepo,
-      {} as any,
-      { getVndPerUsd: async () => 25000 } as any,
-    );
+    const service = new PaymentTransactionQueryService(transactionRepo, { getVndPerUsd: async () => 25000 } as any);
 
     await service.findTransactionsAdmin({ needsReview: true, verificationStatus: 'LATE' });
     expect(listQb.wheres.map(([sql]: any) => sql)).toEqual(
@@ -178,14 +171,7 @@ describe('the list filters and the counts share one condition', () => {
 
   it('transactions: no needsReview → the list is not filtered', async () => {
     const qb = fakeQb();
-    const service = new PaymentService(
-      {} as any,
-      {} as any,
-      {} as any,
-      { createQueryBuilder: () => qb } as any,
-      {} as any,
-      { getVndPerUsd: async () => 25000 } as any,
-    );
+    const service = new PaymentTransactionQueryService({ createQueryBuilder: () => qb } as any, { getVndPerUsd: async () => 25000 } as any);
     await service.findTransactionsAdmin({});
     expect(qb.wheres.map(([sql]: any) => sql)).not.toContain(TRANSACTION_NEEDS_REVIEW_SQL);
   });

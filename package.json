@@ -7,19 +7,31 @@
   "license": "UNLICENSED",
   "scripts": {
     "build": "nest build",
-    "format": "biome format --write ./src",
+    "format": "biome format --write ./src ./test ./tools",
     "dev": "nest start --watch",
     "start": "node dist/src/main.js",
-    "start:prod": "yarn typeorm migration:run -d data-source.ts && node dist/src/main.js",
-    "lint": "biome check ./src",
-    "lint:fix": "biome check --fix ./src",
+    "start:prod": "yarn migration:run && node dist/src/main.js",
+    "lint": "biome check --error-on-warnings ./src ./test ./tools",
+    "lint:fix": "biome check --fix ./src ./test ./tools",
     "typeorm": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js",
     "migration:generate": "bash -c 'yarn typeorm migration:generate src/migrations/$1 -d data-source.ts' --",
     "migration:create": "bash -c 'yarn typeorm migration:create src/migrations/$1' --",
-    "migration:run": "yarn typeorm migration:run -d data-source.ts",
+    "migration:run": "ts-node -r tsconfig-paths/register scripts/migrate.ts",
     "migration:revert": "yarn typeorm migration:revert -d data-source.ts",
     "prepare": "husky",
-    "test": "NODE_OPTIONS='--experimental-vm-modules' jest --forceExit --verbose --passWithNoTests"
+    "test": "NODE_OPTIONS='--experimental-vm-modules' jest --forceExit --verbose --passWithNoTests",
+    "test:db:up": "docker compose --env-file .env.test -f docker-compose.test.yml up -d --wait",
+    "test:db:down": "docker compose --env-file .env.test -f docker-compose.test.yml down",
+    "test:flows": "yarn test:db:up && yarn test:flows:run && yarn test:coverage",
+    "test:flows:run": "jest --config test/jest.flows.config.js --runInBand --forceExit",
+    "test:coverage": "ts-node --transpile-only test/support/coverage-report.ts",
+    "test:coverage:update": "ts-node --transpile-only test/support/coverage-report.ts --update-baseline",
+    "impact": "ts-node --transpile-only tools/impact.ts",
+    "check:docs": "ts-node --transpile-only tools/check-docs.ts",
+    "check:change": "ts-node --transpile-only tools/check-change.ts",
+    "smoke:prod": "bash scripts/smoke-prod.sh",
+    "verify:quick": "npx tsc --noEmit && yarn lint && yarn check:docs && yarn test",
+    "verify": "yarn verify:quick && yarn check:docs --strict && yarn build && yarn test:flows && yarn smoke:prod"
   },
   "dependencies": {
     "@nestjs/cli": "^11.0.0",
@@ -32,11 +44,13 @@
     "@nestjs/schedule": "^6",
     "@nestjs/schematics": "^11.0.0",
     "@nestjs/swagger": "^11.2.4",
+    "@nestjs/throttler": "^6.7.1",
     "@nestjs/typeorm": "^11.0.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.3",
     "google-auth-library": "^10.9.0",
     "helmet": "^8.3.0",
+    "ioredis": "^6.0.0",
     "lodash": "^4.17.21",
     "nanoid": "^3.3.7",
     "passport": "^0.7.0",
@@ -78,6 +92,10 @@
       "ts"
     ],
     "rootDir": "src",
+    "roots": [
+      "<rootDir>",
+      "<rootDir>/../tools"
+    ],
     "testRegex": ".*(\\.|e2e-)spec\\.ts$",
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
@@ -96,5 +114,12 @@
   },
   "lint-staged": {
     "*.ts": "biome check --fix --no-errors-on-unmatched"
+  },
+  "resolutions": {
+    "proxy-addr": "^2.0.8",
+    "body-parser": "^2.4.0",
+    "qs": "^6.16.0",
+    "multer": "2.5.0",
+    "js-yaml": "^4.3.2"
   }
 }

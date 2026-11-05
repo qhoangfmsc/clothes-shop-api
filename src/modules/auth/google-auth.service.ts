@@ -1,6 +1,12 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { AppException, throwAppError } from '@common/exceptions/app.exception';
+import { EAuthErrorCode } from '@common/exceptions/error-codes';
+import { HttpStatus, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { OAuth2Client } from 'google-auth-library';
+
+function unauthorized(code: EAuthErrorCode, message?: string): never {
+  return throwAppError(code, message, HttpStatus.UNAUTHORIZED);
+}
 
 export interface GoogleUserPayload {
   email: string;
@@ -32,8 +38,8 @@ export class GoogleAuthService {
       });
 
       const payload = ticket.getPayload();
-      if (!payload || !payload.email) {
-        throw new UnauthorizedException('Invalid Google token: missing email');
+      if (!payload?.email) {
+        unauthorized(EAuthErrorCode.AUTH_GOOGLE_TOKEN_INVALID, 'Invalid Google token: missing email');
       }
 
       return {
@@ -43,8 +49,8 @@ export class GoogleAuthService {
         sub: payload.sub,
       };
     } catch (error) {
-      if (error instanceof UnauthorizedException) throw error;
-      throw new UnauthorizedException('Invalid Google token');
+      if (error instanceof AppException) throw error;
+      unauthorized(EAuthErrorCode.AUTH_GOOGLE_TOKEN_INVALID);
     }
   }
 
@@ -69,10 +75,10 @@ export class GoogleAuthService {
         return this.fetchUserInfo(tokens.access_token);
       }
 
-      throw new UnauthorizedException('No token received from Google');
+      unauthorized(EAuthErrorCode.AUTH_GOOGLE_EXCHANGE_FAILED, 'No token received from Google');
     } catch (error) {
-      if (error instanceof UnauthorizedException) throw error;
-      throw new UnauthorizedException('Failed to exchange authorization code');
+      if (error instanceof AppException) throw error;
+      unauthorized(EAuthErrorCode.AUTH_GOOGLE_EXCHANGE_FAILED);
     }
   }
 
@@ -86,12 +92,12 @@ export class GoogleAuthService {
       });
 
       if (!res.ok) {
-        throw new UnauthorizedException('Failed to fetch Google user info');
+        unauthorized(EAuthErrorCode.AUTH_GOOGLE_VERIFY_FAILED, 'Failed to fetch Google user info');
       }
 
       const data = await res.json();
       if (!data.email) {
-        throw new UnauthorizedException('Google user info missing email');
+        unauthorized(EAuthErrorCode.AUTH_GOOGLE_TOKEN_INVALID, 'Google user info missing email');
       }
 
       return {
@@ -101,8 +107,8 @@ export class GoogleAuthService {
         sub: data.sub,
       };
     } catch (error) {
-      if (error instanceof UnauthorizedException) throw error;
-      throw new UnauthorizedException('Failed to verify Google access token');
+      if (error instanceof AppException) throw error;
+      unauthorized(EAuthErrorCode.AUTH_GOOGLE_VERIFY_FAILED);
     }
   }
 }

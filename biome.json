@@ -30,7 +30,7 @@
         "useNodejsImportProtocol": "warn"
       },
       "suspicious": {
-        "noExplicitAny": "off"
+        "noExplicitAny": "warn"
       },
       "complexity": {
         "noBannedTypes": "off"
@@ -48,8 +48,14 @@
     }
   },
   "files": {
-    "includes": ["src/**", "!src/migrations"]
+    "includes": ["src/**", "test/**", "tools/**", "scripts/**", "!src/migrations", "!test/coverage-baseline.json"]
   },
+  "overrides": [
+    {
+      "includes": ["**/*.spec.ts", "**/*.test-utils.ts", "test/**"],
+      "linter": { "rules": { "suspicious": { "noExplicitAny": "off" } } }
+    }
+  ],
   "vcs": {
     "enabled": true,
     "clientKind": "git",

@@ -1,0 +1,28 @@
+# Postgres cho flow test, cấu hình đọc từ .env.test. Dữ liệu nằm trong tmpfs nên tắt container là mất.
+services:
+  postgres-test:
+    image: postgres:16-alpine
+    ports:
+      - '${POSTGRES_PORT:-55432}:5432'
+    environment:
+      POSTGRES_USER: ${POSTGRES_USERNAME:-test}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-test}
+      POSTGRES_DB: ${POSTGRES_DATABASE:-clothes_shop_test}
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USERNAME:-test} -d ${POSTGRES_DATABASE:-clothes_shop_test}']
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  # Redis cho flow kho đếm rate limit dùng chung (spec common/0017); chỉ test đó dùng, app flow khác không đặt REDIS_URL
+  redis-test:
+    image: redis:7-alpine
+    ports:
+      - '56379:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 2s
+      timeout: 3s
+      retries: 20

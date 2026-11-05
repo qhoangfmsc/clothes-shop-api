@@ -1,6 +1,6 @@
 # review (`src/modules/review`)
 
-> Cập nhật lần cuối: 2026-10-14
+> Cập nhật lần cuối: 2026-10-25
 
 ## 1. Tổng quan
 
@@ -12,7 +12,7 @@ Module đánh giá sản phẩm: khách đã mua và nhận hàng viết đánh 
 | Route prefix | `/api/reviews` (public + khách), `/api/my-reviews` (khách), `/api/admin/reviews` (admin) |
 | Bảng DB | `reviews`, `review_votes` |
 | Module phụ thuộc | `order` (đọc `Order`, `OrderItem` qua `EntityManager`/QueryBuilder để xác định dòng hàng đã mua); `media` (`MediaService`: upload và xác nhận ảnh đánh giá); ghi `products.rating_average`/`rating_count` qua `EntityManager`; entity tham chiếu `Product`, `User` |
-| Export | `ReviewService` (module [pending-count](pending-count.md) dùng `countAwaitingReply`) |
+| Export | `ReviewModerationQueryService` (module [pending-count](pending-count.md) dùng `countAwaitingReply`) |
 
 ## 2. Mục đích & nghiệp vụ phục vụ
 
@@ -23,11 +23,15 @@ Module đánh giá sản phẩm: khách đã mua và nhận hàng viết đánh 
 
 ## 3. Submodule & chức năng
 
-| Submodule | Controller | Route prefix | Truy cập | Chức năng |
-|---|---|---|---|---|
-| Public + khách | `review.controller.ts` | `/api/reviews` | `GET` public; ghi cần JWT + permission | List đánh giá theo sản phẩm, tổng hợp; upload ảnh, tạo, sửa đánh giá; bấm/bỏ "hữu ích" |
-| Khách | `my-review.controller.ts` | `/api/my-reviews` | JWT + permission | Đánh giá của tôi, dòng hàng chờ đánh giá, các đánh giá tôi đã bấm "hữu ích" |
-| Admin | `admin-review.controller.ts` | `/api/admin/reviews` | JWT + permission | List/chi tiết, ẩn/hiện, đặt/xoá phản hồi của cửa hàng |
+Mỗi nhóm chức năng là một thư mục (cell, quy ước `docs/specs/common/0011`); các cell không import nhau.
+
+| Cell | Thư mục | Controller | Route prefix | Truy cập | Chức năng |
+|---|---|---|---|---|---|
+| Xem công khai | `public/` | `review-public.controller.ts` | `/api/reviews` | `@Public()` | List đánh giá theo sản phẩm, tổng hợp (điểm, phân bố, fit) |
+| Khách viết | `authoring/` | `review-authoring.controller.ts`, `my-review.controller.ts` | `/api/reviews`, `/api/my-reviews` | JWT + permission | Upload ảnh, tạo, sửa đánh giá; đánh giá của tôi, dòng hàng chờ đánh giá |
+| Bình chọn | `vote/` | `review-vote.controller.ts`, `my-review-votes.controller.ts` | `/api/reviews`, `/api/my-reviews` | JWT + permission | Bấm/bỏ "hữu ích", các đánh giá tôi đã bấm |
+| Kiểm duyệt | `moderation/` | `admin-review.controller.ts` | `/api/admin/reviews` | JWT + permission | List/chi tiết, ẩn/hiện, đặt/xoá phản hồi của cửa hàng, `countAwaitingReply` |
+| Dùng chung | `shared/` | — | — | — | Entity `Review`, `ReviewVote`, hằng số, `review-eligibility.util.ts`, `shared/review-view.util.ts`, `review-rating.util.ts` (khoá sản phẩm và tính lại điểm), `review-lookup.util.ts`, `review-sql.constant.ts` |
 
 ## 4. Chi tiết
 
@@ -86,13 +90,13 @@ Luôn chỉ lấy `status = 'PUBLISHED'`; thứ tự phụ `id` ASC để phân 
 | `fit` | | `IsIn(REVIEW_FITS)` |
 | `images` | | mảng string, ≤ 5 phần tử, không trùng, mỗi URL ≤ 1000 ký tự; chỉ nhận URL ảnh do chính user upload ở `POST /api/reviews/images` |
 
-Response HTTP 201 `{ data: <góc nhìn tác giả> }`: phần công khai ở trên cộng `productId`, `orderItemId`, `product: { id, name, slug, image }`, `status`, `moderationNote` (chỉ có giá trị khi `HIDDEN`), `editedAt`, `canEdit`, `editableUntil` (`null` khi hết quyền sửa). Field lạ (vd `status`) bị `ValidationPipe` từ chối.
+Response HTTP 201 `{ data: <góc nhìn tác giả> }`: phần công khai ở trên cộng `productId`, `orderItemId`, `product` (tóm tắt sản phẩm `ProductSummary` của [product](product.md): `{ id, name, slug, image, badge, category: { id, slug, title }, subcategory: { id, slug, label } }`), `status`, `moderationNote` (chỉ có giá trị khi `HIDDEN`), `editedAt`, `canEdit`, `editableUntil` (`null` khi hết quyền sửa). Field lạ (vd `status`) bị `ValidationPipe` từ chối.
 
 **PATCH `/api/reviews/:reviewId`** — `UpdateReviewDto`: `rating`, `title`, `content`, `fit`, `images` đều tuỳ chọn, cùng ràng buộc như create (`images` thay toàn bộ danh sách, `[]` = bỏ hết ảnh); phải gửi ít nhất một field (body rỗng → `400 Nothing to update`). Response `{ data: <góc nhìn tác giả> }`.
 
 **GET `/api/my-reviews`** — `MyReviewQueryDto`: `status` (`IsIn(REVIEW_STATUSES)`), `productId` (≤ 16), `sort` (whitelist `createdAt`, `rating`; mặc định `-createdAt`). Response `paginated(...)` các phần tử góc nhìn tác giả.
 
-**GET `/api/my-reviews/pending`** — `MyPendingReviewQueryDto`: `sort` (whitelist `deliveredAt`; mặc định `-deliveredAt`). Response `paginated(...)`, mỗi phần tử `{ orderItemId, orderId, productId, productName, productImage, size, color, quantity, deliveredAt, reviewDeadline }`.
+**GET `/api/my-reviews/pending`** — `MyPendingReviewQueryDto`: `sort` (whitelist `deliveredAt`; mặc định `-deliveredAt`). Response `paginated(...)`, mỗi phần tử `{ orderItemId, orderId, productId, productName, productImage, product, size, color, quantity, deliveredAt, reviewDeadline }`. `productName`/`productImage` là ảnh chụp lúc đặt; `product` là `ProductSummary` của sản phẩm hiện tại (xem [product](product.md)).
 
 **GET `/api/my-reviews/votes`** — `MyReviewVotesQueryDto` (không phân trang): `productId` bắt buộc, ≤ 16. Response `{ data: string[] }` (id các đánh giá của sản phẩm mà user đã bấm "hữu ích").
 
@@ -112,7 +116,7 @@ Response HTTP 201 `{ data: <góc nhìn tác giả> }`: phần công khai ở tr�
 | `replied` | boolean tuỳ chọn (chỉ `true`/`false`, giá trị khác → 400): `true` = đã có phản hồi của cửa hàng, `false` = chưa có |
 | `sort` | whitelist `createdAt`, `rating`, `helpfulCount`; mặc định `-createdAt` |
 
-Response `paginated(...)`; mỗi phần tử là phần công khai cộng `productId`, `orderItemId`, `userId`, `product { id, name, slug, image }`, `status`, `moderationNote`, `moderatedBy`, `moderatedAt`, `editedAt`, `repliedBy`.
+Response `paginated(...)`; mỗi phần tử là phần công khai cộng `productId`, `orderItemId`, `userId`, `product` (`ProductSummary`, như trên), `status`, `moderationNote`, `moderatedBy`, `moderatedAt`, `editedAt`, `repliedBy`.
 
 **POST `/api/admin/reviews/:reviewId/hide`** — `HideReviewDto`: `note` bắt buộc (trim, not empty, ≤ 500), là lý do ẩn và tác giả thấy. **POST `.../publish`** không có body. **PUT `.../reply`** — `ReplyReviewDto`: `content` bắt buộc (trim, not empty, ≤ 1000). Các endpoint admin trả `{ data: <góc nhìn admin> }` của đánh giá sau khi đổi.
 
@@ -172,7 +176,7 @@ Bảng `review_votes` (entity `ReviewVote extends BaseEntity`): `review_id` (NOT
 
 **Sửa (`update`)** — trong transaction khoá dòng đánh giá (`pessimistic_write`) của user (không có → `REVIEW_NOT_FOUND` 404) → `reviewEditBlock`: `HIDDEN` (đánh giá đã bị ẩn), `ALREADY_EDITED`, `EDIT_WINDOW_EXPIRED` → đều `REVIEW_EDIT_NOT_ALLOWED` kèm message → gộp field gửi lên (`images` được xác nhận như create), đặt `edited_at`; nếu `rating` được gửi thì khoá sản phẩm và tính lại điểm sản phẩm.
 
-**Điểm trên sản phẩm** — `products.rating_average` (làm tròn 1 chữ số, `null` khi chưa có) và `rating_count` được tính lại từ các đánh giá `PUBLISHED` của sản phẩm (`COUNT(*)`, `ROUND(AVG(rating), 1)`) bởi `refreshProductRating` trong cùng transaction với mọi thay đổi làm đổi tập hoặc điểm: tạo, sửa `rating`, ẩn, hiện lại. Trước mỗi lần tính, transaction khoá dòng sản phẩm (`pessimistic_write`), nên các thay đổi đồng thời trên cùng sản phẩm tuần tự và số liệu luôn tính trên dữ liệu đã commit; thứ tự khoá luôn là đánh giá → sản phẩm (create: sản phẩm → đánh giá mới). Vote và phản hồi không đổi điểm.
+**Điểm trên sản phẩm** — `products.rating_average` (làm tròn 1 chữ số, `null` khi chưa có) và `rating_count` được tính lại từ các đánh giá `PUBLISHED` của sản phẩm (`COUNT(*)`, `ROUND(AVG(rating), 1)`) bởi `refreshProductRating` (tính từ `reviews`, ghi qua `setProductRating` của module [product](product.md)) trong cùng transaction với mọi thay đổi làm đổi tập hoặc điểm: tạo, sửa `rating`, ẩn, hiện lại. Trước mỗi lần tính, transaction khoá dòng sản phẩm (`pessimistic_write`), nên các thay đổi đồng thời trên cùng sản phẩm tuần tự và số liệu luôn tính trên dữ liệu đã commit; thứ tự khoá luôn là đánh giá → sản phẩm (create: sản phẩm → đánh giá mới). Vote và phản hồi không đổi điểm.
 
 **Vote (`vote`/`unvote`)** — trong transaction khoá dòng đánh giá (`pessimistic_write`, nên các vote đồng thời tuần tự); đánh giá không có hoặc không `PUBLISHED` → `REVIEW_NOT_FOUND` 404; POST thêm dòng `review_votes` nếu chưa có (lặp lại không đổi gì), DELETE xoá dòng của user; `helpful_count` luôn được đặt lại bằng `COUNT(review_votes)` trong cùng transaction.
 
@@ -196,23 +200,28 @@ Bảng `review_votes` (entity `ReviewVote extends BaseEntity`): `review_id` (NOT
 | 1906 | `REVIEW_INVALID_STATE` | Ẩn đánh giá đã ẩn, hiện đánh giá đang hiển thị |
 | 1907 | `REVIEW_VOTE_OWN` | Vote đánh giá của chính mình |
 | 1908 | `REVIEW_IMAGE_INVALID` | `images` chứa URL không phải ảnh đánh giá do chính user upload |
-
-Ngoài ra, `PATCH` với body rỗng trả `400` thô (`BadRequestException('Nothing to update')`).
+| 1909 | `REVIEW_NOTHING_TO_UPDATE` | `PATCH` với body không có field nào (HTTP 400) |
 
 ### 4.6 Phụ thuộc & cấu hình
 
-- `TypeOrmModule.forFeature([Review, ReviewVote, Order, OrderItem])` và `MediaModule`; `ReviewService` inject `DataSource`, `Repository<Review>` và `MediaService`. Module export `ReviewService`.
-- Hằng số ở `review.constant.ts`: `REVIEW_STATUSES`, `REVIEW_FITS`, `REVIEWABLE_ORDER_STATUSES`, `REVIEWABLE_PAYMENT_STATUSES`, `REVIEW_WINDOW_DAYS = 30`, `REVIEW_EDIT_WINDOW_DAYS = 30`, `REVIEW_MAX_IMAGES = 5`; ảnh đánh giá dùng `REVIEW_IMAGE_MAX_FILE_SIZE` (5 MB) và `REVIEW_UPLOAD_LIMIT_PER_DAY` (30) ở `media.constant.ts`. Cần `SUPABASE_URL`, `SUPABASE_STORAGE_BUCKET`, `SUPABASE_SERVICE_ROLE_KEY` để upload ảnh (xem [media](media.md)).
+- `TypeOrmModule.forFeature([Review, ReviewVote, Order, OrderItem])` và `MediaModule`. Service theo cell: `ReviewPublicQueryService` và `ReviewAuthoringQueryService`, `ReviewModerationQueryService` inject `DataSource`, `Repository<Review>`; `ReviewAuthoringService` inject `DataSource`, `MediaService`, `ReviewAuthoringQueryService`; `ReviewVoteService` inject `DataSource`; `ReviewModerationService` inject `DataSource`, `ReviewModerationQueryService`. Module export `ReviewModerationQueryService`.
+- Hằng số ở `review.constant.ts` (`REVIEWABLE_ORDER_STATUSES: readonly OrderStatus[]`, `REVIEWABLE_PAYMENT_STATUSES: readonly OrderPaymentStatus[]`): `REVIEW_STATUSES`, `REVIEW_FITS`, `REVIEWABLE_ORDER_STATUSES`, `REVIEWABLE_PAYMENT_STATUSES`, `REVIEW_WINDOW_DAYS = 30`, `REVIEW_EDIT_WINDOW_DAYS = 30`, `REVIEW_MAX_IMAGES = 5`; ảnh đánh giá dùng `REVIEW_IMAGE_MAX_FILE_SIZE` (5 MB) và `REVIEW_UPLOAD_LIMIT_PER_DAY` (30) ở `media.constant.ts`. Cần `SUPABASE_URL`, `SUPABASE_STORAGE_BUCKET`, `SUPABASE_SERVICE_ROLE_KEY` để upload ảnh (xem [media](media.md)).
 - Quyền: `REVIEW_CREATE 17000`, `REVIEW_VIEW 17001`, `REVIEW_VOTE 17002` (trong `DEFAULT_USER_PERMISSIONS`); `REVIEW_ADMIN_VIEW 18000`, `REVIEW_ADMIN_MODERATE 18001`, `REVIEW_ADMIN_REPLY 18002` (admin tự có, không nằm trong `DEFAULT_USER_PERMISSIONS`). Migration `AddReviewFeatures` cấp ba quyền khách cho user hiện có `ORDER_CREATE`.
 - Biến môi trường: chỉ các biến Supabase của [media](media.md) cho upload ảnh.
 
 ### 4.7 Test
 
-- `review-eligibility.util.spec.ts` — `computeReviewEligibility` (đơn đã trả/đã giao/đã hoàn tiền, từng trạng thái đơn bị từ chối, thiếu `delivered_at`, biên hạn 30 ngày, sản phẩm đã xoá), `reviewEditBlock` (ẩn, đã sửa, quá hạn, biên hạn sửa), `containsLink`.
-- `review.service.spec.ts` (EntityManager giả trong bộ nhớ) — `create` (snapshot, tên/ảnh mặc định, đơn của người khác/không tồn tại → 404, chưa trả/chưa giao/quá hạn/sản phẩm đã xoá, đã có đánh giá → 409, vi phạm UNIQUE đồng thời → 409, lỗi DB khác được ném lại, từ chối liên kết trước khi chạm DB), `update` (sửa một lần, từ chối lần hai/quá hạn/đã ẩn, đánh giá của người khác → 404, body rỗng, liên kết), vote (đếm một lần dù gửi hai lần, nhiều người, bỏ vote chỉ xoá của mình, vote đánh giá của mình, đánh giá bị ẩn/không có → 404, khoá dòng), ẩn/hiện, đặt/thay/xoá phản hồi, list công khai (điều kiện `PUBLISHED`, filter rating/fit, sort, phân trang, không lộ field nội bộ), tổng hợp (trung bình, phân bố, fit, làm tròn, rỗng) và các DTO (`CreateReviewDto`, `UpdateReviewDto`, `HideReviewDto`).
-- `review.service.spec.ts` (tiếp) — ảnh (lưu URL đã xác nhận, mặc định `[]`, ảnh không phải của user → 1908 và không lưu, sửa thay/xoá ảnh, ảnh sai không tiêu hao lần sửa, `uploadImage` uỷ quyền cho media với `REVIEW` (kiểm tra kích thước ở service chỉ là lớp phòng thủ thứ hai sau `FileInterceptor`), filter `hasImages` ở list công khai/admin, `withImages` của tổng hợp), đồng bộ `products.rating_*` (create khoá sản phẩm trước khi chèn, trung bình tính trên mọi đánh giá `PUBLISHED`, sửa sao mới tính lại, ẩn/hiện, ẩn đánh giá cuối về `null`, vote/phản hồi không đụng sản phẩm, làm tròn half-up khớp Postgres), `countAwaitingReply` cùng điều kiện với list admin, và DTO `images`.
+- `authoring/review-authoring.service.spec.ts` (tiếp) — `findPending` trả `product` tóm tắt cạnh ảnh chụp; `product` trong đánh giá của tôi và danh sách admin có cùng dạng `ProductSummary` kèm `category`/`subcategory`.
+- `shared/review-eligibility.util.spec.ts` — `computeReviewEligibility` (đơn đã trả/đã giao/đã hoàn tiền, từng trạng thái đơn bị từ chối, thiếu `delivered_at`, biên hạn 30 ngày, sản phẩm đã xoá), `reviewEditBlock` (ẩn, đã sửa, quá hạn, biên hạn sửa), `containsLink`.
+- `authoring/review-authoring.service.spec.ts`, `vote/review-vote.service.spec.ts`, `moderation/review-moderation.service.spec.ts`, `public/review-public-query.service.spec.ts` (EntityManager giả trong bộ nhớ ở `shared/review.test-utils.ts`; mỗi cell có helper dựng service riêng) — `create` (snapshot, tên/ảnh mặc định, đơn của người khác/không tồn tại → 404, chưa trả/chưa giao/quá hạn/sản phẩm đã xoá, đã có đánh giá → 409, vi phạm UNIQUE đồng thời → 409, lỗi DB khác được ném lại, từ chối liên kết trước khi chạm DB), `update` (sửa một lần, từ chối lần hai/quá hạn/đã ẩn, đánh giá của người khác → 404, body rỗng, liên kết), vote (đếm một lần dù gửi hai lần, nhiều người, bỏ vote chỉ xoá của mình, vote đánh giá của mình, đánh giá bị ẩn/không có → 404, khoá dòng), ẩn/hiện, đặt/thay/xoá phản hồi, list công khai (điều kiện `PUBLISHED`, filter rating/fit, sort, phân trang, không lộ field nội bộ), tổng hợp (trung bình, phân bố, fit, làm tròn, rỗng) và các DTO (`CreateReviewDto`, `UpdateReviewDto`, `HideReviewDto`).
+- các spec theo cell (tiếp) — ảnh (lưu URL đã xác nhận, mặc định `[]`, ảnh không phải của user → 1908 và không lưu, sửa thay/xoá ảnh, ảnh sai không tiêu hao lần sửa, `uploadImage` uỷ quyền cho media với `REVIEW` (kiểm tra kích thước ở service chỉ là lớp phòng thủ thứ hai sau `FileInterceptor`), filter `hasImages` ở list công khai/admin, `withImages` của tổng hợp), đồng bộ `products.rating_*` (create khoá sản phẩm trước khi chèn, trung bình tính trên mọi đánh giá `PUBLISHED`, sửa sao mới tính lại, ẩn/hiện, ẩn đánh giá cuối về `null`, vote/phản hồi không đụng sản phẩm, làm tròn half-up khớp Postgres), `countAwaitingReply` cùng điều kiện với list admin, và DTO `images`.
+- Flow test trên Postgres thật (`test/flows/review/`; `steps.ts` bật cấu hình storage giả và dựng ảnh `REVIEW` của user; builder `b.review()` dựng đánh giá kiểu seed):
+  - `review.flow.ts` (batch 09) — tạo đánh giá (snapshot tác giả/dòng hàng, tên mặc định `Customer`, đơn `refunded` vẫn đánh giá được, điểm sản phẩm tính lại trên mọi đánh giá `PUBLISHED`, ảnh chỉ của chính user và dựng lại từ storage key → 1908, các lý do 1902 theo thứ tự thanh toán/giao/hạn/sản phẩm đã xoá, 404 cho dòng lạ hoặc của người khác, một đánh giá mỗi dòng và hai request đồng thời → 201 + 409 / 1903, liên kết → 1905, validation từng field); danh sách công khai (chỉ `PUBLISHED`, không lộ field nội bộ, phản hồi, lọc `rating`/`fit`/`hasImages`, sort, phân trang, id lạ → rỗng, tham số sai); tổng hợp (rỗng, loại `HIDDEN`, phân bố, fit, ảnh, làm tròn half-up khớp cột lưu); sửa một lần (đổi từng phần, đóng sau lần đầu, tính lại điểm khi đổi sao, thay/xoá ảnh, lần sửa bị từ chối không tiêu hao lần sửa, quá hạn 30 ngày, bị ẩn, đánh giá của người khác → 404 / 1901, hai lần sửa đồng thời → 200 + 400 / 1904); bỏ "hữu ích" (chỉ phiếu của mình, idempotent, đánh giá ẩn/lạ → 404 / 1901, chờ khoá dòng đánh giá).
+  - `review-customer.flow.ts` (batch 10) — bấm "hữu ích" (đếm lại từ `review_votes`, lặp lại không đổi gì, nhiều người và hai lần của một người cùng lúc, đánh giá của mình → 1907, ẩn/lạ → 404 / 1901); upload ảnh (storage giả bằng `jest.spyOn(globalThis, 'fetch')`: gọi đúng đường dẫn/header, loại ảnh theo magic bytes, dùng URL trả về để đính vào đánh giá, không hiện ở thư viện admin, thiếu file 1602, không phải ảnh 1603, quá 5 MB → 413 không `errorCode`, giới hạn 30 ảnh/24 giờ mỗi user 1607 không tính ảnh cũ hơn 24 giờ hay của user khác, storage lỗi/không với tới 1605, từ chối key 1601, chưa cấu hình 1601 kèm tên biến); `my-reviews` (chỉ của mình kể cả ẩn kèm lý do, lọc, sort, phân trang, tham số sai); `pending` (hạn đánh giá, sắp xếp, loại dòng đã đánh giá/chưa trả/chưa giao/quá hạn/sản phẩm đã xoá/của người khác); `votes` (đúng sản phẩm và đúng người, bỏ vote thì mất khỏi danh sách, thiếu `productId` → 400).
+  - `review-admin.flow.ts` (batch 11–12) — danh sách admin (đủ trạng thái, view admin, lọc `status`/`rating`/`fit`/`hasImages`/`replied`/`product`/`userId`, tìm theo tiêu đề/nội dung/tác giả/tên sản phẩm, sort, phân trang, tham số sai); chi tiết (kể cả đã ẩn, 404 / 1901); ẩn (lý do được trim và tác giả thấy, điểm sản phẩm và danh sách/tổng hợp công khai loại đánh giá đó, ẩn cái cuối đưa điểm về `null`, đã ẩn → 1906, validation, hai lần ẩn đồng thời → 201 + 400, chờ khoá dòng); hiện lại (xoá lý do, giữ phiếu "hữu ích", điểm sản phẩm trở lại, đã hiện → 1906); đặt/thay phản hồi (trim, ai và khi nào, hiển thị công khai, không đổi điểm hay quyền sửa của tác giả, validation); xoá phản hồi (idempotent).
 - `list-query.dto.spec.ts` tự kiểm tra `PublicReviewQueryDto`, `MyReviewQueryDto`, `MyPendingReviewQueryDto`, `AdminReviewQueryDto`; `MyReviewVotesQueryDto` nằm trong `NOT_LIST_DTO_FILES` (không phân trang).
-- Các QueryBuilder của `findMine`, `findPending`, `findAllAdmin`, `findMyVotes` và việc tính lại điểm sản phẩm khi có thao tác đồng thời không được kiểm chứng bằng unit test (bộ test dùng DB giả); chúng đã được chạy thủ công trên PostgreSQL thật (xem 4.8).
+- Các QueryBuilder của `findMine`, `findPending`, `findAllAdmin`, `findMyVotes`, việc tính lại điểm sản phẩm và các thao tác đồng thời không được kiểm chứng bằng unit test (bộ test dùng DB giả); chúng được phủ bởi các flow test ở trên trên PostgreSQL thật.
+- `authoring/review-authoring.service.spec.ts` (`ReviewAuthoringService.update`): body rỗng → 400 / 1909; nội dung chứa liên kết → 400 / 1905.
 
 ### 4.8 Lưu ý hiện trạng
 
@@ -228,4 +237,13 @@ Ngoài ra, `PATCH` với body rỗng trả `400` thô (`BadRequestException('Not
 - `helpful_count` là số đếm được lưu sẵn, đặt lại từ `review_votes` ở mỗi lượt vote/bỏ vote; vote đánh giá đã bị ẩn trả 404 (kể cả bỏ vote). Khi đánh giá được hiện lại, các vote cũ còn nguyên.
 - Xoá sản phẩm xoá luôn đánh giá và vote của nó (CASCADE); xoá đơn/dòng hàng giữ đánh giá và đặt `order_item_id` về NULL; xoá user giữ đánh giá (`user_id` NULL) và xoá vote của user đó.
 - Badge `reviews` của [pending-count](pending-count.md) đếm mọi đánh giá `PUBLISHED` chưa có phản hồi (không phân biệt số sao, không có khái niệm "đã xem"); đánh giá bị ẩn không tính.
-- Migration `AddReviewFeatures` và `AddReviewImagesAndProductRating` đã được chạy thủ công trên PostgreSQL 16 tạm (toàn bộ chuỗi migration trên DB sạch, `down` rồi `up` lại, điền lại điểm cho đánh giá seed) cùng hai kịch bản tích hợp với `ReviewService`, `MediaService`, `ProductService` thật (tạo/vote/sửa/ẩn đồng thời, điểm sản phẩm luôn khớp tính lại từ `reviews`, ảnh chính chủ, giới hạn upload, sort/lọc sản phẩm theo sao với `NULLS LAST`, các CHECK/UNIQUE); các kịch bản này không nằm trong repo.
+- Migration `AddReviewFeatures` và `AddReviewImagesAndProductRating` đã được chạy thủ công trên PostgreSQL 16 tạm (toàn bộ chuỗi migration trên DB sạch, `down` rồi `up` lại, điền lại điểm cho đánh giá seed) cùng hai kịch bản tích hợp với `ReviewService`, `MediaService`, `ProductService` thật (tạo/vote/sửa/ẩn đồng thời, điểm sản phẩm luôn khớp tính lại từ `reviews`, ảnh chính chủ, giới hạn upload, sort/lọc sản phẩm theo sao với `NULLS LAST`, các CHECK/UNIQUE); các kịch bản thủ công này không nằm trong repo (các thao tác đồng thời nay có flow test ở 4.7).
+- `POST /api/reviews/images` ngoài giới hạn nghiệp vụ 30 ảnh/24 giờ còn có giới hạn tần suất theo IP (`RATE_LIMIT_UPLOAD_PER_MINUTE`, mặc định 20/phút); vượt → 429 / 9201.
+
+### 4.9 Thiết kế & pattern
+
+- **Tách đọc/ghi theo use case** (spec [review/0002](../specs/review/0002-split-review-service.md)): `ReviewQueryService` (danh sách công khai, tổng hợp, của tôi, chờ đánh giá, vote của tôi, danh sách và chi tiết admin, `countAwaitingReply`) và `ReviewService` (tạo, sửa, upload ảnh, vote, ẩn/hiện, phản hồi). Mỗi service một lý do đổi; ghi gọi đọc một chiều để trả bản ghi sau khi ghi (`findOneOwn`, `findOneAdmin`).
+- **Presenter thuần dùng chung**: `shared/review-view.util.ts` (`toPublicView`, `toOwnView`, `toAdminView`) cho cả đọc và ghi.
+- **State/khoá**: ghi trong một transaction, thứ tự khoá cố định đánh giá → sản phẩm (`findLocked`), điểm sản phẩm ghi qua `setProductRating` của module product.
+
+Chia cell (spec [review/0003](../specs/review/0003-review-cells.md), quy ước [common/0011](../specs/common/0011-module-cells.md)): `ReviewService` cũ thành `ReviewAuthoringService` (`create`, `update`, `uploadImage`), `ReviewVoteService` (`vote`, `unvote`, `findMyVotes`) và `ReviewModerationService` (`hide`, `publish`, `reply`, `removeReply`); `ReviewQueryService` cũ thành `ReviewPublicQueryService`, `ReviewAuthoringQueryService`, `ReviewModerationQueryService`. Khoá sản phẩm và tính lại điểm dùng chung ở `shared/review-rating.util.ts` (thứ tự khoá đánh giá → sản phẩm giữ nguyên).

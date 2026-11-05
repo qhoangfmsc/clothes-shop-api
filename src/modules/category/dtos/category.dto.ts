@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -76,34 +76,7 @@ export class CreateCategoryDto {
   subcategories?: CreateSubCategoryDto[];
 }
 
-export class UpdateCategoryDto {
-  @ApiPropertyOptional()
-  @IsString()
-  @IsOptional()
-  @MaxLength(255)
-  slug?: string;
-
-  @ApiPropertyOptional()
-  @IsString()
-  @IsOptional()
-  @MaxLength(255)
-  title?: string;
-
-  @ApiPropertyOptional()
-  @IsString()
-  @IsOptional()
-  description?: string;
-
-  @ApiPropertyOptional({
-    example: HERO_IMAGE_EXAMPLE,
-    nullable: true,
-    description: 'Ảnh banner hero cho category, hiển thị ở CategoryGrid',
-  })
-  @IsString()
-  @IsOptional()
-  @MaxLength(500)
-  heroImage?: string | null;
-
+export class UpdateCategoryDto extends PartialType(CreateCategoryDto, { skipNullProperties: false }) {
   @ApiPropertyOptional({
     example: 1,
     minimum: 1,
@@ -113,13 +86,6 @@ export class UpdateCategoryDto {
   @IsOptional()
   @Min(1)
   priority?: number;
-
-  @ApiPropertyOptional({ type: [CreateSubCategoryDto] })
-  @IsArray()
-  @IsOptional()
-  @ValidateNested({ each: true })
-  @Type(() => CreateSubCategoryDto)
-  subcategories?: CreateSubCategoryDto[];
 }
 
 export class ReorderCategoriesDto {

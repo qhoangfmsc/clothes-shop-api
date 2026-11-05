@@ -2,7 +2,7 @@
 
 > **DOOVAN** — Backend API for the fashion e-commerce store.
 
-NestJS backend serving the [clothes-shop](../clothes-shop) Next.js frontend.
+NestJS backend serving the clothes-shop Next.js frontend (separate repository).
 
 ## Quick Start
 

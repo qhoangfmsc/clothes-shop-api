@@ -1,6 +1,6 @@
 # pending-count (`src/modules/pending-count`)
 
-> Cập nhật lần cuối: 2026-10-14
+> Cập nhật lần cuối: 2026-10-25
 
 ## 1. Tổng quan
 
@@ -11,7 +11,7 @@ Module nhỏ trả các con số "việc đang chờ admin xử lý" để hiệ
 | Thư mục | `src/modules/pending-count` |
 | Route prefix | `/api/admin/pending-counts` |
 | Bảng DB | không có (đọc `orders`, `payment_transactions`, `refunds`, `return_requests`, `reviews` qua service của từng module) |
-| Module phụ thuộc | `order` (`OrderService.countNeedsAction`), `payment` (`PaymentService.countNeedsReview`, `RefundService.countRequested`), `return` (`ReturnService.countRequested`), `review` (`ReviewService.countAwaitingReply`) |
+| Module phụ thuộc | `order` (`OrderQueryService.countNeedsAction`), `payment` (`PaymentTransactionQueryService.countNeedsReview`), `refund` (`RefundQueryService.countRequested`), `return` (`ReturnProcessingQueryService.countRequested`), `review` (`ReviewModerationQueryService.countAwaitingReply`) |
 | Export | không |
 
 ## 2. Mục đích & nghiệp vụ phục vụ
@@ -61,11 +61,11 @@ Không có bảng riêng. Các COUNT dùng index sẵn có: `IDX_orders_status`,
 
 1. `PendingCountService.get(user)` xác định quyền của người gọi và lập danh sách COUNT được phép chạy.
 2. Các COUNT chạy song song (`Promise.all`), mỗi COUNT do service của module sở hữu dữ liệu thực hiện:
-   - `OrderService.countNeedsAction()` và `findAllAdmin({ needsAction })` cùng dùng `ORDER_NEEDS_ACTION_SQL` (`order-needs-action.util.ts`, alias `o`).
-   - `PaymentService.countNeedsReview()` và `findTransactionsAdmin({ needsReview })` cùng dùng `TRANSACTION_NEEDS_REVIEW_SQL` (`payment-needs-review.util.ts`, alias `t`, `a`, `o`).
-   - `RefundService.countRequested()` đếm `status = REQUESTED`, cùng điều kiện với `findAdmin({ status: 'REQUESTED' })`.
-   - `ReturnService.countRequested()` đếm `status = REQUESTED`, cùng điều kiện với `findAllAdmin({ status: 'REQUESTED' })`.
-   - `ReviewService.countAwaitingReply()` đếm `status = PUBLISHED` và `reply IS NULL`, cùng điều kiện với `findAllAdmin({ status: 'PUBLISHED', replied: false })`.
+   - `OrderQueryService.countNeedsAction()` và `findAllAdmin({ needsAction })` cùng dùng `ORDER_NEEDS_ACTION_SQL` (`order-needs-action.util.ts`, alias `o`).
+   - `PaymentTransactionQueryService.countNeedsReview()` và `findTransactionsAdmin({ needsReview })` cùng dùng `TRANSACTION_NEEDS_REVIEW_SQL` (`payment/transaction/payment-needs-review.util.ts`, alias `t`, `a`, `o`).
+   - `RefundQueryService.countRequested()` đếm `status = REQUESTED`, cùng điều kiện với `findAdmin({ status: 'REQUESTED' })`.
+   - `ReturnProcessingQueryService.countRequested()` đếm `status = REQUESTED`, cùng điều kiện với `findAllAdmin({ status: 'REQUESTED' })`.
+   - `ReviewModerationQueryService.countAwaitingReply()` đếm `status = PUBLISHED` và `reply IS NULL`, cùng điều kiện với `findAllAdmin({ status: 'PUBLISHED', replied: false })`.
 3. Trả `{ data }` gồm đúng các key đã chạy.
 
 Đơn `pending` chưa thanh toán được tính là "khách đang chuyển khoản" (không đếm) chỉ khi phiên QR còn hạn theo `expires_at`; đơn tự quay lại số đếm ngay khi quá hạn, không cần chờ bộ đếm giờ đổi phiên sang `EXPIRED`.
@@ -76,11 +76,11 @@ Không có mã riêng. `401` (thiếu/sai JWT) và `403` `PERMISSION_DENIED (900
 
 ### 4.6 Phụ thuộc & cấu hình
 
-`PendingCountModule` import `OrderModule`, `PaymentModule`, `ReturnModule`, `ReviewModule` (các module này export `OrderService`, `PaymentService`/`RefundService`, `ReturnService`, `ReviewService`). Không có biến môi trường.
+`PendingCountModule` import `OrderModule`, `PaymentModule`, `RefundModule`, `ReturnModule`, `ReviewModule` (các module này export `OrderQueryService`, `PaymentTransactionQueryService`, `RefundQueryService`, `ReturnProcessingQueryService`, `ReviewModerationQueryService`). Không có biến môi trường.
 
 ### 4.7 Test
 
-`pending-count.spec.ts` — quyền quyết định key nào có và COUNT nào chạy (admin, đủ quyền, chỉ một quyền kể cả chỉ `REVIEW_ADMIN_VIEW`, không quyền, số `0` khác với thiếu key), các COUNT chạy song song, bộ lọc danh sách và COUNT dùng đúng cùng điều kiện SQL (đơn và giao dịch; kết hợp với bộ lọc khác; `false`/bỏ trống không lọc), nội dung các điều kiện SQL, và parse boolean của query (`true`/`false`, giá trị khác bị từ chối, giữ mặc định phân trang). Việc khớp số với danh sách trên Postgres thật (mọi tình huống tạo/xử lý/huỷ) không có test tự động trong repo.
+`pending-count.spec.ts` — quyền quyết định key nào có và COUNT nào chạy (admin, đủ quyền, chỉ một quyền kể cả chỉ `REVIEW_ADMIN_VIEW`, không quyền, số `0` khác với thiếu key), các COUNT chạy song song, bộ lọc danh sách và COUNT dùng đúng cùng điều kiện SQL (đơn và giao dịch; kết hợp với bộ lọc khác; `false`/bỏ trống không lọc), nội dung các điều kiện SQL, và parse boolean của query (`true`/`false`, giá trị khác bị từ chối, giữ mặc định phân trang). Flow test trên Postgres thật: `test/flows/pending-count/pending-count.flow.ts` (batch 24) — shop không có việc gì thì cả năm key bằng `0`; dựng việc ở mỗi nhóm (đơn `pending` chưa có QR và đơn đã trả đang `confirmed` được đếm, đơn có QR còn hạn/đã giao/đã huỷ thì không; giao dịch không khớp phiên nào; khoản hoàn `REQUESTED` sau khi huỷ đơn đã trả; yêu cầu trả hàng `REQUESTED` nhưng không tính `APPROVED`; đánh giá hiển thị chưa phản hồi nhưng không tính đã phản hồi hay đã ẩn) và mỗi số bằng `total` của danh sách mà nó trỏ tới; số giảm khi phản hồi đánh giá, từ chối yêu cầu trả hàng, hoàn tất khoản hoàn; người không phải admin chỉ thấy key theo quyền (`0` khác với thiếu key); khách không có quyền nào → 403 / 9001.
 
 ### 4.8 Lưu ý hiện trạng
 

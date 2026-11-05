@@ -27,7 +27,7 @@ Module tiền tệ: tiền gốc của toàn hệ thống là **VND** (số nguy
 | Tỷ giá | `exchange-rate-config.ts` | Kiểu, giá trị mặc định, parse/validate giá trị `EXCHANGE_RATE` |
 | Dịch vụ | `currency.service.ts` | `getVndPerUsd()`, `toUsd(vnd)` |
 | Helper | `src/common/utils/money.util.ts` | `vndToUsd`, `money`, `moneyOrNull`, `MAX_MONEY_VND` |
-| Presenter | `product/product.presenter.ts`, `order/order.presenter.ts`, `payment/payment.presenter.ts` | Đổi field tiền của entity thành cặp `...Vnd`/`...Usd` |
+| Presenter | `product/shared/product.presenter.ts`, `order/shared/order.presenter.ts`, `payment/shared/payment.presenter.ts` | Đổi field tiền của entity thành cặp `...Vnd`/`...Usd` |
 
 ## 4. Chi tiết
 
@@ -94,8 +94,9 @@ Giá trị `EXCHANGE_RATE` (cột `site_configs.value`, chuỗi JSON):
 
 - `currency.service.spec.ts` — `getVndPerUsd` (đọc dòng mỗi lần, fallback khi thiếu dòng/JSON hỏng/sai cấu trúc), `toUsd`, `parseExchangeRateConfig`, `validateExchangeRateConfigValue` (lỗi 1503).
 - `src/common/utils/money.util.spec.ts` — `vndToUsd` (làm tròn 2 chữ số, nhận chuỗi số), `money`, `moneyOrNull`.
-- `product/product.presenter.spec.ts`, `order/order.presenter.spec.ts` — đổi field tiền, tỷ giá chốt trên đơn.
+- `product/shared/product.presenter.spec.ts`, `order/shared/order.presenter.spec.ts` — đổi field tiền, tỷ giá chốt trên đơn.
 - `site-config/site-config.service.spec.ts` — lưu và từ chối `EXCHANGE_RATE`.
+- Flow test trên Postgres thật (module không có route riêng nên được phủ qua các luồng dùng nó): `test/flows/site-config/site-config.flow.ts` (đặt `EXCHANGE_RATE` hợp lệ/sai → 1503, tỷ giá mới có hiệu lực ngay ở mọi số USD của sản phẩm, xoá dòng thì về 25.000), `test/flows/shipping/shipping.flow.ts` (USD của phí ship và ngưỡng theo tỷ giá hiện tại), `test/flows/order/order-checkout.flow.ts` và `order-payment/*` (tỷ giá chốt trên đơn, USD của đơn/thanh toán/hoàn tiền không đổi khi admin đổi tỷ giá).
 
 ### 4.8 Lưu ý hiện trạng
 

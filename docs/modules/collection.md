@@ -1,6 +1,6 @@
 # collection (`src/modules/collection`)
 
-> Cập nhật lần cuối: 2026-10-16
+> Cập nhật lần cuối: 2026-10-23
 
 ## 1. Tổng quan
 
@@ -46,7 +46,7 @@ Module bộ sưu tập: nhóm các sản phẩm theo chủ đề/mùa (ví dụ 
 | `search` | ≤ 255; `ILIKE` trên `name`, `slug` |
 | `sort` | whitelist `name`, `createdAt`; mặc định `-createdAt` |
 
-Response list `paginated(...)`: mỗi phần tử là entity `Collection` kèm mảng `products` (không kèm category/subcategory của sản phẩm). Mọi sản phẩm trong response collection (public, admin, create/update) có dạng sản phẩm của [product](product.md): `priceVnd`, `priceUsd`, `originalPriceVnd`, `originalPriceUsd`, USD theo tỷ giá hiện tại.
+Response list `paginated(...)`: mỗi phần tử là entity `Collection` kèm mảng `products`. Mọi sản phẩm trong response collection (public, admin, create/update) có dạng sản phẩm của [product](product.md): `priceVnd`, `priceUsd`, `originalPriceVnd`, `originalPriceUsd`, USD theo tỷ giá hiện tại, kèm `category` và `subcategory` (public list/detail, admin list, create, update cùng một hình dạng; `products` luôn nạp `products.category`, `products.subcategory`).
 
 **GET `/api/admin/collections`** — `AdminCollectionQueryDto`: `search` (≤ 255; `ILIKE` trên `slug`, `name`), `season` (string ≤ 100, lọc bằng so sánh bằng), `sort` (whitelist `name`, `createdAt`; mặc định `-createdAt`). Phần tử kèm `products`.
 
@@ -101,7 +101,7 @@ Bảng nối `collection_products` (`@ManyToMany` + `@JoinTable`): `collection_i
 
 | Code | Tên | Khi nào |
 |---|---|---|
-| 1202 | `COLLECTION_SLUG_DUPLICATE` | Slug đã tồn tại |
+| 1202 | `COLLECTION_SLUG_DUPLICATE` | Slug đã tồn tại, kể cả khi hai request đồng thời cùng slug (`UQ_collections_slug` được ánh xạ) |
 | 1203 | `COLLECTION_PRODUCT_NOT_FOUND` | Có `productIds` không tồn tại |
 | 1201 | `COLLECTION_NOT_FOUND` | Bộ sưu tập không tồn tại (`findBySlug`, `update`, `delete`) — HTTP 404 |
 
@@ -112,9 +112,13 @@ Bảng nối `collection_products` (`@ManyToMany` + `@JoinTable`): `collection_i
 
 ### 4.7 Test
 
-Chưa có spec riêng. `PublicCollectionQueryDto` và `AdminCollectionQueryDto` được `list-query.dto.spec.ts` kiểm tra tự động.
+`collection.service.spec.ts` — public list/detail, admin list, create, update đều nạp `products` kèm `category` và `subcategory`. `PublicCollectionQueryDto` và `AdminCollectionQueryDto` được `list-query.dto.spec.ts` kiểm tra tự động.
+
+Flow test trên Postgres thật: `test/flows/collection/collection.flow.ts` (batch 17) — danh sách công khai (mới nhất trước, sản phẩm đúng hình dạng chuẩn với `Vnd`/`Usd`, tìm theo tên/slug, sort, phân trang tính trên collection chứ không trên dòng sản phẩm, tra theo `slug` bỏ qua tham số list, 404 / 1201, `season` bị từ chối ở public); danh sách admin (lọc `season` khớp chính xác, tìm theo slug/tên, sort, phân trang); tạo (mặc định, 1202, 1203 kèm id thiếu, validation); sửa (từng phần, thay hẳn danh sách sản phẩm và xoá bằng `[]`, nhận lại slug của chính mình, 1202, 1203 giữ nguyên dữ liệu cũ, 404); xoá (xoá bảng nối, giữ sản phẩm và collection khác, 404).
 
 ### 4.8 Lưu ý hiện trạng
+
+- `PATCH` dùng `Update*Dto = PartialType(Create*Dto, { skipNullProperties: false })`: mọi ràng buộc của create được kế thừa (chuỗi rỗng ở field bắt buộc → 400), `null` ở field bắt buộc → 400, `null` ở field tuỳ chọn được coi như không gửi (trừ không có field nào như vậy). Response là bản ghi đầy đủ, không thiếu field chưa gửi (xem [common](common.md) 4.13).
 
 - Public chi tiết (`?slug=`) và public list trả mọi sản phẩm của bộ sưu tập, không lọc theo `status` của sản phẩm.
 - `resolveProducts` giữ thứ tự theo `productIds` ở bộ nhớ khi trả về, nhưng bảng nối không lưu thứ tự nên thứ tự đọc lại từ DB không được đảm bảo.

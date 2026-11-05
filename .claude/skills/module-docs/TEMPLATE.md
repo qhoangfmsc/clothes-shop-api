@@ -67,3 +67,11 @@ Với từng endpoint cần nói rõ: query/body (field, kiểu, ràng buộc), 
 ### 4.8 Lưu ý hiện trạng
 
 <Hành vi đặc biệt / điểm lệch chuẩn đang tồn tại trong code. Chỉ nêu sự thật, không đề xuất kế hoạch.>
+
+### 4.9 Thiết kế & pattern
+
+<Pattern và ranh giới đang dùng trong module, mỗi dòng một ý: pattern/nguyên lý → chỗ dùng → vì sao. Spec liên quan: `docs/specs/<module>/NNNN-slug.md`. Chỉ ghi cái đã có trong code; ghi "không dùng pattern đặc biệt" nếu đúng như vậy.>
+
+| Pattern / nguyên lý | Chỗ dùng | Vì sao |
+|---|---|---|
+| ... | ... | ... |

@@ -1,14 +1,14 @@
 import { Public } from '@common/decorator/public.decorator';
 import { Controller, Get, Query } from '@nestjs/common';
 import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
-import { CategoryService } from './category.service';
+import { CategoryQueryService } from './category-query.service';
 import { PublicCategoryQueryDto } from './dtos/public-category-query.dto';
 
 @ApiTags('Categories')
 @Controller('api/categories')
 @Public()
 export class CategoryController {
-  constructor(private readonly categoryService: CategoryService) {}
+  constructor(private readonly categoryService: CategoryQueryService) {}
 
   @Get()
   @ApiOperation({ summary: 'List all categories with search, pagination, or get one by slug' })

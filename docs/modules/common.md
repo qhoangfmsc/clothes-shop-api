@@ -1,6 +1,6 @@
 # common & core (`src/common`, `src/core`, `src/main*.ts`, `src/migrations`)
 
-> Cập nhật lần cuối: 2026-10-17
+> Cập nhật lần cuối: 2026-10-25
 
 ## 1. Tổng quan
 
@@ -8,7 +8,7 @@ Phần hạ tầng dùng chung cho mọi module: bootstrap ứng dụng, guard x
 
 | Mục | Giá trị |
 |---|---|
-| Thư mục | `src/common`, `src/core`, `src/main.ts`, `src/main.module.ts`, `src/main.controller.ts`, `src/migrations`, `data-source.ts` |
+| Thư mục | `src/common`, `src/core`, `src/main.ts`, `src/main.module.ts`, `src/main.controller.ts`, `src/migrations`, `data-source.ts`, `test/` (hạ tầng flow test), `docker-compose.test.yml` |
 | Route prefix | `/` , `/health` (`MainController`), `/api-docs` (Swagger) |
 | Bảng DB | `typeorm_migrations` (bảng theo dõi migration); các bảng nghiệp vụ thuộc module tương ứng |
 | Path alias | `@common/*` → `src/common/*`, `@core/*` → `src/core/*`, `@/*` → `src/modules/*` |
@@ -25,25 +25,28 @@ Phần hạ tầng dùng chung cho mọi module: bootstrap ứng dụng, guard x
 
 | Submodule | Vị trí | Chức năng |
 |---|---|---|
-| Bootstrap | `src/main.ts`, `src/main.module.ts` | Tạo app, middleware, pipe, filter, Swagger, đăng ký module và guard toàn cục |
+| Bootstrap | `src/main.ts`, `src/core/app.setup.ts`, `src/main.module.ts` | Tạo app, middleware, Swagger, đăng ký module và guard toàn cục; `configureApp` gom body parser, ValidationPipe, filter dùng chung với flow test |
+| Flow test | `test/`, `docker-compose.test.yml` | Hạ tầng test luồng chính trên Postgres thật (xem 4.12 và `test/README.md`) |
 | Health | `src/main.controller.ts` | `GET /` và `GET /health` (public) |
 | CoreModule | `src/core/core.module.ts` | `ConfigModule` toàn cục + kết nối TypeORM + log thống kê bảng khi khởi động |
 | Swagger | `src/core/swagger/swagger.config.ts` | Tài liệu API tại `/api-docs` |
 | Guards | `src/common/guards` | `JwtAuthGuard`, `PermissionsGuard` |
 | Decorators | `src/common/decorator` | `@Public`, `@Permissions`, `@CurrentUser`, `@SortField`, `@SearchField`, `@ApiEndpoint` |
-| Base | `src/common/base` | `BaseEntity`, `pagination.util`, `sort.util`, `typeorm-list-query.util`, `base.interface` |
+| Base | `src/common/base` | `BaseEntity`, `pagination.util`, `sort.util`, `typeorm-list-query.util` (kèm lớp `Paging<T>`), `column-transformers` |
 | DTO chung | `src/common/dto` | `PaginationQueryDto` + spec guard cho mọi query DTO |
 | Exceptions | `src/common/exceptions` | `AppException`, `throwAppError`, `error-codes.ts` |
 | Filter | `src/common/filter/exception.filter.ts` | `AllExceptionFilter` |
-| Middleware | `src/common/middleware/request-id.middleware.ts` | Gắn `x-request-id` |
+| Middleware | `src/common/middleware/request-id.middleware.ts`, `request-log.middleware.ts` | Gắn `x-request-id`; ghi một dòng log mỗi request khi xong (spec 0018) |
 | Permissions | `src/common/permissions/permissions.constant.ts` | Enum `Permission`, `DEFAULT_USER_PERMISSIONS` |
 | Constants | `src/common/constants/enum-values.constant.ts` | Enum dùng chung giữa DTO |
-| Utils / Validator | `src/common/utils`, `src/common/validator` | Helper nhỏ, validator hỗ trợ filter operator |
+| Utils | `src/common/utils` | `money.util` (tiền VND/USD) |
 | Migrations | `src/migrations`, `data-source.ts` | Lịch sử schema |
 
 ## 4. Chi tiết
 
-### 4.1 Bootstrap (`src/main.ts`)
+### 4.1 Bootstrap (`src/main.ts`, `src/core/app.setup.ts`)
+
+`main.ts` tạo app, bật CORS, `helmet`, `RequestIdMiddleware`, rồi gọi `configureApp(app)` (`src/core/app.setup.ts`) cho phần body parser + `ValidationPipe` + `AllExceptionFilter`; flow test gọi cùng `configureApp` nên chạy đúng pipeline production.
 
 | Thành phần | Giá trị |
 |---|---|
@@ -51,20 +54,22 @@ Phần hạ tầng dùng chung cho mọi module: bootstrap ứng dụng, guard x
 | CORS | origin = `CORS_ORIGINS` (phân tách bằng dấu phẩy) hoặc `http://localhost:3000`; `credentials: true`; methods `GET, POST, PUT, PATCH, DELETE, OPTIONS`; headers `Content-Type, Authorization, X-Requested-With` |
 | Bảo mật header | `helmet()` |
 | Request id | `RequestIdMiddleware`: dùng `x-request-id` của request hoặc sinh `randomUUID()`, trả lại trong header response |
+| Log (spec 0018) | Production (`NODE_ENV=production`): `ConsoleLogger({ json: true })` mức `log/warn/error`, mỗi sự kiện một dòng JSON; dev: text, đủ mức. `RequestLogMiddleware` (đăng ký trong `main.ts`, không có trong flow test) ghi khi response `finish` một đối tượng `{ event: 'request', requestId, method, path (không query), route, status, durationMs, ip, userId }`; mức theo status (2xx/3xx `log`, 4xx `warn`, 5xx `error`); bỏ qua `GET /` và `GET /health`. Không bao giờ ghi body, header hay query. `AllExceptionFilter` ghi lỗi 5xx (một lần, kèm stack) và vi phạm ràng buộc DB kèm `requestId=` để nối với dòng request; `requestId` không đưa vào body response |
 | Body | JSON và urlencoded giới hạn `5mb`. Parser JSON có `verify` giữ bytes gốc vào `req.rawBody` cho request có đường dẫn bắt đầu `/api/webhooks/` (webhook ký trên raw body; xem [payment](payment.md)) |
 | ValidationPipe toàn cục | `transform: true`, `whitelist: true`, `forbidNonWhitelisted: true` (field lạ bị từ chối) |
+| Cờ compiler cho DTO | `tsconfig.json`: `useDefineForClassFields: false` — với `target: esnext` mặc định `true` làm mọi field khai báo thành thuộc tính `undefined` ngay khi `new Dto()`, nên `Object.assign(entity, dto)` ghi `undefined` lên entity (response thiếu field, `sku` sinh sai); `exposeUnsetFields: false` không sửa được (khoá sinh từ khai báo, không từ body) |
 | Exception filter | `AllExceptionFilter` |
 | Shutdown hooks | bật |
 | Swagger | `/api-docs`, title "Clothes Shop API", `persistAuthorization`, `docExpansion: none`; tag mô tả: Products, Categories, Collections, Reviews, Shipping, Size Guides |
 
-`MainModule` import: `CoreModule`, `AuthModule`, `UserModule`, `ProductModule`, `CategoryModule`, `CollectionModule`, `ReviewModule`, `ShippingModule`, `SizeGuideModule`, `SiteConfigModule`, `MediaModule`, `AddressModule`, `WishlistModule`, `CartModule`, `OrderModule`, `PaymentModule`. Hai `APP_GUARD` theo thứ tự: `JwtAuthGuard` → `PermissionsGuard`.
+`MainModule` import: `CoreModule`, `AuthModule`, `UserModule`, `ProductModule`, `CategoryModule`, `CollectionModule`, `ReviewModule`, `CurrencyModule`, `ShippingModule`, `SizeGuideModule`, `SiteConfigModule`, `MediaModule`, `AddressModule`, `WishlistModule`, `CartModule`, `OrderModule`, `PaymentModule`, `ReturnModule`, `PendingCountModule`. Hai `APP_GUARD` theo thứ tự: `JwtAuthGuard` → `PermissionsGuard`.
 
 `MainController` (`@Public`, ẩn khỏi Swagger):
 
 | Method | Path | Response |
 |---|---|---|
 | GET | `/` | chuỗi `Clothes Shop API is running` |
-| GET | `/health` | `{ status: 'ok', timestamp, uptime, db: 'connected' }`; lỗi DB: `{ status: 'error', timestamp, db: 'disconnected' }` (sau khi chạy `SELECT 1`) |
+| GET | `/health` | `{ status: 'ok', timestamp, uptime, db: 'connected', commit }` (`commit` = `RENDER_GIT_COMMIT` hoặc `null`; kiểm tra sau deploy dùng nó); lỗi DB: `{ status: 'error', timestamp, db: 'disconnected' }` (sau khi chạy `SELECT 1`; cả hai trường hợp đều HTTP 200). Flow test: `test/flows/health/health.flow.ts` |
 
 ### 4.2 Cấu hình DB & CoreModule
 
@@ -72,7 +77,7 @@ Phần hạ tầng dùng chung cho mọi module: bootstrap ứng dụng, guard x
 - Biến môi trường đọc ở đây: `POSTGRES_HOST` (mặc định `127.0.0.1`), `POSTGRES_PORT` (`5432`), `POSTGRES_USERNAME` (`pguser`), `POSTGRES_PASSWORD` (rỗng), `POSTGRES_DATABASE` (`clothes-shop`).
 - `onModuleInit` log danh sách bảng schema `public` kèm số dòng; cảnh báo nếu chưa có bảng nào (chưa chạy migration).
 - `data-source.ts` (cho TypeORM CLI): cùng biến POSTGRES_*, `entities: src/**/*.entity.ts`, `migrations: src/migrations/*.ts`, bảng theo dõi `typeorm_migrations`.
-- `yarn start:prod` chạy `typeorm migration:run -d data-source.ts` rồi `node dist/src/main.js`.
+- `yarn start:prod` chạy `yarn migration:run` (= `scripts/migrate.ts`, migration có khoá advisory) rồi `node dist/src/main.js`.
 
 ### 4.3 Xác thực & phân quyền
 
@@ -93,6 +98,8 @@ Decorators:
 | `@Permissions(...codes)` | Đặt metadata `permissions` |
 | `@CurrentUser(field?)` | Lấy `request.user` (entity `User` do `JwtStrategy.validate` trả về) hoặc 1 field của nó |
 | `@ApiEndpoint(summary, { method, auth })` | Gộp `ApiOperation` + `ApiOk/CreatedResponse` (+ `ApiBearerAuth`); hiện chưa module nào dùng |
+
+**Rate limit** (`RateLimitGuard`, spec common/0010): `APP_GUARD` **đầu tiên**, trước `JwtAuthGuard`, nên request chưa xác thực cũng bị đếm. Mỗi cặp (route, IP) có một bộ đếm trong cửa sổ 60 giây (spec 0017: nếu đặt `REDIS_URL` thì kho Redis dùng chung giữa các instance — cửa sổ cố định, INCR + PEXPIRE nguyên tử qua Lua, `common/utils/rate-limit.storage.ts`; Redis lỗi thì đếm tạm in-memory theo từng instance, cảnh báo tối đa 1 lần/phút, API không lỗi; không đặt `REDIS_URL` thì kho in-memory của `@nestjs/throttler`, mỗi instance đếm riêng). Mặc định 120 request/phút; `@RateLimit('auth')` (10/phút) cho `POST /api/auth/google` và `/api/auth/refresh`; `@RateLimit('upload')` (20/phút) cho `POST /api/admin/media` và `POST /api/reviews/images`; `@SkipRateLimit()` cho `POST /api/webhooks/sepay`, `GET /`, `GET /health`. Vượt giới hạn → HTTP 429, `errorCode 9201`, header `Retry-After`, không chạm DB. IP lấy từ `req.ip` với `trust proxy = TRUST_PROXY`: sau Render phải ≥ 1, nếu không mọi client chung một bộ đếm; không có proxy thì phải là 0, nếu không client giả `X-Forwarded-For` để né giới hạn.
 
 ### 4.4 Permission (`Permission` enum)
 
@@ -142,15 +149,14 @@ Enum dùng chung (`@common/constants/enum-values.constant`):
 
 | Hằng | Giá trị |
 |---|---|
-| `ACTIVE_STATUSES` | `active`, `disabled` |
+| `ACTIVE_STATUSES` (kiểu `ActiveStatus`) | `active`, `disabled` — cột `status` của `products`, `users` |
 | `USER_ROLES` | `user`, `admin` |
-| `ORDER_PAYMENT_STATUSES` | `unpaid`, `paid`, `refunded` (`orders.payment_status`) |
+| `ORDER_PAYMENT_STATUSES` (kiểu `OrderPaymentStatus`) | `unpaid`, `paid`, `refunded` (`orders.payment_status`) |
+| `ORDER_STATUSES` (kiểu `OrderStatus`) | `pending`, `confirmed`, `shipping`, `delivered`, `completed`, `cancelled` (`orders.status`) |
 | `PRODUCT_BADGES` | `new`, `sale`, `bestseller`, `sold_out`, `limited`, `custom_order` |
 | `NON_ORDERABLE_BADGES` | `sold_out`, `custom_order` (không cho thêm vào giỏ / checkout) |
 
-`ORDER_STATUSES` khai báo ở `src/modules/order/dtos/admin-order.dto.ts` (xem module order).
-
-`base.interface.ts`: kiểu `DeepPartial`, `AsTypeSort`, `BaseListProps`, lớp `Paging<T>`, `BadRequestErrorResponse` (schema Swagger).
+Entity dùng đúng các type này cho cột trạng thái (`Order.status: OrderStatus`, `Order.paymentStatus: OrderPaymentStatus`, `Product.status`/`User.status: ActiveStatus`); luật "cột `status` không khai báo `string`" được ép bởi `architecture.spec.ts`. Bảng chuyển trạng thái của đơn: `ORDER_TRANSITIONS` ở `order/shared/order.constant.ts`.
 
 ### 4.6 Error code & xử lý lỗi
 
@@ -161,20 +167,26 @@ Format `[MM][EE]` (4 chữ số). `throwAppError(errorCode, message?, statusCode
 | 10xx | Product | `EProductErrorCode` | 1001–1005, 1009 |
 | 11xx | Category | `ECategoryErrorCode` | 1101–1108 |
 | 12xx | Collection | `ECollectionErrorCode` | 1201–1203 |
-| 13xx | Order | `EOrderErrorCode` | 1301–1307 |
+| 13xx | Order | `EOrderErrorCode` | 1301–1312 |
 | 14xx | User | `EUserErrorCode` | 1401–1402 |
 | 15xx | Site config | `ESiteConfigErrorCode` | 1501–1503 |
 | 16xx | Media | `EMediaErrorCode` | 1601–1607 |
 | 17xx | Payment | `EPaymentErrorCode` | 1701–1714 |
 | 18xx | Return | `EReturnErrorCode` | 1801–1805 |
-| 19xx | Review | `EReviewErrorCode` | 1901–1908 |
+| 19xx | Review | `EReviewErrorCode` | 1901–1909 |
+| 20xx | Cart | `ECartErrorCode` | 2001–2004 |
+| 21xx | Address | `EAddressErrorCode` | 2101 |
+| 22xx | Auth | `EAuthErrorCode` | 2201–2203, 2210–2212 |
 | 90xx | Permission | `EPermissionErrorCode` | 9001 `PERMISSION_DENIED`, 9002 `NO_PERMISSION_DEFINED` |
+| 92xx | Rate limit | `ERateLimitErrorCode` | 9201 `RATE_LIMITED` (HTTP 429) |
+| 91xx | Toàn vẹn DB (lưới an toàn của filter) | `EDatabaseErrorCode` | 9101 `DB_NOT_NULL_VIOLATION`, 9102 `DB_CHECK_VIOLATION` (HTTP 400), 9103 `DB_UNIQUE_VIOLATION`, 9104 `DB_FOREIGN_KEY_VIOLATION` (HTTP 409) |
 
 Chi tiết từng mã nằm ở mục Error code của module tương ứng.
 
 `AllExceptionFilter` (`@Catch()` mọi lỗi):
 
 - `HttpException` → giữ status, body = response của exception (string được bọc thành `{ statusCode, message }`).
+- Lỗi vi phạm ràng buộc DB mà service chưa ánh xạ riêng (SQLSTATE `23502` NOT NULL, `23514` CHECK → 400; `23505` UNIQUE, `23503` FK → 409) → body `{ statusCode, errorCode: 91xx, message }`, message chỉ nêu tên cột (không lộ SQL hay giá trị), log `warn` kèm tên constraint. Đây là lưới cuối: lỗi dữ liệu của client không được là 500 (spec 0008).
 - Lỗi khác → HTTP 500, body `{ statusCode: 500, message: 'Internal server error' }`; chi tiết chỉ ghi log (không lộ ra client). Mọi lỗi ≥ 500 đều được log.
 - Lỗi validation của `ValidationPipe` giữ định dạng mặc định của Nest (`message` là mảng chuỗi).
 
@@ -184,20 +196,20 @@ Chi tiết từng mã nằm ở mục Error code của module tương ứng.
 
 Entity **không** extends `BaseEntity` (tự khai báo id nanoid16): `Wishlist` (chỉ có `created_at`), `OrderItem` (chỉ có `created_at`).
 
-### 4.8 Utils & validator
+### 4.8 Utils
 
 | File | Nội dung | Dùng ở |
 |---|---|---|
 | `utils/money.util.ts` | Tiền tệ gốc VND: `MAX_MONEY_VND` (1 tỷ), `vndToUsd(vnd, vndPerUsd)` (làm tròn 2 chữ số), `money(tên, vnd, tỷ giá)` → `{ <tên>Vnd, <tên>Usd }`, `moneyOrNull(...)` (`null` ở cả hai field khi vắng giá trị) | mọi module trả tiền (xem [currency](currency.md)) |
+| `base/db-error.util.ts` | `dbError(err)` đọc SQLSTATE/constraint/cột từ lỗi `pg` (bọc trong `driverError` của TypeORM); `isUniqueViolation(err, constraint?)`; `throwOnConstraint(err, { [constraint]: errorCode })` và `saveOrThrowOnConstraint(repo, entity, map)` ánh xạ vi phạm UNIQUE/CHECK theo **tên constraint** sang mã nghiệp vụ. Thao tác idempotent (yêu thích, thêm giỏ, đăng nhập lần đầu) dùng `isUniqueViolation` rồi đọc lại bản ghi của bên thắng | product, collection, category, wishlist, cart, auth, `AllExceptionFilter` |
+| `base/lock.util.ts` | `findLocked(manager, Entity, where, { select?, order? })`: `SELECT … FOR UPDATE` (`pessimistic_write`) một dòng; nơi duy nhất chọn chiến lược khoá (luật kiến trúc cấm viết `lock: { mode:` ở chỗ khác). Thứ tự khoá toàn dự án: `Order` trước, rồi bản ghi con (`PaymentTransaction` → `PaymentAttempt` / `Refund` / `ReturnRequest`); `Review` và `Product` (tính lại điểm sao) khoá riêng, không cùng `Order` trong một transaction. `category` dùng khoá cố vấn `pg_advisory_xact_lock` riêng | order, payment (3 service), return, review |
 | `base/column-transformers.ts` | `bigintTransformer` (bigint → number, dùng cho mọi cột tiền VND), `numericTransformer` (numeric → number, dùng cho `orders.exchange_rate`) | entity product, order, order_item, payment_attempt, payment_transaction, refund |
-| `utils/helper.ts` | `sleep(ms)`, `formatError(err)` (kèm `err.cause`) | chưa có chỗ gọi |
-| `utils/transform.ts` | `transformJSON`, `transformArray`, `transformImageUrl` (nối `process.env.STORAGE_URL`) | chưa có chỗ gọi |
-| `validator/BaseValidate.ts` | `BaseValidate` + `baseValidateEnum/String/Number/Date/Boolean`, hiểu operator `lt lte gt gte ne in range eq` | chưa có chỗ gọi |
-| `types/baseType.ts` | `GConstructor` | chưa có chỗ gọi |
 
 ### 4.9 Migration
 
 Đặt tên `{timestamp}-{PascalCaseName}.ts` (timestamp từ `Date.now()`), constraint theo prefix: `PK_`, `FK_`, `UQ_`, `CK_`, `IDX_`. Lệnh: `yarn migration:run`, `yarn migration:revert`, `yarn migration:generate`, `yarn migration:create`.
+
+**Khoá khi chạy** (spec 0016): `yarn migration:run` chạy `runMigrationsWithLock` (`scripts/migrate.ts`): mở một kết nối riêng, `pg_advisory_lock(20261027)` (chờ nếu instance khác đang migrate), `runMigrations()`, rồi nhả khoá (kể cả khi migration lỗi). Hai instance khởi động cùng lúc nên không chạy trùng một migration; instance đến sau thấy không còn gì để chạy. Khoá theo phiên nên tiến trình chết là khoá tự nhả. Flow `test/flows/migration/migration-lock.flow.ts` chạy trên DB tạm `clothes_shop_lock_test`. `migration:revert`, `generate`, `create` vẫn là lệnh TypeORM CLI, không khoá.
 
 | Migration | Nội dung |
 |---|---|
@@ -237,13 +249,18 @@ Entity **không** extends `BaseEntity` (tự khai báo id nanoid16): `Wishlist` 
 | Biến | Nơi dùng |
 |---|---|
 | `PORT` | `main.ts` (mặc định 7001) |
+| `RATE_LIMIT_DEFAULT_PER_MINUTE` (120), `RATE_LIMIT_AUTH_PER_MINUTE` (10), `RATE_LIMIT_UPLOAD_PER_MINUTE` (20) | `common/utils/rate-limit.config.ts`; số nguyên dương, đọc mỗi request |
+| `TRUST_PROXY` | `core/app.setup.ts`: số tầng reverse proxy tin cậy (mặc định 1 ở production, 0 nơi khác) |
+| `REDIS_URL` (tuỳ chọn) | `main.module.ts` → `createRateLimitStorage`: kho đếm rate limit dùng chung; phải là `redis://` hoặc `rediss://`; trống = in-memory |
+| `RENDER_GIT_COMMIT` (Render tự đặt) | `main.controller.ts`: trường `commit` của `/health` |
 | `CORS_ORIGINS` | `main.ts` |
 | `POSTGRES_HOST/PORT/USERNAME/PASSWORD/DATABASE` | `core.module.ts`, `data-source.ts` |
 | `JWT_SECRET`, `JWT_EXPIRES_IN`, `JWT_REFRESH_EXPIRES_IN` | module auth |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | module auth |
 | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET` | module media |
-| `STORAGE_URL` | `utils/transform.ts` (`transformImageUrl`) |
 | `SEPAY_RECEIVING_BANK_CODE`, `SEPAY_RECEIVING_BANK_NAME`, `SEPAY_RECEIVING_ACCOUNT`, `SEPAY_RECEIVING_ACCOUNT_NAME`, `SEPAY_WEBHOOK_SECRET`, `PAYMENT_TRANSFER_PREFIX` | module payment |
+
+**Kiểm tra khi khởi động** (`src/core/env.validation.ts`, `validateEnvForConfigModule` truyền vào `ConfigModule.forRoot({ validate })`, chạy ngay khi module được nạp; spec common/0009). Mọi môi trường: `PORT`, `POSTGRES_PORT` nếu có phải là số nguyên 1–65535; `RATE_LIMIT_*` số nguyên dương; `TRUST_PROXY` số nguyên không âm; `REDIS_URL` nếu có phải là URL `redis://` hoặc `rediss://`. Chỉ khi `NODE_ENV=production`: bắt buộc `JWT_SECRET` (≥ 32 ký tự và khác `DEFAULT_JWT_SECRET`, hằng số nay ở `common/constants/security.constant.ts`), `POSTGRES_HOST/USERNAME/PASSWORD/DATABASE`, `GOOGLE_CLIENT_ID`, `SEPAY_WEBHOOK_SECRET`, `SEPAY_RECEIVING_ACCOUNT`, và `CORS_ORIGINS` (mọi origin là URL http(s)). Sai thì app không khởi động (tiến trình thoát với lỗi), thông báo liệt kê mọi lỗi theo tên biến và lý do, không in giá trị. `SUPABASE_*`, `GOOGLE_CLIENT_SECRET`, `PAYMENT_TRANSFER_PREFIX`, `SEPAY_RECEIVING_BANK_*` không bắt buộc (tính năng tự trả 503 khi thiếu). Hàm chỉ trả phần cấu hình đến từ file `.env`: `ConfigService` ưu tiên bản đã validate hơn `process.env`, trả cả `process.env` sẽ đóng băng mọi biến lúc nạp. `render.yaml` không khai báo biến nào nên chúng nằm ở dashboard của dịch vụ: kiểm đủ trước khi deploy.
 
 ### 4.11 Lệnh
 
@@ -251,19 +268,85 @@ Entity **không** extends `BaseEntity` (tự khai báo id nanoid16): `Wishlist` 
 yarn dev                       # dev server (nest start --watch)
 npx nest build                  # build
 npx tsc --noEmit                # type check
-npx biome check src/            # lint
-yarn test                       # jest (rootDir src, regex *.spec.ts / *e2e-spec.ts)
-yarn migration:run              # chạy migration
+yarn lint                       # biome check ./src ./test ./tools, cảnh báo cũng là lỗi
+yarn test                       # unit test: jest (rootDir src, regex *.spec.ts / *e2e-spec.ts), mock, không cần DB
+yarn test:db:up                 # bật Postgres test (docker compose đọc .env.test; mặc định cổng 55432, DB clothes_shop_test)
+yarn test:flows                 # flow test trên Postgres thật (tự gọi test:db:up rồi test:flows:run)
+yarn test:flows:run             # chỉ chạy jest của flow test, không bật docker
+yarn test:coverage              # báo cáo độ phủ endpoint + ratchet từ lần chạy gần nhất
+yarn test:coverage:update       # gỡ khỏi test/coverage-baseline.json các route đã đủ ca
+yarn test:db:down               # tắt Postgres test
+yarn migration:run              # chạy migration có khoá advisory (scripts/migrate.ts, spec 0016); start:prod dùng lệnh này
+yarn impact                     # module/flow bị ảnh hưởng bởi thay đổi hiện tại (--run unit|flows)
+yarn check:docs [--strict]      # docs, spec, test matrix, migration, route khớp code (strict: spec không kẹt Draft/Approved)
+yarn check:change [--base ref]  # PR: đổi code thì phải đổi test và docs (hoặc trailer miễn có lý do)
+yarn smoke:prod                 # migrate từ DB trống, chạy bản build ở production, kiểm /health, log JSON, script sau deploy (cần Docker test DB)
+yarn verify:quick               # tsc + lint + check:docs + unit (pre-push)
+yarn verify                     # toàn bộ: verify:quick + check:docs --strict + build + flow + smoke:prod
 ```
+
+**CI** (`.github/workflows/ci.yml`, GitHub Actions, chạy khi push lên `main` và ở mọi pull request; thiết kế ở spec 0015, quy trình ở `.claude/rules/release-gate.md`): năm job.
+- `check` — audit phụ thuộc (chặn khi có lỗ hổng critical), `tsc --noEmit`, `yarn lint` (Biome, cảnh báo cũng là lỗi), `yarn check:docs --strict`, `yarn build`, `yarn test`.
+- `change` (chỉ PR) — `yarn check:change --base origin/<nhánh gốc>`: đổi code phải đổi test (C1) và docs của module (C2) / `common.md` (C3), trừ khi có trailer `No-Test:` / `No-Docs:` kèm lý do ở một commit.
+- `flows` — Postgres 16 (cổng 55432, DB `clothes_shop_test`, khớp `.env.test`) và Redis 7 (cổng 56379, khớp `docker-compose.test.yml`) làm service container, rồi `yarn test:flows:run` và `yarn test:coverage` (ratchet độ phủ endpoint).
+- `boot` — Postgres sạch, `yarn smoke:prod` (`scripts/smoke-prod.sh`): build, migrate từ DB trống, cấu hình production thiếu `JWT_SECRET` phải bị từ chối khởi động, chạy `node dist/src/main.js` ở `NODE_ENV=production` với cấu hình giả hợp lệ, `GET /health` trả `status: ok` + `db: connected`, route admin không đăng nhập trả 401. Script chỉ chạy trên DB có tên kết thúc `_test` hoặc `_smoke`.
+- `gate` (`CI gate`) — tổng hợp bốn job trên (`change` được phép bị bỏ qua khi push vào `main`); là check duy nhất cần đặt "required" khi bảo vệ nhánh.
+
+Workflow `post-deploy.yml` (không thuộc `CI gate`): sau mỗi push vào `main`, nếu repository variable `PRODUCTION_URL` đã đặt thì chạy `scripts/post-deploy-check.sh <url> <github.sha>`: chờ tối đa 15 phút cho tới khi `/health.commit` khớp commit vừa push, rồi kiểm `status: ok`, `db: connected`, `GET /api/products?limit=1` = 200, `GET /api/admin/orders` không đăng nhập = 401; đỏ nghĩa là deploy hỏng hoặc bản mới không lên (GitHub thông báo). Chưa đặt `PRODUCTION_URL` thì chỉ in cảnh báo. Cùng script được `smoke:prod` dùng (cả ca đỏ khi commit không khớp).
+
+Hook cục bộ (husky, cài bởi `prepare`): `pre-commit` chạy `lint-staged` (`biome check --fix` trên `*.ts` đã stage), `commit-msg` kiểm tiêu đề theo mẫu `<loại>(<module>): <mệnh đề>`, `pre-push` chạy `yarn verify:quick`. Bảo vệ nhánh `main` và Render "After CI Checks Pass" là cài đặt ngoài repo (xem `release-gate.md` mục 4).
 
 ### 4.12 Test
 
-- `src/common/dto/list-query.dto.spec.ts`: guard chuẩn list cho mọi `*-query.dto.ts` (xem 4.5).
-- Test của từng module: xem file module tương ứng.
+- **Unit** (`yarn test`): `src/**/*.spec.ts` cạnh code, dùng mock. `src/common/architecture/architecture.spec.ts` ép các luật kiến trúc (xem 4.13) với allowlist ở `architecture-allowlist.test-utils.ts` chỉ được co lại:
+  - `common/`, `core/` không import `modules/`;
+  - đồ thị module Nest không vòng, không `forwardRef`, không entry `imports` là `undefined`;
+  - không export thừa trong `common/`, `core/`;
+  - `*.service.ts` không ném exception HTTP thô, dùng `throwAppError` (không còn ngoại lệ nào);
+  - cột entity tên `status`/`paymentStatus` không khai báo `string` (dùng type union);
+  - khoá dòng chỉ qua `findLocked` (không có `lock: { mode:` ngoài `lock.util.ts`);
+  - không ghi bảng của module khác (`update/delete/insert/remove/upsert/create(<Entity khác module>)` hoặc ghi qua `@InjectRepository(<Entity khác module>)`): module chủ viết hàm chuyển trạng thái (`*-state.util.ts`, `product-rating.util.ts`, `cart-checkout.util.ts`) và module khác gọi, trong cùng transaction. Ngoại lệ có lý do trong `CROSS_MODULE_WRITES`: `auth.service.ts` tạo/cập nhật `User` khi đăng nhập;
+  - service tối đa 300 dòng và 5 dependency constructor;
+  - module có `shared/` thì mỗi cell (thư mục con trực tiếp) chỉ import chính nó, `shared/` và các cell khai báo ở `CELL_DEPENDENCIES` (đồ thị không vòng, không cạnh chết), và `shared/` không import cell (spec 0011, 0012).
+  `src/common/architecture/conventions.spec.ts` ép convention của `coding-conventions.md` (spec 0013), allowlist cùng file `architecture-allowlist.test-utils.ts`:
+  - tên file `kebab-case` + hậu tố vai trò (`x.service.ts`, `x.util.ts`...; test `x.<vai trò>.spec.ts`, `x.test-utils.ts`), ngoại lệ không hậu tố trong `UNSUFFIXED_FILES`;
+  - `*.service/controller/module/scheduler/guard.ts` export class đặt theo tên file; file trong `dtos/` là `*.dto.ts` và ngược lại;
+  - controller không inject Repository/DataSource/EntityManager (ngoại lệ `CONTROLLERS_WITH_DB_ACCESS`: health check);
+  - không ném exception HTTP thô ngoài `RAW_HTTP_EXCEPTIONS` (`jwt.strategy.ts`, `typeorm-list-query.util.ts`);
+  - không `console.*` trong code ứng dụng; module nghiệp vụ không đọc `process.env` (dùng `ConfigService`).
+  Thêm vi phạm mới hoặc để vi phạm cũ lớn thêm → đỏ; sửa xong mà chưa giảm allowlist → đỏ. `src/common/dto/list-query.dto.spec.ts` là guard chuẩn list cho mọi `*-query.dto.ts` (xem 4.5); `src/common/utils/money.util.spec.ts` cho helper tiền. Test của từng module: xem file module tương ứng.
+- **Công cụ phạm vi ảnh hưởng** (`yarn impact`, spec 0014): `tools/impact.ts` + `tools/lib/*`. Đồ thị module suy ra từ import thật của `src/modules` (alias `@/…` và đường dẫn tương đối, bỏ spec/test-utils); flow được gắn với module qua tiền tố `@Controller` mà URL trong flow (và file `steps` cùng thư mục) khớp; thư mục `access`, `rate-limit`, `health`, `migration` là flow toàn cục. Từ `git diff` (so với `main`, thêm thay đổi chưa commit) in ra: module đổi, phụ thuộc trực tiếp / gián tiếp, docs phải cập nhật / cần rà, unit và flow cần chạy lại; `--run unit|flows` chạy hộ. Đổi `src/common`, `src/core`, migration, `package.json`, cấu hình → mọi module. Gợi ý cho vòng lặp phát triển, không thay chạy toàn bộ. Unit test: `tools/impact.spec.ts` (jest `roots` có thêm `tools/`), gồm kiểm tra trên repo thật: cạnh tiền (`order → payment, refund`, `refund → return`...), mọi module có route đều có flow, mọi flow thuộc module hoặc thư mục toàn cục.
+- **Kiểm tra docs và kỷ luật thay đổi** (spec 0015): `tools/check-docs.ts` + `tools/lib/docs-checks.ts` (D1 module ↔ docs ↔ README, D2 chỉ mục spec/trạng thái/số liên tục/strict, D3 mục 6 spec Implemented, D4 liên kết markdown, D5 đường dẫn file được nhắc (kể cả dạng tương đối theo thư mục module và tham chiếu spec theo số), D6 mọi route có trong docs module sở hữu, D7 mọi flow có trong test matrix, D8 mọi migration có trong 4.9, D9 mọi rule được liệt kê); `tools/check-change.ts` + `tools/lib/change-checks.ts` (C1–C3, trailer miễn). Unit: `tools/check-docs.spec.ts` (mỗi mục một ca đúng và một ca vi phạm, cộng ca "repo thật không có vấn đề") và `tools/check-change.spec.ts`.
+- **Flow** (`yarn test:flows`): `test/flows/<module>/*.flow.ts`, đi qua HTTP thật (`MainModule` + `configureApp`) trên Postgres thật. Config riêng `test/jest.flows.config.js` (rootDir repo, chỉ nhận `*.flow.ts`, chạy tuần tự).
+  - Mỗi lần chạy: lấy khoá advisory (`pg_try_advisory_lock`; lần chạy thứ hai cùng DB bị chặn), `DROP SCHEMA public` → chạy toàn bộ migration → `TRUNCATE` dữ liệu seed; sau mỗi test `truncateAll`.
+  - Cấu hình: file `.env.test` ở root chỉ chứa kết nối Postgres test (`POSTGRES_*`; thiếu khoá thì dùng mặc định trong `test/support/test-env.ts`); `docker-compose.test.yml` và jest cùng đọc. Secret giả của JWT/SePay là hằng số trong `test-env.ts`, `SUPABASE_*`/`GOOGLE_*` luôn rỗng. Giá trị gán thẳng vào `process.env`, thắng `.env` của app. Khoá lạ trong file làm global-setup dừng với thông báo lỗi.
+  - Chốt chặn: `POSTGRES_DATABASE` phải kết thúc `_test` (`assertTestDatabase`), nếu không dừng ngay.
+  - Công cụ dùng chung ở `test/support/`: `createTestApp`, `createBuilders` (user, admin, product, cart, address), `bearer`, `sepayWebhook`, `truncateAll`.
+  - Hermetic: `test-env.ts` đặt rỗng `SUPABASE_*`, `GOOGLE_*` (kể cả khi `.env` có khoá thật) và `test/support/env.ts` thay `fetch` toàn cục bằng hàm ném lỗi; test cần giả dịch vụ ngoài dùng `jest.spyOn(globalThis, 'fetch')`.
+  - `test/support/routes.ts` (`discoverRoutes`) tự phát hiện route, `@Public()` và `@Permissions` từ metadata của Nest; `test/flows/access/route-table.flow.ts` giữ snapshot bảng route–quyền và các bất biến (route cần đăng nhập có quyền, route `/api/admin` không public và không dùng quyền mặc định, mã quyền hợp lệ).
+  - `test/flows/access/access-matrix.flow.ts`: ma trận xác thực và phân quyền cho mọi route đã phát hiện (token thiếu/hỏng/hết hạn/refresh/user không tồn tại/disabled → 401; thiếu quyền → 403 mã 9001; đúng một quyền, admin → qua guard; user mặc định trên `/api/admin/**` → 403). Chỉ kiểm guard nên chấp nhận mọi status khác của route được vào (input rỗng).
+  - `createTestApp` dọn DB đầu mỗi file flow và `app.listen(0, '127.0.0.1')` một lần; mỗi request có timeout 10s trong ma trận.
+  - Độ phủ endpoint: `createTestApp` gắn middleware ghi `{route, status}` của request thật (bỏ qua header `x-test-probe` của ma trận) vào `test/.coverage/` (gitignore); `test/support/coverage-report.ts` chạy sau jest trong `yarn test:flows`, in số route có ca thành công / ca lỗi và áp ratchet với `test/coverage-baseline.json` (route mới thiếu ca → lỗi; mục đã đủ ca còn trong baseline → lỗi; baseline chỉ co lại).
+  - Hiện có: `test/flows/order-payment/` (đặt hàng – thanh toán, huỷ – hoàn tiền, mã lỗi và trạng thái đơn hàng, request song song, hợp đồng khoá dòng), `test/flows/cart/`, `test/flows/address/` (mã lỗi), `test/flows/access/` (bảng quyền, hermetic, ma trận auth/quyền). Bảng luồng nào có test nào: `test/README.md`. Thiết kế: `docs/specs/testing/0001-flow-test-infrastructure.md`.
 
 ### 4.13 Lưu ý hiện trạng
 
+- Phụ thuộc: `package.json` có `resolutions` ghim bản vá cho các gói bắc cầu nằm trên đường chạy production (`proxy-addr`, `body-parser`, `qs`, `multer`, `js-yaml`) vì `@nestjs/platform-express` 11.x ghim phiên bản cũ có lỗ hổng (đo ngày 2026-10-24: 1 critical + 55 high → 0 critical + 39 high; số còn lại đều thuộc công cụ build `@nestjs/cli`: `brace-expansion`, `browserslist`, `fast-uri`). CI chặn merge khi `yarn audit --groups dependencies` có critical. Bỏ `resolutions` khi nâng Nest lên bản đã kéo các gói này lên bản vá.
+- Cấu trúc cell (spec 0011, 0012): `payment` chia `attempt/`, `transaction/`, `order-payments/`, `sepay/`, `shared/`; `order` chia `checkout/`, `status/`, `query/`, `shared/`; `return` chia `request/`, `processing/`, `shared/`; `review` chia `public/`, `authoring/`, `vote/`, `moderation/`, `shared/`; `product` chia `catalog/`, `admin/`, `shared/`; `refund` tách thành module riêng (spec payment/0004). Các module nhỏ còn lại (category, collection, site-config, cart, address, wishlist, media, auth, user, shipping, currency, size-guide, pending-count) giữ cấu trúc phẳng: dưới ~8 file và đã tách khách/admin bằng tên file controller, chia thêm chỉ làm nhiều thư mục hơn file. Hai guard `list-query.dto.spec.ts` và `update-dto.spec.ts` quét `dtos/` ở mọi cấp thư mục của `modules/`.
+- Ranh giới ghi giữa các module (spec 0006): payment không còn `UPDATE` bảng `orders`/`return_requests`, review không còn `UPDATE products`, order không còn xoá `cart_items` — mỗi nơi gọi hàm của module chủ. Việc **đọc** chéo module (giỏ/yêu thích/collection/review đọc `Product`, return/review đọc `Order`/`OrderItem`, product đọc `Category`) được giữ có chủ đích.
+- Mọi service tạo bản ghi theo mẫu "kiểm tra rồi ghi" (`ensure*Unique`) vẫn giữ kiểm tra cho đường thường nhưng phải bắt thêm vi phạm ràng buộc khi hai request đồng thời (spec 0008): dùng `saveOrThrowOnConstraint` hoặc `isUniqueViolation` + đọc lại.
+- Quy ước `PATCH` (spec 0007): `Update*Dto` luôn là `PartialType(Create*Dto, { skipNullProperties: false })` — được ép bởi `src/common/dto/update-dto.spec.ts` (mọi cặp `Create<X>Dto`/`Update<X>Dto`: không khoá "ma", giữ mọi ràng buộc của create trên các field chung). `null` ở field bắt buộc → 400; field tuỳ chọn mang `@IsOptional()` coi `null` là "không gửi" nên service ghi entity qua `pickProvided(dto, nullableKeys)` (`common/base/provided-fields.util.ts`), chỉ giữ `null` ở field cố ý nhận null (`badge`, `heroImage`, `originalPriceVnd`).
 - Port đọc từ `PORT` (không có biến `APP_PORT`); `APP_ENV` còn trong `.env` cục bộ nhưng code không đọc.
 - `PermissionsGuard` trả HTTP 500 (`NO_PERMISSION_DEFINED`) cho route không public mà quên `@Permissions` (với user không phải admin); admin vẫn truy cập được route đó.
 - Trong `JwtStrategy`, mỗi request đều đọc user từ DB nên role/permissions/status thay đổi có hiệu lực ngay, không cần chờ token hết hạn.
 - Danh sách quyền của một user được lưu trong cột `users.permissions`; `DEFAULT_USER_PERMISSIONS` chỉ được áp khi tạo user mới, không tự cập nhật cho user đã tồn tại.
+- Migration có dữ liệu seed (`categories`, `subcategories`, `collections`, `products`, `reviews`, `site_configs`); flow test xoá hết dữ liệu này sau khi dựng schema nên mỗi test tự dựng dữ liệu bằng builder, và phí ship/tỷ giá trong flow test là giá trị mặc định trong code (`DEFAULT_SHIPPING_CONFIG`, `DEFAULT_VND_PER_USD`) vì không có dòng `site_configs`.
+- `@ApiEndpoint` (`decorator/api-endpoint.decorator.ts`) chưa module nào dùng; skill `.agent/skills/nest-best-practices` quy định dùng nó thay cho `@ApiOperation`.
+- `common/guards/permissions.guard.ts` import entity `User` từ `src/modules/user`; ngoài ra `common/` và `core/` không import `modules/` (được ép bởi `architecture.spec.ts`, ngoại lệ nằm trong allowlist).
+- `auth/jwt.strategy.ts` cố ý ném `UnauthorizedException` thô (401 của guard không có `errorCode`, khác với 401 nghiệp vụ có `errorCode`); mọi `*.service.ts` đều dùng `throwAppError`. `throwAppError` mặc định trả HTTP 400, nên một số chỗ admin dùng `ORDER_NOT_FOUND` mà không truyền 404 sẽ trả 400 (khác khách hàng: 404).
+- Không còn service nào vượt 300 dòng hay 5 dependency: cả hai allowlist (`OVERSIZED_SERVICES`, `MANY_DEPENDENCIES_SERVICES`) đều rỗng, vi phạm mới làm `architecture.spec.ts` đỏ. Các service từng vượt đã được tách: `OrderService` thành `OrderQueryService`, `OrderCheckoutService`, `OrderStatusService` thành `OrderQueryService`, `OrderCheckoutService`, `OrderStatusService` (xem `order.md` 4.9); `ReviewService` thành `ReviewQueryService` + `ReviewService` (xem `review.md` 4.9); `PaymentService` thành `PaymentService`, `PaymentConfirmService`, `PaymentQueryService` (xem `payment.md` 4.9); `ReturnService` thành `ReturnQueryService` + `ReturnService` (xem `return.md` 4.9); `RefundService` thành `RefundQueryService` + `RefundService` (xem `payment.md` 4.9); logic thuần của `MediaService` sang `media-file.util.ts` (xem `media.md` 4.9); `CategoryService` thành `CategoryQueryService` + `CategoryService` (xem `category.md` 4.9); `ProductService` thành `ProductQueryService` + `ProductService` (xem `product.md` 4.9).
+- Trạng thái dùng type union cho mọi cột `status` (xem 4.5). Chuyển trạng thái chỉ có bảng tường minh cho đơn (`ORDER_TRANSITIONS`, cạnh do admin thực hiện); `return` kiểm theo hành động (`assertStatus` với danh sách trạng thái xuất phát từng hành động) và có thêm cạnh do hệ thống (`RECEIVED → APPROVED` khi khoản hoàn bị từ chối, `RECEIVED → REFUNDED` khi hoàn xong); `refund`, `payment attempt`, `review` kiểm trực tiếp trong service.
+- Entity `Order` được import và đăng ký `TypeOrmModule.forFeature` trực tiếp ở module `payment`, `return`, `review`; entity `Product` ở `cart`, `wishlist`, `collection` (bên cạnh module `product`). Các module này truy cập bảng của nhau không qua service.
+- Cổng production: kiểm lệch giữa entity TypeORM và schema do migration không bật được (`migration:generate --check` báo toàn bộ FK/CHECK vì entity không mô tả chúng); nguồn sự thật là migration và flow test chạy trên schema dựng từ migration. `.agent/skills/nest-best-practices` là mẫu NestJS chung không khớp dự án; rule trong `.claude/rules/` thắng khi mâu thuẫn.
+- Từ spec 0019 `any` bị chặn bằng máy trong code ứng dụng: Biome `noExplicitAny` ở mức `warn` (= lỗi vì `yarn lint` có `--error-on-warnings`), tắt riêng cho `*.spec.ts`, `*.test-utils.ts` và `test/**` (`overrides` trong `biome.json`). Mã `23505`/`23503` của Postgres được nhận qua `isUniqueViolation`/`isDbError`, không so chuỗi.
+- Rate limit dùng chung nhiều instance cần `REDIS_URL` (Redis chưa được cấp trên Render); kho là cửa sổ cố định nên sát ranh giới cửa sổ có thể qua tối đa ~2× giới hạn. Log production hiện chỉ ra stdout dạng JSON; chưa có gom log, đo lường hay cảnh báo theo ngưỡng lỗi.

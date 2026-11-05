@@ -6,7 +6,20 @@ function setup(product: any) {
     create: jest.fn(),
     save: jest.fn(),
   };
-  const cartItemRepo: any = { findOne: jest.fn(async () => null), create: jest.fn((d: any) => d), save: jest.fn() };
+  // UPDATE nguyên tử không chạm dòng nào (chưa có dòng) → dòng mới được tạo
+  const update = { affected: 0 };
+  const queryBuilder: any = {
+    update: () => queryBuilder,
+    set: () => queryBuilder,
+    where: () => queryBuilder,
+    execute: jest.fn(async () => update),
+  };
+  const cartItemRepo: any = {
+    createQueryBuilder: jest.fn(() => queryBuilder),
+    exists: jest.fn(async () => false),
+    create: jest.fn((d: any) => d),
+    save: jest.fn(),
+  };
   const productRepo: any = { findOne: jest.fn(async () => product) };
   const currencyService: any = { getVndPerUsd: jest.fn(async () => 25000) };
   return { service: new CartService(cartRepo, cartItemRepo, productRepo, currencyService), cartItemRepo };

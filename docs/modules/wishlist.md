@@ -1,6 +1,6 @@
 # wishlist (`src/modules/wishlist`)
 
-> Cập nhật lần cuối: 2026-10-18
+> Cập nhật lần cuối: 2026-10-23
 
 ## 1. Tổng quan
 
@@ -63,6 +63,7 @@ UNIQUE `(user_id, product_id)`.
 
 ### 4.4 Luồng xử lý & quy tắc nghiệp vụ
 
+- `add` idempotent cả khi đồng thời (bấm đúp): request thua `UQ_wishlists_user_product` đọc lại bản ghi của request thắng và trả `created: false`; đúng một phản hồi có `created: true`.
 - `add`: sản phẩm không tồn tại → `PRODUCT_NOT_FOUND (1001)`, HTTP 404; đã có bản ghi → trả bản ghi đó với `created: false`; chưa có → tạo và trả `created: true`.
 - `remove`: idempotent — không có bản ghi vẫn trả `{ success: true }`.
 - `check`: chỉ trả có/không.
@@ -79,7 +80,10 @@ Không có error code riêng của module; sản phẩm không tồn tại trả
 
 `wishlist.service.spec.ts` — `WishlistService.findAll` nạp kèm `product.category` và `product.subcategory`.
 
+Flow test trên Postgres thật: `test/flows/wishlist/wishlist.flow.ts` (batch 19) — thêm (`created: true`, thêm lại là `created: false` không tạo hàng mới, nhiều user cùng một sản phẩm, không kiểm tra `status`, sản phẩm lạ → 404 / 1001); danh sách (chỉ của mình, mới nhất trước, sản phẩm đúng hình dạng chuẩn với `Vnd`/`Usd`, rỗng, giữ cả sản phẩm `disabled`); kiểm tra (chỉ tính của mình, id lạ → `false`); bỏ (chỉ bản ghi của mình, idempotent, xoá sản phẩm thì wishlist tự sạch).
+
 ### 4.8 Lưu ý hiện trạng
+
 
 - `add` chỉ kiểm tra sản phẩm tồn tại, không kiểm tra `status`; `findAll` trả kèm sản phẩm kể cả `disabled`.
 - Không có `GET /api/wishlist/:productId`, nên route `check/:productId` không xung đột với route khác.

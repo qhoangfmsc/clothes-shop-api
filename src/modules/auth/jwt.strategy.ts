@@ -1,3 +1,4 @@
+import { DEFAULT_JWT_SECRET } from '@common/constants/security.constant';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
@@ -5,7 +6,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { Repository } from 'typeorm';
 import { User } from '../user/user.entity';
-import { DEFAULT_JWT_SECRET, JwtPayload } from './auth.constant';
+import { JwtPayload } from './auth.constant';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -31,7 +32,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('Invalid access token');
     }
     const user = await this.userRepo.findOne({ where: { id: payload.sub } });
-    if (!user || user.status !== 'active') {
+    if (user?.status !== 'active') {
       throw new UnauthorizedException('User not found or disabled');
     }
     return user;

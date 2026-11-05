@@ -3,6 +3,7 @@ import { Permission } from '@common/permissions/permissions.constant';
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CategoryService } from './category.service';
+import { CategoryQueryService } from './category-query.service';
 import { AdminCategoryQueryDto } from './dtos/admin-category-query.dto';
 import { CreateCategoryDto, ReorderCategoriesDto, UpdateCategoryDto } from './dtos/category.dto';
 
@@ -10,13 +11,16 @@ import { CreateCategoryDto, ReorderCategoriesDto, UpdateCategoryDto } from './dt
 @Controller('api/admin/categories')
 @ApiBearerAuth()
 export class AdminCategoryController {
-  constructor(private readonly categoryService: CategoryService) {}
+  constructor(
+    private readonly categoryService: CategoryService,
+    private readonly queryService: CategoryQueryService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: '[Admin] Danh sách danh mục (search, sort, pagination)' })
   @Permissions(Permission.CATEGORY_VIEW)
   findAll(@Query() query: AdminCategoryQueryDto) {
-    return this.categoryService.findAllAdmin(query);
+    return this.queryService.findAllAdmin(query);
   }
 
   @Post()

@@ -15,6 +15,8 @@ src/
 │   ├── category/    # controller + admin controller + service + entity + dtos
 │   ├── collection/  # controller + admin controller + service + entity + dtos
 │   ├── order/       # controller + admin controller + service + entity + dtos
+│   ├── payment/     # cell: attempt/ transaction/ order-payments/ sepay/ shared/ (VietQR + SePay)
+│   ├── refund/      # hoàn tiền (module riêng, chỉ đọc entity của payment)
 │   ├── cart/
 │   ├── address/
 │   ├── wishlist/
@@ -26,6 +28,12 @@ src/
 │   ├── shipping/    # Static data, no DB
 │   └── size-guide/  # Static data, no DB
 └── migrations/      # TypeORM migrations
+tools/               # Công cụ kiểm tra của repo: impact (phạm vi ảnh hưởng), check-docs, check-change
+scripts/             # smoke-prod.sh (boot bản build ở production)
+test/                # Flow test (Postgres thật): flows/<module>/*.flow.ts, support/, README.md = test matrix
+docs/
+├── modules/         # Docs hiện trạng, mỗi module một file (viết SAU khi code)
+└── specs/           # Tech spec theo module: <module>/NNNN-slug.md (viết TRƯỚC khi code)
 ```
 
 ## Auth & Permission
@@ -108,19 +116,63 @@ Khi tạo hoặc sửa API list, dùng skill `list-api` (`.claude/skills/list-ap
 - Tỷ giá lấy từ `CurrencyService.getVndPerUsd()` (dòng `EXCHANGE_RATE` của site_configs). Dữ liệu danh mục/giỏ dùng tỷ giá hiện tại; dữ liệu gắn với đơn (đơn, thanh toán, hoàn tiền, trả hàng) dùng `orders.exchange_rate` đã chốt lúc checkout.
 - Entity trả thẳng ra API phải đi qua presenter (`presentProduct`, `presentOrder`, `payment.presenter`) — không trả entity có cột tiền thô.
 
-## Docs (`docs/`) — quy trình khép kín Docs → Feature → Docs (BẮT BUỘC)
+## Quy trình làm việc: Đọc → Spec → Code + Test → Docs (BẮT BUỘC)
 
-`docs/` là tài liệu BE thực tế theo **từng module**: `docs/modules/<module>.md` (mục lục `docs/README.md`, hạ tầng dùng chung ở `docs/modules/common.md`). Chỉ ghi những gì đã có trong code; KHÔNG viết tài liệu FE, roadmap, kế hoạch.
+Mọi việc chạm `src/modules`, `src/common`, `src/core`, `src/migrations` phải đi đủ 5 bước, đúng thứ tự. Dùng skill `feature-workflow` (`.claude/skills/feature-workflow/`) để làm theo checklist; luật ở `.claude/rules/feature-workflow.md`.
 
-Mọi việc chạm `src/modules`, `src/common`, `src/core`, `src/migrations` phải đi đủ 3 bước, đúng thứ tự:
+1. **Đọc & hiểu trước**: đọc `docs/modules/<module>.md`, code thực tế, spec cũ `docs/specs/<module>/` của mọi module bị ảnh hưởng (tạo module mới thì đọc `docs/README.md` + `common.md`). Chưa hiểu thì hỏi, không đoán, không code.
+2. **Tech spec trước khi code** (skill `tech-spec`): `docs/specs/<module>/NNNN-slug.md` — vấn đề, phương án, kiến trúc, design pattern, kiểm tra SOLID, dữ liệu, luồng, lỗi, kế hoạch test. Cỡ đầy đủ / rút gọn / miễn theo bảng trong rule. Quyết định thiết kế đáng kể thì trình người dùng trước khi code.
+3. **Code + test cùng lượt**: theo spec, `.claude/rules/engineering-principles.md` và các chuẩn trong file này; test theo `.claude/rules/testing.md` (skill `module-test`).
+4. **Docs hiện trạng**: `docs/modules/<module>.md` (+ `common.md` nếu chạm phần chung, `docs/README.md` nếu thêm module); spec điền mục 6 và chuyển Implemented; cập nhật `test/README.md`.
+5. **Đối chiếu & báo xong**: type check, lint, `yarn check:docs`, `yarn test`, `yarn test:flows` đều qua (`yarn verify` chạy cả chuỗi); docs/spec/test khớp code; **kiểm lại bên liên quan** của module đã đổi (module phụ thuộc, phía admin, lõi tiền/quyền) bằng `yarn impact` theo `.claude/rules/change-impact.md`.
 
-1. **Đọc & hiểu trước**: đọc `docs/modules/<module>.md` + code thực tế của mọi module bị ảnh hưởng (tạo module mới thì đọc `docs/README.md` + `common.md`). Chưa hiểu thì hỏi, không đoán, không code.
-2. **Làm feature**: theo các chuẩn trong file này.
-3. **Viết / cập nhật docs ngay trong cùng lượt**: tạo `docs/modules/<module>.md` (module mới) hoặc sửa các mục bị ảnh hưởng (module cũ) + `common.md` nếu chạm phần dùng chung.
+**Chưa đủ 5 bước = chưa xong.** Báo cáo cuối nêu: file spec, docs, test đã tạo/sửa + 1–3 dòng về pattern/nguyên lý đã áp dụng và vì sao + dòng **Phạm vi ảnh hưởng** (module đổi · bên liên quan đã kiểm lại · flow/unit đã chạy). Chỉ được bỏ qua khi thay đổi không đổi hành vi (đổi tên biến nội bộ, format, comment, test thuần) và phải nói rõ.
 
-**Chưa cập nhật docs = chưa xong.** Báo cáo cuối phải nêu file docs đã tạo/sửa. Chỉ được bỏ qua docs khi thay đổi không đổi hành vi (đổi tên biến nội bộ, format, comment, test thuần) và phải nói rõ.
+| Loại tài liệu | Nơi | Trả lời | Viết khi |
+|---|---|---|---|
+| Docs module | `docs/modules/<module>.md` | Hiện giờ hệ thống làm gì | Sau code, luôn khớp code |
+| Tech spec | `docs/specs/<module>/NNNN-slug.md` | Vì sao, thiết kế thế nào | Trước code |
+| Test | `src/**.spec.ts`, `test/flows/` | Còn đúng không | Cùng code |
 
-Luật: `.claude/rules/module-docs.md` · Quy trình + template + checklist: skill `module-docs` (`.claude/skills/module-docs/`).
+`docs/modules/` chỉ ghi cái đã có trong code; KHÔNG viết tài liệu FE, roadmap, kế hoạch. Luật docs: `.claude/rules/module-docs.md` · Template + checklist: skill `module-docs`.
+
+## Nguyên tắc kỹ thuật: Design pattern · Kiến trúc · Convention · SOLID (BẮT BUỘC)
+
+Mục lục + nguyên tắc nền: `.claude/rules/engineering-principles.md`. Mỗi chủ đề một rule chi tiết (là gì, áp dụng thế nào ở đây, ví dụ trong repo, cái gì máy ép, checklist):
+
+| Chủ đề | Rule |
+|---|---|
+| Kiến trúc (modular monolith, cell, phụ thuộc, transaction, tích hợp ngoài) | `.claude/rules/architecture.md` |
+| Design pattern (đang dùng / khi nào mới dùng / không dùng) | `.claude/rules/design-patterns.md` |
+| SOLID (5 câu hỏi tự kiểm) | `.claude/rules/solid.md` |
+| Coding convention (đặt tên, lỗi, log, config, API, test, git) | `.claude/rules/coding-conventions.md` |
+
+Kiến thức, mẫu code, checklist: skill `design-principles`. Tóm tắt những điều không được quên:
+
+- **Pattern là công cụ, không phải mục tiêu**: chỉ dùng khi gọi tên được vấn đề cụ thể; "không dùng pattern" là hợp lệ; rule of three (lần 3 mới gom). Ghi pattern và cái giá ở spec mục 3.3 và một dòng comment ở chỗ định nghĩa.
+- **Kiến trúc**: Controller (mỏng) → Service (use case) → Repository/EntityManager, Presenter map response; phụ thuộc một chiều, không vòng, `common/` không import `modules/`; module khác dùng nhau qua service được export; logic thuần tách thành `*.util.ts`; ghi tiền/trạng thái trong một transaction với thứ tự khoá cố định; service > ~300 dòng hoặc > ~5 dependency thì dừng và tách.
+- **Cell**: module có nhiều nhóm chức năng thì mỗi nhóm là một thư mục (`<module>/<cell>/`) cộng `shared/`; cell chỉ import chính nó, `shared/` và cell đã khai báo (ép bởi `architecture.spec.ts`); thực thể độc lập (vòng đời, bảng, route riêng) thì tách thành module cấp cao. Quy ước: `docs/specs/common/0011-module-cells.md`.
+- **Convention**: lỗi luôn `throwAppError` + error code; trạng thái/enum là `as const` + type union dùng chung DTO ↔ entity; tên file `kebab-case` + hậu tố vai trò; không magic value, không code chết, không `console.*`; comment ít và ngắn (`.claude/rules/comments.md`); Biome là nguồn sự thật format. Quy ước quan trọng được test ép (`architecture.spec.ts`, `conventions.spec.ts`, allowlist chỉ co lại).
+- **SOLID**: S (một lý do để đổi), O (thêm dữ liệu thay vì thêm nhánh `if`), L (kế thừa chỉ để dùng chung cột/DTO), I (nhận kiểu hẹp đúng nhu cầu), D (phụ thuộc interface ở biên ngoài như cổng thanh toán/storage). Mỗi spec điền bảng SOLID.
+- Code cũ lệch chuẩn: sửa phần mình chạm tới, không refactor hàng loạt ngoài phạm vi; điểm còn lệch ghi ở `docs/modules/common.md` mục 4.13.
+
+## Cổng trước khi lên `main` (production) (BẮT BUỘC)
+
+Luật: `.claude/rules/release-gate.md` · Phạm vi kiểm lại: `.claude/rules/change-impact.md`.
+
+- Không commit thẳng lên `main`: PR từ nhánh `<loại>/<slug>`, merge khi check **`CI gate`** xanh (job `check`: audit, tsc, lint không cảnh báo, `check:docs --strict`, build, unit · `change`: đổi code phải đổi test + docs · `flows`: Postgres thật + ratchet độ phủ · `boot`: migrate từ trống + chạy bản build ở production).
+- Hook cục bộ: `pre-commit` (Biome), `commit-msg` (mẫu `<loại>(<module>): <mệnh đề>`), `pre-push` (`yarn verify:quick`). Trước khi xin merge chạy `yarn verify`.
+- Miễn test/docs chỉ khi thay đổi không đổi hành vi, bằng trailer `No-Test: <lý do>` / `No-Docs: <lý do>` ở một commit.
+- Sau merge: workflow `post-deploy` kiểm bản mới đã lên và còn sống (cần biến repo `PRODUCTION_URL`). Migration khi khởi động có khoá (`yarn migration:run`); rate limit dùng Redis nếu đặt `REDIS_URL`; production log JSON mỗi request.
+- Bảo vệ nhánh `main`, Render "After CI Checks Pass", `PRODUCTION_URL` là cài đặt ngoài repo — lệnh và các bước ở `release-gate.md` mục 4.
+
+## Test (BẮT BUỘC đi kèm mọi thay đổi hành vi)
+
+- **Unit** (`yarn test`): `src/**/*.spec.ts` cạnh code, mock, không DB.
+- **Flow** (`yarn test:flows`): `test/flows/<module>/*.flow.ts`, HTTP thật + Postgres thật (docker, cổng 55432, DB `*_test`, schema dựng từ migration). Bắt buộc cho luồng chính; chạm luồng tiền/trạng thái đơn/thanh toán/hoàn tiền/trả hàng/auth thì phải mở rộng flow tương ứng. Sửa bug: viết test tái hiện trước.
+- Độ phủ endpoint do máy đo cuối `yarn test:flows` (ca thành công + ca lỗi mỗi route, ratchet `test/coverage-baseline.json`): route mới bắt buộc kèm test, phủ thêm thì `yarn test:coverage:update`.
+- Bảng luồng nào có test nào: `test/README.md` — cập nhật cùng lượt khi thêm/đổi test. Hạ tầng: `docs/specs/testing/0001-flow-test-infrastructure.md`.
+- Chiến dịch test toàn diện (ca đúng, ca lỗi, auth, quyền cho mọi route) đã xong 25/25 batch (nhật ký `test/PROGRESS.md`); đợt phủ lớn mới dùng lại skill `test-campaign` theo lượt 1 batch ≤ 5 route.
 
 ## Migration Convention
 
@@ -136,6 +188,14 @@ node -e "console.log(Date.now())"
 yarn start:dev        # Dev server (port 7001)
 npx nest build        # Build
 npx tsc --noEmit      # Type check
-npx biome check src/  # Lint
+yarn lint             # Lint (biome: src + test)
+yarn test             # Unit test (mock)
+yarn test:flows       # Flow test (tự bật Postgres test bằng docker; cần Docker chạy)
+yarn test:db:down     # Tắt Postgres test
+yarn impact           # Module/flow bị ảnh hưởng bởi thay đổi hiện tại (--run unit|flows)
+yarn check:docs       # Docs/spec/test matrix/migration/route khớp code (--strict trước khi vào main)
+yarn check:change     # PR: đổi code thì phải đổi test và docs (hoặc trailer No-Test:/No-Docs: kèm lý do)
+yarn smoke:prod       # Migrate từ DB trống (có khoá), chạy bản build ở production, kiểm /health + log JSON
+yarn verify           # Toàn bộ cổng như CI (cần Docker)
 npx typeorm migration:run -d data-source.ts  # Run migrations
 ```

@@ -1,11 +1,15 @@
+import { isUniqueViolation } from '@common/base/db-error.util';
+import { DEFAULT_JWT_SECRET } from '@common/constants/security.constant';
+import { throwAppError } from '@common/exceptions/app.exception';
+import { EAuthErrorCode } from '@common/exceptions/error-codes';
 import { DEFAULT_USER_PERMISSIONS } from '@common/permissions/permissions.constant';
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { HttpStatus, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { JwtService } from '@nestjs/jwt';
+import { JwtService, JwtSignOptions } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../user/user.entity';
-import { DEFAULT_JWT_SECRET, JwtPayload, JwtTokenType } from './auth.constant';
+import { JwtPayload, JwtTokenType } from './auth.constant';
 import { GoogleAuthService, GoogleUserPayload } from './google-auth.service';
 
 @Injectable()
@@ -40,29 +44,7 @@ export class AuthService {
       googleUser = await this.googleAuthService.fetchUserInfo(credential);
     }
 
-    // Upsert user by email
-    let user = await this.userRepo.findOne({ where: { email: googleUser.email } });
-
-    if (!user) {
-      user = this.userRepo.create({
-        email: googleUser.email,
-        name: googleUser.name,
-        image: googleUser.picture,
-        provider: 'google',
-        providerId: googleUser.sub,
-        role: 'user',
-        permissions: DEFAULT_USER_PERMISSIONS,
-        status: 'active',
-      });
-      user = await this.userRepo.save(user);
-    } else {
-      // Update Google info on each login
-      user.name = googleUser.name || user.name;
-      user.image = googleUser.picture || user.image;
-      user.provider = 'google';
-      user.providerId = googleUser.sub;
-      user = await this.userRepo.save(user);
-    }
+    const user = await this.upsertGoogleUser(googleUser);
 
     const tokens = this.generateTokens(user);
 
@@ -77,9 +59,7 @@ export class AuthService {
    */
   async getMe(userId: string) {
     const user = await this.userRepo.findOne({ where: { id: userId } });
-    if (!user) {
-      throw new UnauthorizedException('User not found');
-    }
+    if (!user) throwAppError(EAuthErrorCode.AUTH_USER_NOT_FOUND, undefined, HttpStatus.UNAUTHORIZED);
     return { user: this.sanitizeUser(user) };
   }
 
@@ -87,23 +67,61 @@ export class AuthService {
    * Refresh access token using refresh token
    */
   async refreshToken(refreshToken: string) {
+    const user = await this.findUserForRefreshToken(refreshToken);
+    if (!user) throwAppError(EAuthErrorCode.AUTH_REFRESH_TOKEN_INVALID, undefined, HttpStatus.UNAUTHORIZED);
+    return { accessToken: this.generateAccessToken(user), user: this.sanitizeUser(user) };
+  }
+
+  /** Mọi lỗi (token hỏng, sai loại, user không tồn tại/bị khoá, lỗi DB) đều quy về "không hợp lệ", như trước đây */
+  private async findUserForRefreshToken(refreshToken: string): Promise<User | null> {
     try {
       const payload = this.jwtService.verify<JwtPayload>(refreshToken, { secret: this.jwtSecret });
       // Chỉ nhận refresh token — access token (hoặc token cũ không có claim `type`) không đổi được lấy token mới
-      if (payload.type !== 'refresh') {
-        throw new UnauthorizedException('Invalid refresh token');
-      }
-
+      if (payload.type !== 'refresh') return null;
       const user = await this.userRepo.findOne({ where: { id: payload.sub } });
-      if (!user || user.status !== 'active') {
-        throw new UnauthorizedException('User not found or disabled');
-      }
-
-      const accessToken = this.generateAccessToken(user);
-      return { accessToken, user: this.sanitizeUser(user) };
+      return user?.status === 'active' ? user : null;
     } catch {
-      throw new UnauthorizedException('Invalid refresh token');
+      return null;
     }
+  }
+
+  /** Tạo user theo email Google, hoặc cập nhật hồ sơ nếu đã có (kể cả khi vừa bị request đồng thời tạo mất) */
+  private async upsertGoogleUser(googleUser: GoogleUserPayload): Promise<User> {
+    const existing = await this.userRepo.findOne({ where: { email: googleUser.email } });
+    if (existing) return this.refreshGoogleProfile(this.assertActive(existing), googleUser);
+
+    try {
+      return await this.userRepo.save(
+        this.userRepo.create({
+          email: googleUser.email,
+          name: googleUser.name,
+          image: googleUser.picture,
+          provider: 'google',
+          providerId: googleUser.sub,
+          role: 'user',
+          permissions: DEFAULT_USER_PERMISSIONS,
+          status: 'active',
+        }),
+      );
+    } catch (err) {
+      const raced = isUniqueViolation(err, 'UQ_users_email') && (await this.userRepo.findOne({ where: { email: googleUser.email } }));
+      if (!raced) throw err;
+      return this.refreshGoogleProfile(this.assertActive(raced), googleUser);
+    }
+  }
+
+  /** Tài khoản bị khoá không nhận token mới (và không bị cập nhật hồ sơ) */
+  private assertActive(user: User): User {
+    if (user.status !== 'active') throwAppError(EAuthErrorCode.AUTH_USER_DISABLED, undefined, HttpStatus.FORBIDDEN);
+    return user;
+  }
+
+  private refreshGoogleProfile(user: User, googleUser: GoogleUserPayload): Promise<User> {
+    user.name = googleUser.name || user.name;
+    user.image = googleUser.picture || user.image;
+    user.provider = 'google';
+    user.providerId = googleUser.sub;
+    return this.userRepo.save(user);
   }
 
   private get jwtSecret(): string {
@@ -122,7 +140,7 @@ export class AuthService {
     const expiresIn =
       type === 'access' ? this.configService.get('JWT_EXPIRES_IN', '1d') : this.configService.get('JWT_REFRESH_EXPIRES_IN', '30d');
     const payload: JwtPayload = { sub: user.id, email: user.email, role: user.role, type };
-    return this.jwtService.sign(payload, { secret: this.jwtSecret, expiresIn: expiresIn as any });
+    return this.jwtService.sign(payload, { secret: this.jwtSecret, expiresIn: expiresIn as JwtSignOptions['expiresIn'] });
   }
 
   private sanitizeUser(user: User) {

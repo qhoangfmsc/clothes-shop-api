@@ -1,0 +1,32 @@
+import { Public } from '@common/decorator/public.decorator';
+import { Controller, Get, Param, Query } from '@nestjs/common';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ProductAutocompleteQueryDto } from './dtos/product-autocomplete-query.dto';
+import { ProductDetailQueryDto } from './dtos/product-detail-query.dto';
+import { PublicProductQueryDto } from './dtos/public-product-query.dto';
+import { ProductCatalogQueryService } from './product-catalog-query.service';
+
+@ApiTags('Products')
+@Controller('api/products')
+@Public()
+export class ProductCatalogController {
+  constructor(private readonly productService: ProductCatalogQueryService) {}
+
+  @Get()
+  @ApiOperation({ summary: 'List products with search, filters, sorting, and pagination' })
+  async findAll(@Query() query: PublicProductQueryDto) {
+    return this.productService.findAllPublic(query);
+  }
+
+  @Get('autocomplete')
+  @ApiOperation({ summary: 'Search product suggestions for autocomplete (min 2 chars)' })
+  async autocomplete(@Query() query: ProductAutocompleteQueryDto) {
+    return this.productService.autocomplete(query);
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Get product by ID with related products' })
+  async findOne(@Param('id') id: string, @Query() query: ProductDetailQueryDto) {
+    return this.productService.findById(id, query);
+  }
+}

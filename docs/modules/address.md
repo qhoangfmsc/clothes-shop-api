@@ -1,6 +1,6 @@
 # address (`src/modules/address`)
 
-> Cập nhật lần cuối: 2026-10-12
+> Cập nhật lần cuối: 2026-10-23
 
 ## 1. Tổng quan
 
@@ -89,7 +89,9 @@ Bảng `addresses` (entity `Address extends BaseEntity`):
 
 ### 4.5 Error code
 
-Không có error code riêng; không tìm thấy địa chỉ ném `NotFoundException('Address not found')` (HTTP 404).
+| Code | Tên | Khi nào |
+|---|---|---|
+| 2101 | `EAddressErrorCode.ADDRESS_NOT_FOUND` | Sửa/xoá địa chỉ không tồn tại hoặc không thuộc user; checkout với địa chỉ như vậy (HTTP 404) |
 
 ### 4.6 Phụ thuộc & cấu hình
 
@@ -97,9 +99,14 @@ Không có error code riêng; không tìm thấy địa chỉ ném `NotFoundExce
 
 ### 4.7 Test
 
-Chưa có test.
+Flow test trên Postgres thật (`test/flows/address/`):
+
+- `address-errors.flow.ts` — sửa/xoá địa chỉ lạ hoặc của người khác → 404 / 2101 và địa chỉ của người khác không đổi.
+- `address.flow.ts` (batch 18) — danh sách (chỉ của mình, mặc định trước rồi mới nhất trước, `{ data, total }`, rỗng); tạo (giá trị mặc định của các field tuỳ chọn, địa chỉ mặc định mới thay mặc định cũ chỉ trong địa chỉ của chính mình, validation từng field, `userId` và field lạ bị từ chối); sửa (chỉ field được gửi đổi, body rỗng không đổi gì, đặt/bỏ mặc định, 404 / 2101, validation); xoá (không tự chọn mặc định mới, đơn đã đặt vẫn giữ bản sao địa chỉ, 404 / 2101 kể cả xoá lần hai).
 
 ### 4.8 Lưu ý hiện trạng
+
+- `PATCH` dùng `Update*Dto = PartialType(Create*Dto, { skipNullProperties: false })`: mọi ràng buộc của create được kế thừa (chuỗi rỗng ở field bắt buộc → 400), `null` ở field bắt buộc → 400, `null` ở field tuỳ chọn được coi như không gửi (trừ không có field nào như vậy). Response là bản ghi đầy đủ, không thiếu field chưa gửi (xem [common](common.md) 4.13).
 
 - Thao tác đổi cờ mặc định không nằm trong transaction.
 - Địa chỉ đầu tiên không tự động là mặc định; xoá địa chỉ mặc định không tự chọn địa chỉ khác làm mặc định.

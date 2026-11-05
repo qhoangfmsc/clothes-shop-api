@@ -1,4 +1,4 @@
-import { ACTIVE_STATUSES, USER_ROLES } from '@common/constants/enum-values.constant';
+import { ACTIVE_STATUSES, ActiveStatus, USER_ROLES } from '@common/constants/enum-values.constant';
 import { SearchField } from '@common/decorator/search-field.decorator';
 import { SortField } from '@common/decorator/sort-field.decorator';
 import { PaginationQueryDto } from '@common/dto/pagination-query.dto';
@@ -19,7 +19,7 @@ export class AdminUserQueryDto extends PaginationQueryDto {
   @IsString()
   @IsOptional()
   @IsIn(ACTIVE_STATUSES)
-  status?: string;
+  status?: ActiveStatus;
 
   @SortField(['name', 'email', 'createdAt'], '-createdAt')
   sort?: string;

@@ -1,6 +1,6 @@
 # product (`src/modules/product`)
 
-> Cập nhật lần cuối: 2026-10-18
+> Cập nhật lần cuối: 2026-10-25
 
 ## 1. Tổng quan
 
@@ -12,7 +12,7 @@ Module sản phẩm: API công khai để duyệt/tìm/xem chi tiết sản ph�
 | Route prefix | `/api/products` (public), `/api/admin/products` (admin) |
 | Bảng DB | `products` |
 | Module phụ thuộc | `category` (entity `Category`, `SubCategory`); `currency` (`CurrencyService.getVndPerUsd` — USD của giá, xem [currency](currency.md)) |
-| Export | `ProductService` |
+| Export | `ProductCatalogQueryService` |
 
 ## 2. Mục đích & nghiệp vụ phục vụ
 
@@ -23,10 +23,13 @@ Module sản phẩm: API công khai để duyệt/tìm/xem chi tiết sản ph�
 
 ## 3. Submodule & chức năng
 
-| Submodule | Controller | Route prefix | Truy cập | Chức năng |
-|---|---|---|---|---|
-| Public | `product.controller.ts` | `/api/products` | `@Public()` | List có filter/sort/phân trang, autocomplete, chi tiết + related |
-| Admin | `admin-product.controller.ts` | `/api/admin/products` | JWT + permission | List (kể cả `disabled`), tạo, sửa, xoá |
+Mỗi nhóm chức năng là một thư mục (cell, quy ước `docs/specs/common/0011`); hai cell không import nhau.
+
+| Cell | Thư mục | Controller | Route prefix | Truy cập | Chức năng |
+|---|---|---|---|---|---|
+| Danh mục công khai | `catalog/` | `product-catalog.controller.ts` | `/api/products` | `@Public()` | List có filter/sort/phân trang, autocomplete, chi tiết + related |
+| Quản trị | `admin/` | `admin-product.controller.ts` | `/api/admin/products` | JWT + permission | List (kể cả `disabled`), tạo, sửa, xoá |
+| Dùng chung | `shared/` | — | — | — | Entity `Product`, `shared/product.presenter.ts`, `shared/product-rating.util.ts` |
 
 ## 4. Chi tiết
 
@@ -58,7 +61,13 @@ Module sản phẩm: API công khai để duyệt/tìm/xem chi tiết sản ph�
 
 Luôn chỉ lấy `status = 'active'`. Response `paginated(...)`, mỗi phần tử là sản phẩm kèm `category`, `subcategory`, `ratingAverage` (number 1.0–5.0 hoặc `null`) và `ratingCount` (xem 4.2). Giá trả ra dạng `priceVnd`, `priceUsd`, `originalPriceVnd`, `originalPriceUsd` (cả hai `originalPrice…` là `null` khi không có giá gốc); không còn field `price`/`originalPrice`. Quy ước này áp dụng cho mọi nơi trả sản phẩm (chi tiết, `related`, admin, create/update, giỏ, wishlist, collection).
 
-**GET `/api/products/autocomplete`** — `ProductAutocompleteQueryDto`: `q` (string, 2–255 ký tự, bắt buộc), `limit` (int, tuỳ chọn, mặc định 8, 1–10; vượt → 400). Khớp "chứa" `ILIKE '%q%'` trên `name` hoặc `slug` (ký tự `%`, `_`, `\` trong `q` được escape nên khớp theo nghĩa đen), chỉ `active`. Sắp xếp: tên bắt đầu bằng `q` lên trước, rồi `name` ASC. Response `{ data: [{ id, name, slug, priceVnd, priceUsd, image, badge }] }` (`image` là ảnh đầu tiên hoặc `null`, `badge` là `new`/`sale`/`bestseller`/`sold_out`/`limited`/`custom_order` hoặc `null`). `limit` nằm riêng trong DTO này (không kế thừa `PaginationQueryDto`), không phân trang; DTO nằm trong `NOT_LIST_DTO_FILES`.
+**Hình dạng chung của sản phẩm trong mọi response**: luôn qua `presentProduct` (`shared/product.presenter.ts`). `category` là `{ id, slug, title, description, heroImage, priority, createdAt, updatedAt }` (không có `subcategories`), `subcategory` là `{ id, slug, label, description, count, createdAt, updatedAt }` (không có `category`) — giống nhau dù entity được nạp bằng `find` (eager `Category.subcategories`) hay query builder. Nơi nào trả sản phẩm phải nạp `PRODUCT_RELATIONS` (`['category', 'subcategory']`, cùng file presenter) để hai field này có mặt: danh sách/chi tiết/`related`/admin/create/update sản phẩm, `GET /api/cart`, `GET /api/wishlist`, mọi response collection. 
+
+**Tóm tắt sản phẩm `ProductSummary`** — nơi chỉ cần nhận diện sản phẩm và dựng link (autocomplete, `product` trong đánh giá, `product` trong dòng đơn hàng và trong danh sách chờ đánh giá) luôn dùng `presentProductSummary` (cùng file presenter): `{ id, name, slug, image, badge, category: { id, slug, title } | null, subcategory: { id, slug, label } | null }`. `image` là ảnh đầu tiên hoặc `null`, `badge` hoặc `null`; mọi key luôn có mặt. Nơi cần giá thì ghép thêm cặp `priceVnd`/`priceUsd` (autocomplete). Quan hệ phải được nạp (join) trước khi present, nếu không `category`/`subcategory` là `null`.
+
+Dòng đơn hàng (`order_items`) giữ ảnh chụp lúc đặt (`productId`, `productName`, `productImage`, `price`) và có thêm `product` là `ProductSummary` của sản phẩm hiện tại (`null` khi sản phẩm đã bị xoá), xem [order](order.md).
+
+**GET `/api/products/autocomplete`** — `ProductAutocompleteQueryDto`: `q` (string, 2–255 ký tự, bắt buộc), `limit` (int, tuỳ chọn, mặc định 8, 1–10; vượt → 400). Khớp "chứa" `ILIKE '%q%'` trên `name` hoặc `slug` (ký tự `%`, `_`, `\` trong `q` được escape nên khớp theo nghĩa đen), chỉ `active`. Sắp xếp: tên bắt đầu bằng `q` lên trước, rồi `name` ASC. Response `{ data: ProductSummary & { priceVnd, priceUsd } }[]` (`badge` là `new`/`sale`/`bestseller`/`sold_out`/`limited`/`custom_order` hoặc `null`; `category`/`subcategory` lấy bằng join chỉ chọn các cột `id`, `slug`, `title`/`label`). `limit` nằm riêng trong DTO này (không kế thừa `PaginationQueryDto`), không phân trang; DTO nằm trong `NOT_LIST_DTO_FILES`.
 
 **GET `/api/products/:id`** → `{ data: Product(+category, subcategory), related: Product[] }`. `ProductDetailQueryDto`: `relatedLimit` (int, tuỳ chọn, mặc định 4, 1–20; ngoài khoảng hoặc không phải số nguyên → 400). `related`: tối đa `relatedLimit` sản phẩm `active` cùng category, khác chính nó, mới nhất trước (ít hơn nếu category không đủ sản phẩm). `relatedLimit` nằm riêng trong DTO này (không phải API list, không kế thừa `PaginationQueryDto`); DTO nằm trong `NOT_LIST_DTO_FILES`. Không thấy → `404 Product not found`.
 
@@ -158,14 +167,14 @@ Tham chiếu tới `products`: `reviews`, `wishlists`, `cart_items`, `collection
 
 **List admin**: dùng `findAndCount` với `where` dạng mảng OR cho search (mỗi nhánh kèm filter status/badge/category/`minRating`); sort theo `ratingAverage` dùng `nulls: 'LAST'`, thứ tự phụ `id` ASC.
 
-**Điểm đánh giá**: `ratingAverage`/`ratingCount` do [review](review.md) tính lại trong mỗi thao tác đánh giá (tạo, sửa sao, ẩn, hiện lại) và điền lại cho dữ liệu cũ bởi migration `AddReviewImagesAndProductRating`; module này chỉ đọc, sort và lọc theo chúng.
+**Điểm đánh giá**: `ratingAverage`/`ratingCount` do [review](review.md) tính lại (số liệu từ các đánh giá `PUBLISHED`) rồi ghi qua `setProductRating` (`shared/product-rating.util.ts`, module product sở hữu hai cột) trong mỗi thao tác đánh giá (tạo, sửa sao, ẩn, hiện lại) và điền lại cho dữ liệu cũ bởi migration `AddReviewImagesAndProductRating`; module này chỉ đọc, sort và lọc theo chúng.
 
 ### 4.5 Error code
 
 | Code | Tên | Khi nào |
 |---|---|---|
-| 1002 | `PRODUCT_SLUG_DUPLICATE` | Slug đã tồn tại |
-| 1003 | `PRODUCT_SKU_DUPLICATE` | SKU đã tồn tại |
+| 1002 | `PRODUCT_SLUG_DUPLICATE` | Slug đã tồn tại, kể cả khi hai request tạo đồng thời cùng slug (ràng buộc `UQ_products_slug` được ánh xạ thay vì 500; xem [common](common.md) 4.6) |
+| 1003 | `PRODUCT_SKU_DUPLICATE` | SKU đã tồn tại, kể cả SKU tự sinh trùng SKU có sẵn |
 | 1004 | `PRODUCT_CATEGORY_NOT_FOUND` | Không thấy category hoặc subcategory |
 | 1005 | `PRODUCT_SUBCATEGORY_MISMATCH` | Subcategory không thuộc category |
 | 1009 | `PRODUCT_INVALID_PRICE` | `originalPriceVnd < priceVnd` |
@@ -176,18 +185,36 @@ Sizes/colors/images rỗng không có error code riêng: bị chặn ở DTO (`A
 ### 4.6 Phụ thuộc & cấu hình
 
 - `TypeOrmModule.forFeature([Product, Category, SubCategory])`; `CurrencyModule` (`CurrencyService`).
-- `product.presenter.ts` (`presentProduct`) đổi `price`/`originalPrice` của entity thành cặp `...Vnd`/`...Usd`; module cart, wishlist, collection dùng lại hàm này.
+- `shared/product.presenter.ts` (`presentProduct`) đổi `price`/`originalPrice` của entity thành cặp `...Vnd`/`...Usd`; module cart, wishlist, collection dùng lại hàm này.
 - Không có biến môi trường riêng.
-- `ProductService` được export nhưng chưa module nào inject.
+- `ProductCatalogQueryService` inject `Repository<Product>`, `CurrencyService`; `ProductAdminQueryService` inject `Repository<Product>`, `Repository<Category>`, `CurrencyService`; `ProductAdminService` inject `Repository<Product>`, `Repository<Category>`, `Repository<SubCategory>`, `CurrencyService`. Module export `ProductCatalogQueryService` nhưng chưa module nào inject.
 
 ### 4.7 Test
 
-`product.presenter.spec.ts` — `presentProduct` (thay field giá bằng cặp Vnd/Usd, giá gốc `null`, không đổi entity gốc). `product.service.spec.ts` — lọc `minRating` và sort theo `ratingAverage`/`ratingCount` (public: điều kiện, `NULLS LAST`, thứ tự phụ; admin: `where`/`order`, kết hợp với search). Các phần còn lại của service chưa có spec riêng. `PublicProductQueryDto` và `AdminProductQueryDto` được `list-query.dto.spec.ts` kiểm tra tự động; `ProductAutocompleteQueryDto` và `ProductDetailQueryDto` nằm trong danh sách DTO không phải list. `findById`: `related` dùng `take` mặc định 4 và theo `relatedLimit`; `ProductDetailQueryDto`: mặc định 4, ép kiểu số, từ chối 0, âm, > 20, chữ, số thập phân.
+`shared/product.presenter.spec.ts` — `presentProduct` (thay field giá bằng cặp Vnd/Usd, giá gốc `null`, không đổi entity gốc; `category`/`subcategory` cùng hình dạng dù nạp kiểu nào, vắng mặt khi chưa nạp). `catalog/product-catalog-query.service.spec.ts` (`ProductCatalogQueryService`) và `admin/product-admin-query.service.spec.ts` (`ProductAdminQueryService`) — lọc `minRating` và sort theo `ratingAverage`/`ratingCount` (public: điều kiện, `NULLS LAST`, thứ tự phụ; admin: `where`/`order`, kết hợp với search). Các phần còn lại của service chưa có unit spec riêng. `PublicProductQueryDto` và `AdminProductQueryDto` được `list-query.dto.spec.ts` kiểm tra tự động; `ProductAutocompleteQueryDto` và `ProductDetailQueryDto` nằm trong danh sách DTO không phải list. `presentProductSummary`: giữ đúng các key của `ProductSummary`, `null` khi thiếu ảnh/badge/quan hệ; autocomplete trả summary kèm `priceVnd`/`priceUsd` và join `category`, `subcategory`. `presentProduct`: bỏ `category.subcategories` và `subcategory.category`, không đụng entity gốc, không thêm field khi quan hệ chưa nạp. `findById`: `related` dùng `take` mặc định 4 và theo `relatedLimit`; `ProductDetailQueryDto`: mặc định 4, ép kiểu số, từ chối 0, âm, > 20, chữ, số thập phân.
+
+Flow test trên Postgres thật (`test/flows/product/`; builder `b.product()` nhận `category`/`subcategory`/`createdAt`/`ratingAverage` để dựng dữ liệu):
+
+- `product-read.flow.ts` (batch 13) — danh sách công khai (chỉ `active`, hình dạng chuẩn với cặp `Vnd`/`Usd`, tìm theo tên/slug/mô tả, lọc category/subcategory/badge, khoảng giá hai đầu gồm cả biên, size/màu khớp một trong các giá trị và bỏ qua mục rỗng, `minRating` loại sản phẩm chưa có đánh giá, sort tăng/giảm với sản phẩm chưa có đánh giá luôn cuối, phân trang, tham số sai); chi tiết (`related` cùng category, chỉ `active`, bỏ chính nó, mới nhất trước, mặc định 4 và `relatedLimit`, 404 / 1001, `relatedLimit` sai); autocomplete (khớp chứa tên/slug, tên bắt đầu bằng `q` lên trước rồi theo tên, `%`/`_` khớp theo nghĩa đen, `limit`, `q`/`limit` sai); danh sách admin (mọi trạng thái, tìm theo tên/slug/SKU/mô tả kết hợp với bộ lọc, lọc category/badge/status/`minRating`, sort, phân trang, tham số sai).
+- `product-admin.flow.ts` (batch 13–14: tạo, sửa, xoá) — tạo (SKU tự sinh `{category}-{subcategory}-{slug}`, SKU và giá gốc tuỳ chỉnh, biên giá 1 và 1.000.000.000, `disabled` không hiện ở danh sách công khai, 1002/1003/1009/1004/1005, validation từng field kể cả tên cũ `price`/`originalPrice` và các field không được gửi); sửa (chỉ field được gửi đổi trong DB, `badge: null` xoá badge, body rỗng không đổi gì, tắt/bật `status`, không đụng điểm đánh giá, SKU sinh lại khi đổi `slug` hoặc dùng `sku` gửi kèm, tự nhận lại slug/SKU của chính mình, kiểm tra giá gốc trên giá trị cuối khi chỉ đổi một trong hai, 1002/1003/1009/1004/1005, 404 / 1001, validation); xoá (biến mất khỏi danh sách và chi tiết, xoá theo dây chuyền giỏ/yêu thích/đánh giá/vote, dòng đơn giữ ảnh chụp với `product: null`, xoá lần hai → 404 / 1001).
 
 ### 4.8 Lưu ý hiện trạng
+
+- `PATCH` dùng `Update*Dto = PartialType(Create*Dto, { skipNullProperties: false })`: mọi ràng buộc của create được kế thừa (chuỗi rỗng ở field bắt buộc → 400), `null` ở field bắt buộc → 400, `null` ở field tuỳ chọn được coi như không gửi (trừ `badge` và `originalPriceVnd`, nơi `null` xoá giá trị). Response là bản ghi đầy đủ, không thiếu field chưa gửi (xem [common](common.md) 4.13).
 
 - `GET /api/products/:id` không lọc theo `status`: sản phẩm `disabled` vẫn xem được chi tiết theo id; `related` thì chỉ gồm `active`.
 - `sort=price` và `minPrice`/`maxPrice` luôn theo VND (tiền gốc); không có lọc/sắp xếp theo USD.
 - Khi sửa `slug`/`categoryId`/`subcategoryId` mà không gửi `sku`, `sku` được sinh lại theo công thức mặc định, kể cả khi sản phẩm đang dùng `sku` tuỳ chỉnh.
 - Xoá sản phẩm không có `try/catch` riêng vì mọi FK trỏ tới `products` đều là `CASCADE` hoặc `SET NULL` (`order_items` giữ lại snapshot tên/giá/ảnh).
 - Giá trị `size`/`color` ở giỏ hàng không được đối chiếu với `sizes`/`colors` của sản phẩm (xem [cart](cart.md)).
+
+### 4.9 Thiết kế & pattern
+
+Spec: `docs/specs/product/0001` (kế hoạch flow test), `docs/specs/product/0002` (tách đọc/ghi).
+
+| Pattern / nguyên lý | Chỗ dùng | Vì sao |
+|---|---|---|
+| Tách command/query theo use case | `ProductCatalogQueryService` (`findAllPublic`, `autocomplete`, `findById`), `ProductAdminQueryService` (`findAllAdmin`) và `ProductAdminService` (`create`, `update`, `delete`) | Luật validate khi ghi (slug/SKU duy nhất, giá gốc ≥ giá, subcategory thuộc category) tách khỏi bộ lọc/sort khi đọc; khách và admin tách lý do đổi |
+| Presenter | `presentProduct`, `presentProductSummary` (`shared/product.presenter.ts`) | Entity không bao giờ trả thẳng ra API; cặp `Vnd`/`Usd` tính một chỗ |
+
+Chia cell (spec [product/0003](../specs/product/0003-product-cells.md), quy ước [common/0011](../specs/common/0011-module-cells.md)): `catalog/`, `admin/`, `shared/`. Entity và presenter dùng chung được các module cart, wishlist, collection, order, review import từ `product/shared/`.

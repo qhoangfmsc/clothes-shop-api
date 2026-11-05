@@ -1,13 +1,15 @@
+import { isUniqueViolation } from '@common/base/db-error.util';
 import { NON_ORDERABLE_BADGES } from '@common/constants/enum-values.constant';
 import { throwAppError } from '@common/exceptions/app.exception';
-import { EOrderErrorCode, EProductErrorCode } from '@common/exceptions/error-codes';
+import { ECartErrorCode, EOrderErrorCode, EProductErrorCode } from '@common/exceptions/error-codes';
 import { money } from '@common/utils/money.util';
-import { BadRequestException, HttpStatus, Injectable, NotFoundException } from '@nestjs/common';
+import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CurrencyService } from '../currency/currency.service';
-import { Product } from '../product/product.entity';
-import { presentProduct } from '../product/product.presenter';
+import { Product } from '../product/shared/product.entity';
+import { presentProduct } from '../product/shared/product.presenter';
+import { CART_MAX_ITEM_QUANTITY } from './cart.constant';
 import { Cart } from './cart.entity';
 import { CartItem } from './cart-item.entity';
 import { AddToCartDto, UpdateCartItemDto } from './dtos/cart.dto';
@@ -26,14 +28,17 @@ export class CartService {
     private readonly currencyService: CurrencyService,
   ) {}
 
-  /** Get or create cart for user */
+  /** Lấy hoặc tạo giỏ; thua cuộc đua tạo (`UQ_carts_user`) thì dùng giỏ của request thắng */
   private async getOrCreateCart(userId: string): Promise<Cart> {
-    let cart = await this.cartRepo.findOne({ where: { userId } });
-    if (!cart) {
-      cart = this.cartRepo.create({ userId });
-      cart = await this.cartRepo.save(cart);
+    const found = await this.cartRepo.findOne({ where: { userId } });
+    if (found) return found;
+    try {
+      return await this.cartRepo.save(this.cartRepo.create({ userId }));
+    } catch (err) {
+      const raced = isUniqueViolation(err, 'UQ_carts_user') && (await this.cartRepo.findOne({ where: { userId } }));
+      if (!raced) throw err;
+      return raced;
     }
-    return cart;
   }
 
   async getCart(userId: string) {
@@ -75,7 +80,7 @@ export class CartService {
     // Validate product exists and is active
     const product = await this.productRepo.findOne({ where: { id: dto.productId } });
     if (!product) throwAppError(EProductErrorCode.PRODUCT_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
-    if (product.status !== 'active') throw new BadRequestException('Product is not available');
+    if (product.status !== 'active') throwAppError(ECartErrorCode.CART_PRODUCT_UNAVAILABLE);
     // sold_out / custom_order không thêm vào giỏ được (cùng mã lỗi với checkout để FE xử lý một chỗ)
     if (product.badge && NON_ORDERABLE_BADGES.includes(product.badge)) {
       throwAppError(
@@ -84,34 +89,53 @@ export class CartService {
       );
     }
 
-    // Check if same product+size+color already in cart
-    const existing = await this.cartItemRepo.findOne({
-      where: { cartId: cart.id, productId: dto.productId, size: dto.size || '', color: dto.color || '' },
-    });
-
-    if (existing) {
-      existing.quantity += dto.quantity || 1;
-      await this.cartItemRepo.save(existing);
-    } else {
-      const item = this.cartItemRepo.create({
-        cartId: cart.id,
-        productId: dto.productId,
-        quantity: dto.quantity || 1,
-        size: dto.size || '',
-        color: dto.color || '',
-      });
-      await this.cartItemRepo.save(item);
-    }
+    await this.addQuantity({ cartId: cart.id, productId: dto.productId, size: dto.size || '', color: dto.color || '' }, dto.quantity || 1);
 
     return this.getCart(userId);
   }
 
+  /**
+   * Cộng dồn nguyên tử trong một câu UPDATE (không mất lần cộng, không vượt trần). Dòng chưa có thì tạo. Hai điểm đua cần thử lại:
+   * dòng vừa được request khác tạo (thua `UQ_cart_items_unique`, hoặc UPDATE chạy trước khi dòng xuất hiện) nên chỉ kết luận "đạt giới hạn"
+   * khi UPDATE đã thất bại lần thứ hai dù dòng đã tồn tại.
+   */
+  private async addQuantity(line: { cartId: string; productId: string; size: string; color: string }, quantity: number): Promise<void> {
+    let sawExistingLine = false;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const updated = await this.cartItemRepo
+        .createQueryBuilder()
+        .update()
+        .set({ quantity: () => 'quantity + :quantity' })
+        .where('cart_id = :cartId AND product_id = :productId AND size = :size AND color = :color AND quantity + :quantity <= :max', {
+          ...line,
+          quantity,
+          max: CART_MAX_ITEM_QUANTITY,
+        })
+        .execute();
+      if (updated.affected) return;
+
+      if (await this.cartItemRepo.exists({ where: line })) {
+        if (sawExistingLine)
+          throwAppError(ECartErrorCode.CART_QUANTITY_LIMIT, `Cart item quantity limit (${CART_MAX_ITEM_QUANTITY}) reached`);
+        sawExistingLine = true;
+        continue;
+      }
+      try {
+        await this.cartItemRepo.save(this.cartItemRepo.create({ ...line, quantity }));
+        return;
+      } catch (err) {
+        if (!isUniqueViolation(err, 'UQ_cart_items_unique')) throw err;
+      }
+    }
+    throwAppError(ECartErrorCode.CART_QUANTITY_LIMIT, `Cart item quantity limit (${CART_MAX_ITEM_QUANTITY}) reached`);
+  }
+
   async updateItem(userId: string, itemId: string, dto: UpdateCartItemDto) {
     const cart = await this.cartRepo.findOne({ where: { userId } });
-    if (!cart) throw new NotFoundException('Cart not found');
+    if (!cart) throwAppError(ECartErrorCode.CART_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
 
     const item = await this.cartItemRepo.findOne({ where: { id: itemId, cartId: cart.id } });
-    if (!item) throw new NotFoundException('Cart item not found');
+    if (!item) throwAppError(ECartErrorCode.CART_ITEM_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
 
     item.quantity = dto.quantity;
     await this.cartItemRepo.save(item);
@@ -121,10 +145,10 @@ export class CartService {
 
   async removeItem(userId: string, itemId: string) {
     const cart = await this.cartRepo.findOne({ where: { userId } });
-    if (!cart) throw new NotFoundException('Cart not found');
+    if (!cart) throwAppError(ECartErrorCode.CART_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
 
     const item = await this.cartItemRepo.findOne({ where: { id: itemId, cartId: cart.id } });
-    if (!item) throw new NotFoundException('Cart item not found');
+    if (!item) throwAppError(ECartErrorCode.CART_ITEM_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
 
     await this.cartItemRepo.remove(item);
 

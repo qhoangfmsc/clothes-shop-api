@@ -1,6 +1,7 @@
+import { DEFAULT_JWT_SECRET } from '@common/constants/security.constant';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { DEFAULT_JWT_SECRET, JwtPayload } from './auth.constant';
+import { JwtPayload } from './auth.constant';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
 
@@ -33,6 +34,9 @@ async function login(service: AuthService, jwtService: JwtService) {
   };
 }
 
+// 401 / 2202 cho mọi lý do khiến refresh token không dùng được
+const invalidRefreshToken = { status: 401, response: { errorCode: 2202, message: 'Invalid refresh token' } };
+
 describe('AuthService tokens', () => {
   it('signs access and refresh tokens with different `type` claims', async () => {
     const { service, jwtService } = setup();
@@ -51,20 +55,36 @@ describe('AuthService tokens', () => {
   it('rejects an access token used as a refresh token', async () => {
     const { service, jwtService } = setup();
     const { accessToken } = await login(service, jwtService);
-    await expect(service.refreshToken(accessToken)).rejects.toMatchObject({ status: 401 });
+    await expect(service.refreshToken(accessToken)).rejects.toMatchObject(invalidRefreshToken);
   });
 
   it('rejects a legacy token without a `type` claim', async () => {
     const { service, jwtService } = setup();
     const legacy = jwtService.sign({ sub: user.id, email: user.email, role: user.role });
-    await expect(service.refreshToken(legacy)).rejects.toMatchObject({ status: 401 });
+    await expect(service.refreshToken(legacy)).rejects.toMatchObject(invalidRefreshToken);
   });
 
   it('rejects refresh for a disabled user', async () => {
     const { service, jwtService, userRepo } = setup();
     const { refreshToken } = await login(service, jwtService);
     userRepo.findOne.mockResolvedValue({ ...user, status: 'disabled' });
-    await expect(service.refreshToken(refreshToken)).rejects.toMatchObject({ status: 401 });
+    await expect(service.refreshToken(refreshToken)).rejects.toMatchObject(invalidRefreshToken);
+  });
+
+  it('rejects refresh for a user that no longer exists, and for garbage', async () => {
+    const { service, jwtService, userRepo } = setup();
+    const { refreshToken } = await login(service, jwtService);
+    userRepo.findOne.mockResolvedValue(null);
+    await expect(service.refreshToken(refreshToken)).rejects.toMatchObject(invalidRefreshToken);
+    await expect(service.refreshToken('not-a-jwt')).rejects.toMatchObject(invalidRefreshToken);
+  });
+
+  it('answers 401 / 2201 from getMe when the user is gone, and returns the user otherwise', async () => {
+    await expect(setup(null).service.getMe('u1')).rejects.toMatchObject({
+      status: 401,
+      response: { errorCode: 2201, message: 'User not found' },
+    });
+    expect((await setup().service.getMe('u1')).user.email).toBe(user.email);
   });
 });
 

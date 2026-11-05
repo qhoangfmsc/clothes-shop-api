@@ -2,6 +2,10 @@ import { JwtAuthGuard } from '@common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '@common/guards/permissions.guard';
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { RateLimitGuard } from './common/guards/rate-limit.guard';
+import { RATE_LIMIT_WINDOW_MS, rateLimitPerMinute } from './common/utils/rate-limit.config';
+import { createRateLimitStorage } from './common/utils/rate-limit.storage';
 import { CoreModule } from './core/core.module';
 import { MainController } from './main.controller';
 import { AddressModule } from './modules/address/address.module';
@@ -15,6 +19,7 @@ import { OrderModule } from './modules/order/order.module';
 import { PaymentModule } from './modules/payment/payment.module';
 import { PendingCountModule } from './modules/pending-count/pending-count.module';
 import { ProductModule } from './modules/product/product.module';
+import { RefundModule } from './modules/refund/refund.module';
 import { ReturnModule } from './modules/return/return.module';
 import { ReviewModule } from './modules/review/review.module';
 import { ShippingModule } from './modules/shipping/shipping.module';
@@ -25,6 +30,13 @@ import { WishlistModule } from './modules/wishlist/wishlist.module';
 
 @Module({
   imports: [
+    ThrottlerModule.forRootAsync({
+      useFactory: () => ({
+        throttlers: [{ name: 'default', ttl: RATE_LIMIT_WINDOW_MS, limit: () => rateLimitPerMinute('default') }],
+        // Có REDIS_URL thì bộ đếm dùng chung giữa các instance; không có thì kho in-memory mặc định
+        storage: createRateLimitStorage(process.env.REDIS_URL),
+      }),
+    }),
     CoreModule,
     AuthModule,
     UserModule,
@@ -42,11 +54,17 @@ import { WishlistModule } from './modules/wishlist/wishlist.module';
     CartModule,
     OrderModule,
     PaymentModule,
+    RefundModule,
     ReturnModule,
     PendingCountModule,
   ],
   controllers: [MainController],
   providers: [
+    // Đầu tiên: chặn cả request chưa xác thực (dò đăng nhập) trước khi tốn JWT/DB
+    {
+      provide: APP_GUARD,
+      useClass: RateLimitGuard,
+    },
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,

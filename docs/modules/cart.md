@@ -1,6 +1,6 @@
 # cart (`src/modules/cart`)
 
-> Cập nhật lần cuối: 2026-10-18
+> Cập nhật lần cuối: 2026-10-24
 
 ## 1. Tổng quan
 
@@ -99,8 +99,7 @@ UNIQUE `UQ_cart_items_unique` trên `(cart_id, product_id, size, color)`.
 1. Lấy hoặc tạo giỏ của user.
 2. Sản phẩm không tồn tại → `PRODUCT_NOT_FOUND (1001)`, HTTP 404; `status !== 'active'` → `400 Product is not available`.
 3. Badge ∈ (`sold_out`, `custom_order`) → `ORDER_PRODUCT_NOT_ORDERABLE (1303)` (cùng mã với checkout).
-4. Tìm dòng trùng `(cartId, productId, size, color)`: có → cộng dồn `quantity += (dto.quantity || 1)`; chưa có → tạo dòng mới.
-5. Trả về giỏ đầy đủ như `GET`.
+4. Cộng dồn nguyên tử bằng một câu `UPDATE cart_items SET quantity = quantity + n WHERE (cart_id, product_id, size, color) AND quantity + n <= 99`: không mất lần cộng khi nhiều request đồng thời. Không dòng nào được đổi: nếu dòng đã tồn tại → `CART_QUANTITY_LIMIT (2004)`; chưa có → tạo dòng mới. Thua cuộc đua tạo (`UQ_cart_items_unique`, hoặc dòng vừa xuất hiện giữa hai câu lệnh) → thử `UPDATE` lại, chỉ kết luận "đạt giới hạn" khi `UPDATE` thất bại lần thứ hai dù dòng đã có. Giỏ (`UQ_carts_user`) tạo đồng thời cũng đọc lại bản của request thắng.
 
 **Sửa số lượng / xoá dòng**: giỏ của user phải tồn tại (`404 Cart not found`), dòng phải thuộc giỏ đó (`404 Cart item not found`); xong trả lại giỏ đầy đủ.
 
@@ -112,8 +111,12 @@ UNIQUE `UQ_cart_items_unique` trên `(cart_id, product_id, size, color)`.
 |---|---|---|
 | 1303 | `EOrderErrorCode.ORDER_PRODUCT_NOT_ORDERABLE` | Thêm sản phẩm có badge `sold_out` / `custom_order` (mã thuộc nhóm order, dùng chung với checkout) |
 | 1001 | `EProductErrorCode.PRODUCT_NOT_FOUND` | `productId` không tồn tại khi thêm vào giỏ (HTTP 404) |
+| 2001 | `ECartErrorCode.CART_NOT_FOUND` | Sửa/xoá dòng khi user chưa có giỏ (HTTP 404) |
+| 2002 | `ECartErrorCode.CART_ITEM_NOT_FOUND` | Dòng không tồn tại hoặc thuộc giỏ khác (HTTP 404) |
+| 2003 | `ECartErrorCode.CART_PRODUCT_UNAVAILABLE` | Thêm sản phẩm không `active` (HTTP 400) |
+| 2004 | `ECartErrorCode.CART_QUANTITY_LIMIT` | Thêm làm tổng số lượng một dòng vượt 99 (`CART_MAX_ITEM_QUANTITY`); message `Cart item quantity limit (99) reached`, giỏ không đổi (HTTP 400) |
 
-Các lỗi khác là HTTP thô: `NotFoundException` (`Cart not found`, `Cart item not found`), `BadRequestException` (`Product is not available`).
+Mọi lỗi nghiệp vụ đều qua `throwAppError`.
 
 ### 4.6 Phụ thuộc & cấu hình
 
@@ -125,9 +128,15 @@ Các lỗi khác là HTTP thô: `NotFoundException` (`Cart not found`, `Cart ite
 
 `cart.service.spec.ts` — `CartService.addItem` (service dựng với stub `CurrencyService`): sản phẩm badge `sold_out` / `custom_order` bị từ chối với `errorCode 1303` (HTTP 400, message chứa tên sản phẩm) và không lưu gì; sản phẩm không badge hoặc badge `new`/`sale`/`bestseller`/`limited` vẫn được thêm. `CartService.getCart` nạp kèm `items.product.category` và `items.product.subcategory`.
 
+Flow test (Postgres thật):
+
+- `test/flows/cart/cart.flow.ts` (spec cart/0002) ghim giới hạn 99: 98+1 được, 99+1 / 98+2 / 50+50 / 1+99 → 400 / 2004 và giỏ không đổi, size/màu khác là dòng khác, `PATCH` đặt tuyệt đối vẫn dùng được, 6 lần thêm đồng thời trên dòng có sẵn cộng đúng 7, 4 lần thêm đầu tiên đồng thời tạo một giỏ một dòng (không 500), hai lần thêm 60 đồng thời → một 201 và một 2004.
+- `test/flows/cart/cart-errors.flow.ts` — chưa có giỏ → 404 / 2001 (sửa và xoá); dòng lạ hoặc của giỏ khác → 404 / 2002 (giỏ khác không bị đụng); thêm sản phẩm `disabled` → 400 / 2003 và không thêm gì.
+- `test/flows/cart/cart.flow.ts` — xem giỏ (rỗng, dòng kèm sản phẩm/category/subcategory, cặp `Vnd`/`Usd`, USD của tổng suy ra từ tổng VND, giá theo giá hiện tại, chỉ giỏ của mình); thêm (mặc định, cộng dồn cùng sản phẩm/size/màu, size hoặc màu khác là dòng khác, biên 1/99/50/100 ký tự, 1001/2003/1303, validation từng field); đổi số lượng (đặt chứ không cộng, biên 1/99, dòng của người khác, validation); xoá dòng; xoá sạch (giữ giỏ, không đụng giỏ người khác, lặp lại được).
+
 ### 4.8 Lưu ý hiện trạng
 
 - `size` và `color` là chuỗi tự do, không đối chiếu với `sizes`/`colors` của sản phẩm.
-- Khi cộng dồn vào dòng đã có, service không kiểm tra trần 99; tổng vượt 99 sẽ bị CHECK `CK_cart_items_quantity_max` của DB từ chối (lỗi DB, chưa map sang error code).
 - `updateItem` và `getCart` không kiểm tra lại `status`/badge của sản phẩm; việc đó chỉ thực hiện khi thêm và khi checkout.
 - Giá trong giỏ lấy theo giá hiện tại của sản phẩm (không lưu snapshot); snapshot chỉ được tạo khi tạo đơn hàng.
+- Module [order](order.md) bỏ các dòng giỏ đã đặt qua `removeOrderedCartItems` (`cart-checkout.util.ts`), không tự xoá `cart_items`.

@@ -1,4 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { pickProvided } from '@common/base/provided-fields.util';
+import { throwAppError } from '@common/exceptions/app.exception';
+import { EAddressErrorCode } from '@common/exceptions/error-codes';
+import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Address } from './address.entity';
@@ -25,27 +28,27 @@ export class AddressService {
       await this.addressRepo.update({ userId, isDefault: true }, { isDefault: false });
     }
 
-    const address = this.addressRepo.create({ ...dto, userId });
+    const address = this.addressRepo.create({ ...pickProvided(dto), userId });
     const saved = await this.addressRepo.save(address);
     return { data: saved };
   }
 
   async update(userId: string, addressId: string, dto: UpdateAddressDto) {
     const address = await this.addressRepo.findOne({ where: { id: addressId, userId } });
-    if (!address) throw new NotFoundException('Address not found');
+    if (!address) throwAppError(EAddressErrorCode.ADDRESS_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
 
     if (dto.isDefault) {
       await this.addressRepo.update({ userId, isDefault: true }, { isDefault: false });
     }
 
-    Object.assign(address, dto);
+    Object.assign(address, pickProvided(dto));
     const saved = await this.addressRepo.save(address);
     return { data: saved };
   }
 
   async remove(userId: string, addressId: string) {
     const address = await this.addressRepo.findOne({ where: { id: addressId, userId } });
-    if (!address) throw new NotFoundException('Address not found');
+    if (!address) throwAppError(EAddressErrorCode.ADDRESS_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
     await this.addressRepo.remove(address);
     return { success: true };
   }

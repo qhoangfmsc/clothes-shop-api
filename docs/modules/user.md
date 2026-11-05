@@ -1,6 +1,6 @@
 # user (`src/modules/user`)
 
-> Cập nhật lần cuối: 2026-10-14
+> Cập nhật lần cuối: 2026-10-23
 
 ## 1. Tổng quan
 
@@ -44,7 +44,7 @@ Không có endpoint tạo/xoá user (user chỉ được tạo qua đăng nhập
 |---|---|---|
 | `search` | string | ≤ 255; tìm `ILIKE %…%` trên `name`, `email` |
 | `role` | string | `IsIn(USER_ROLES)` = `user`, `admin` |
-| `status` | string | `IsIn(ACTIVE_STATUSES)` = `active`, `disabled` |
+| `status` | `ActiveStatus` | `IsIn(ACTIVE_STATUSES)` = `active`, `disabled` |
 | `sort` | string | whitelist `name`, `email`, `createdAt` (+ dạng `-field`); mặc định `-createdAt` |
 
 Response `paginated(...)`: mỗi phần tử `{ id, email, name, image, provider, role, permissions, status, createdAt, updatedAt }` (không trả `password`, `providerId`).
@@ -57,7 +57,7 @@ Response `paginated(...)`: mỗi phần tử `{ id, email, name, image, provider
 |---|---|
 | `role` | `IsString`, `IsIn(USER_ROLES)`, `MaxLength(20)` |
 | `status` | `IsString`, `IsIn(ACTIVE_STATUSES)`, `MaxLength(20)` |
-| `permissions` | `IsArray`, `IsInt({ each: true })` — mảng mã permission |
+| `permissions` | `IsArray`, `IsInt({ each: true })`, `IsIn(PERMISSION_CODES, { each: true })`, `ArrayUnique` — mảng mã permission có thật (giá trị số của enum `Permission`), không lặp; `[]` thu hồi hết quyền (spec user/0002) |
 
 Response `{ data: {...user} }`.
 
@@ -106,7 +106,9 @@ Không phụ thuộc module khác. Được import bởi nhiều module khác qu
 
 ### 4.7 Test
 
-Chưa có test riêng. `AdminUserQueryDto` được `list-query.dto.spec.ts` kiểm tra tự động.
+Chưa có unit spec riêng. `AdminUserQueryDto` được `list-query.dto.spec.ts` kiểm tra tự động.
+
+Flow test trên Postgres thật: `test/flows/user/user.flow.ts` (batch 20–21) — danh sách (không lộ `password`/`providerId`, lọc `role`/`status`, tìm theo tên/email, sort, phân trang, tham số sai); chi tiết (404 / 1401); sửa (đổi `role`, `status`, `permissions` có hiệu lực ngay ở request kế tiếp, kể cả token đã cấp và refresh, chỉ field được gửi đổi, body rỗng không đổi gì, admin đổi `role`/`status` của admin khác được, tự đổi `role`/`status` → 400 / 1402 nhưng tự đổi `permissions` được, 404 / 1401, validation).
 
 ### 4.8 Lưu ý hiện trạng
 

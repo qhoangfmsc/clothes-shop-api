@@ -1,0 +1,132 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Cổng trước khi lên main (docs/specs/common/0015, .claude/rules/release-gate.md).
+# Branch protection chỉ cần đặt "CI gate" là required check.
+jobs:
+  check:
+    name: Type check, lint, docs, build, unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: yarn
+      - run: yarn install --frozen-lockfile
+      # exit code của `yarn audit` là bitmask: bit 16 = có lỗ hổng critical (high/moderate chỉ báo, không chặn)
+      - name: Dependency audit (fail on critical)
+        run: |
+          yarn audit --groups dependencies || code=$?
+          [ $(( ${code:-0} & 16 )) -eq 0 ]
+      - run: npx tsc --noEmit
+      # lint = Biome check (format + lint + import) và coi cảnh báo là lỗi
+      - run: yarn lint
+      # docs, spec, test matrix, migration, route khớp code; spec không kẹt Draft/Approved
+      - run: yarn check:docs --strict
+      - run: yarn build
+      - run: yarn test
+
+  change:
+    name: Change discipline (code needs tests and docs)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: yarn
+      - run: yarn install --frozen-lockfile
+      - run: yarn check:change --base origin/${{ github.base_ref }}
+
+  flows:
+    name: Flow tests (real Postgres)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Khớp .env.test (cổng 55432, DB clothes_shop_test) và docker-compose.test.yml (Redis cổng 56379); runner dùng service container thay cho docker compose
+    services:
+      postgres:
+        image: postgres:16-alpine
+        ports:
+          - 55432:5432
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: clothes_shop_test
+        options: >-
+          --health-cmd "pg_isready -U test -d clothes_shop_test"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 56379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: yarn
+      - run: yarn install --frozen-lockfile
+      - run: yarn test:flows:run
+      - run: yarn test:coverage
+
+  boot:
+    name: Production boot smoke (migrate from empty, run the build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        ports:
+          - 55432:5432
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: clothes_shop_test
+        options: >-
+          --health-cmd "pg_isready -U test -d clothes_shop_test"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: yarn
+      - run: yarn install --frozen-lockfile
+      - run: yarn smoke:prod
+
+  gate:
+    name: CI gate
+    if: always()
+    needs: [check, change, flows, boot]
+    runs-on: ubuntu-latest
+    steps:
+      # change bị bỏ qua khi push vào main (không có PR); các job còn lại phải thành công
+      - run: |
+          echo "check=${{ needs.check.result }} change=${{ needs.change.result }} flows=${{ needs.flows.result }} boot=${{ needs.boot.result }}"
+          [ "${{ needs.check.result }}" = "success" ] && [ "${{ needs.flows.result }}" = "success" ] && [ "${{ needs.boot.result }}" = "success" ] && { [ "${{ needs.change.result }}" = "success" ] || [ "${{ needs.change.result }}" = "skipped" ]; }

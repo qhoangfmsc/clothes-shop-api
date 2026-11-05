@@ -1,0 +1,46 @@
+import { ACTIVE_STATUSES, ActiveStatus, PRODUCT_BADGES } from '@common/constants/enum-values.constant';
+import { SearchField } from '@common/decorator/search-field.decorator';
+import { SortField } from '@common/decorator/sort-field.decorator';
+import { PaginationQueryDto } from '@common/dto/pagination-query.dto';
+import { ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
+import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+
+export class AdminProductQueryDto extends PaginationQueryDto {
+  @SearchField('Search keyword (name, slug, sku, description)')
+  search?: string;
+
+  @ApiPropertyOptional({ enum: ACTIVE_STATUSES, description: 'Filter by status' })
+  @IsString()
+  @IsOptional()
+  @IsIn(ACTIVE_STATUSES)
+  status?: ActiveStatus;
+
+  @ApiPropertyOptional({ description: 'Filter by category slug' })
+  @IsString()
+  @IsOptional()
+  @MaxLength(255)
+  category?: string;
+
+  @ApiPropertyOptional({ enum: PRODUCT_BADGES, description: 'Filter by badge' })
+  @IsString()
+  @IsOptional()
+  @IsIn(PRODUCT_BADGES)
+  badge?: string;
+
+  @SortField(['price', 'createdAt', 'name', 'ratingAverage', 'ratingCount'], '-createdAt')
+  sort?: string;
+
+  @ApiPropertyOptional({
+    type: Number,
+    minimum: 1,
+    maximum: 5,
+    description: 'Only products whose average rating is at least this many stars',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(5)
+  minRating?: number;
+}

@@ -1,10 +1,10 @@
 import { Permission } from '@common/permissions/permissions.constant';
 import { Injectable } from '@nestjs/common';
-import { OrderService } from '../order/order.service';
-import { PaymentService } from '../payment/payment.service';
-import { RefundService } from '../payment/refund.service';
-import { ReturnService } from '../return/return.service';
-import { ReviewService } from '../review/review.service';
+import { OrderQueryService } from '../order/query/order-query.service';
+import { PaymentTransactionQueryService } from '../payment/transaction/payment-transaction-query.service';
+import { RefundQueryService } from '../refund/refund-query.service';
+import { ReturnProcessingQueryService } from '../return/processing/return-processing-query.service';
+import { ReviewModerationQueryService } from '../review/moderation/review-moderation-query.service';
 import { User } from '../user/user.entity';
 
 export type PendingCounts = Partial<Record<'orders' | 'payments' | 'refunds' | 'returns' | 'reviews', number>>;
@@ -16,11 +16,11 @@ export type PendingCounts = Partial<Record<'orders' | 'payments' | 'refunds' | '
 @Injectable()
 export class PendingCountService {
   constructor(
-    private readonly orderService: OrderService,
-    private readonly paymentService: PaymentService,
-    private readonly refundService: RefundService,
-    private readonly returnService: ReturnService,
-    private readonly reviewService: ReviewService,
+    private readonly orderQueryService: OrderQueryService,
+    private readonly paymentService: PaymentTransactionQueryService,
+    private readonly refundService: RefundQueryService,
+    private readonly returnService: ReturnProcessingQueryService,
+    private readonly reviewService: ReviewModerationQueryService,
   ) {}
 
   async get(user: Pick<User, 'role' | 'permissions'>): Promise<{ data: PendingCounts }> {
@@ -29,7 +29,7 @@ export class PendingCountService {
 
     // Thiếu quyền thì bỏ hẳn key (không trả 0) và không chạy COUNT
     const jobs: [keyof PendingCounts, () => Promise<number>][] = [];
-    if (can(Permission.ORDER_ADMIN_VIEW)) jobs.push(['orders', () => this.orderService.countNeedsAction()]);
+    if (can(Permission.ORDER_ADMIN_VIEW)) jobs.push(['orders', () => this.orderQueryService.countNeedsAction()]);
     if (can(Permission.PAYMENT_ADMIN_VIEW)) {
       jobs.push(['payments', () => this.paymentService.countNeedsReview()]);
       jobs.push(['refunds', () => this.refundService.countRequested()]);

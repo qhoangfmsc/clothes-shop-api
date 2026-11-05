@@ -1,6 +1,6 @@
 # media (`src/modules/media`)
 
-> Cập nhật lần cuối: 2026-10-14
+> Cập nhật lần cuối: 2026-10-24
 
 ## 1. Tổng quan
 
@@ -116,6 +116,9 @@ Hằng số (`media.constant.ts`): `MEDIA_MAX_FILE_SIZE = 10 MB`, `MEDIA_ALLOWED
 
 ### 4.7 Test
 
+Flow test trên Postgres thật: `test/flows/media/media.flow.ts` (batch 24; Supabase Storage giả bằng `jest.spyOn(globalThis, 'fetch')`, cấu hình storage giả qua `useStorageEnv` của `test/flows/review/steps.ts`; ảnh `REVIEW` của khách được phủ ở `test/flows/review/review-customer.flow.ts`) — ping (bucket và cờ `public`, gọi đúng URL với service key, 404/400 → 1601, 401 → 1601, 500 hoặc không với tới → 1605, thiếu biến → 1601 kèm tên biến mà không gọi storage); danh sách (chỉ `LIBRARY`, URL công khai đã mã hoá, rỗng vẫn cần `SUPABASE_URL`, tìm theo tên, sort `name`/`size`/`createdAt`, phân trang, tham số sai); upload (key `{12 hex}-{tên ASCII}.{đuôi theo loại}`, tên gốc giữ nguyên ở `name`, `purpose = LIBRARY` và `uploaded_by = NULL`, đúng URL/header gửi lên storage, năm loại ảnh nhận theo byte, 1602/1603 không gọi storage, quá 10 MB → 413 không `errorCode`, storage 413/`EntityTooLarge` → 1606, 403 → 1601, lỗi khác → 1605 và không để lại dòng nào, thiếu service key → 1601 trước khi xét file); xoá (xoá object trước rồi mới xoá dòng, storage lỗi thì giữ dòng để thử lại, 404 / 1604 cho id lạ, ảnh `REVIEW` và xoá lần hai mà không gọi storage).
+`media-file.util.spec.ts` — `sniffImageMime` (chữ ký JPEG/PNG/GIF/WebP/AVIF, buffer ngắn/HTML/HEIC → `null`), `sanitizeStorageName` (bỏ dấu tiếng Việt, ký tự lạ, đuôi theo mime, tên rỗng, cắt 80), `displayName` (bỏ path và ký tự điều khiển, cắt 255).
+
 `media.service.spec.ts` — thư viện admin chỉ liệt kê `LIBRARY`; upload ghi `purpose`/`uploadedBy` (admin: `LIBRARY`/NULL, khách: `REVIEW`/user), giới hạn 30 ảnh/24 giờ (429, không gửi lên storage), chỉ xoá được `LIBRARY`, `resolveReviewImageUrls` (URL chuẩn hoá theo thứ tự, từ chối URL ngoài bucket/hỏng/không phải ảnh của user, danh sách rỗng không truy vấn). `MediaService.findAll`: dựng URL công khai khi chỉ có `SUPABASE_URL` + bucket (không cần service key); thiếu URL/bucket thì luôn trả 503 `errorCode 1601`, dù có hay không có dòng nào. `MediaQueryDto` được `list-query.dto.spec.ts` kiểm tra tự động.
 
 ### 4.8 Lưu ý hiện trạng
@@ -125,3 +128,12 @@ Hằng số (`media.constant.ts`): `MEDIA_MAX_FILE_SIZE = 10 MB`, `MEDIA_ALLOWED
 - File lớn hơn giới hạn `FileInterceptor` (10 MB thư viện, 5 MB ảnh đánh giá) bị chặn trước service với `413 File too large` thô (không có `errorCode`).
 - Xoá file không kiểm tra file có đang được tham chiếu bởi URL ở product/collection/category/site-config hay không.
 - Tên file ASCII hoá cho storage key, còn `name` hiển thị giữ tên gốc (Unicode).
+- `POST /api/admin/media` bị giới hạn tần suất chặt (`RATE_LIMIT_UPLOAD_PER_MINUTE`, mặc định 20/phút/IP); vượt → 429 / 9201.
+
+### 4.9 Thiết kế & pattern
+
+Spec: `docs/specs/media/0001` (kế hoạch flow test), `docs/specs/media/0002` (tách logic thuần).
+
+| Pattern / nguyên lý | Chỗ dùng | Vì sao |
+|---|---|---|
+| Logic thuần tách khỏi I/O | `media-file.util.ts`: `sniffImageMime`, `sanitizeStorageName`, `displayName` | Nhận dạng ảnh theo magic bytes và dựng tên file không cần Storage hay DB, nên test trực tiếp; `MediaService` chỉ điều phối I/O |

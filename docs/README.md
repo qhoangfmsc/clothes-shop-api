@@ -4,7 +4,17 @@ Thư mục này là tài liệu thực tế của backend: mỗi module một fi
 
 Quy tắc viết: `.claude/rules/module-docs.md` · Quy trình: skill `module-docs` · Template: `.claude/skills/module-docs/TEMPLATE.md`.
 
-Cập nhật lần cuối: 2026-10-16
+Cập nhật lần cuối: 2026-10-23
+
+## Ba loại tài liệu
+
+| Loại | Nơi | Trả lời |
+|---|---|---|
+| Docs module (thư mục này) | [`modules/`](modules/common.md) | Hiện giờ hệ thống làm gì (viết sau khi code) |
+| Tech spec | [`specs/`](specs/README.md) | Vì sao và thiết kế thế nào (viết trước khi code, theo module) |
+| Test matrix | [`../test/README.md`](../test/README.md) | Luồng nào đã có test nào (unit cạnh code, flow ở `test/flows/`) |
+
+Quy trình làm việc: `.claude/rules/feature-workflow.md` (Đọc → Spec → Code + Test → Docs).
 
 ## Hệ thống
 
@@ -16,7 +26,7 @@ Toàn bộ module được khai báo trong `src/main.module.ts`. Hai guard toàn
 
 | Module | Thư mục | Route prefix | Loại | Mô tả ngắn |
 |---|---|---|---|---|
-| [common & core](modules/common.md) | `src/common`, `src/core`, `src/migrations` | `/`, `/health`, `/api-docs` | Hạ tầng | Guard, phân trang/sort/search, error code, permission, bootstrap, migration |
+| [common & core](modules/common.md) | `src/common`, `src/core`, `src/migrations`, `test/` | `/`, `/health`, `/api-docs` | Hạ tầng | Guard, phân trang/sort/search, error code, permission, bootstrap, migration, hạ tầng flow test |
 | [auth](modules/auth.md) | `src/modules/auth` | `/api/auth` | DB (qua `users`) | Đăng nhập Google, JWT access/refresh, thông tin phiên |
 | [user](modules/user.md) | `src/modules/user` | `/api/admin/users` | DB | Entity người dùng, quản trị role/status/permissions |
 | [product](modules/product.md) | `src/modules/product` | `/api/products`, `/api/admin/products` | DB | Sản phẩm: list/detail/autocomplete, CRUD admin |
@@ -29,7 +39,8 @@ Toàn bộ module được khai báo trong `src/main.module.ts`. Hai guard toàn
 | [order](modules/order.md) | `src/modules/order` | `/api/orders`, `/api/admin/orders` | DB | Checkout từ giỏ, lịch sử đơn, quản trị trạng thái đơn |
 | [pending-count](modules/pending-count.md) | `src/modules/pending-count` | `/api/admin/pending-counts` | DB (qua các module khác) | Số việc chờ admin xử lý cho badge menu: đơn, giao dịch, hoàn tiền, trả hàng, đánh giá chờ phản hồi |
 | [return](modules/return.md) | `src/modules/return` | `/api/returns`, `/api/admin/returns` | DB | Trả hàng sau khi giao: yêu cầu của khách, duyệt/nhận hàng của admin, sinh khoản hoàn tiền |
-| [payment](modules/payment.md) | `src/modules/payment` | `/api/payments`, `/api/webhooks/sepay`, `/api/admin/payments`, `/api/admin/refunds` | DB + SePay webhook | Thanh toán VietQR: phiên QR, webhook SePay (HMAC), đối soát giao dịch, theo dõi hoàn tiền |
+| [payment](modules/payment.md) | `src/modules/payment` | `/api/payments`, `/api/webhooks/sepay`, `/api/admin/payments` | DB + SePay webhook | Thanh toán VietQR: phiên QR, webhook SePay (HMAC), đối soát giao dịch,  |
+| [refund](modules/refund.md) | `src/modules/refund` | `/api/admin/refunds` | DB | Hoàn tiền: yêu cầu hoàn từ huỷ đơn đã trả hoặc trả hàng, admin ghi mã giao dịch hoàn |
 | [media](modules/media.md) | `src/modules/media` | `/api/admin/media` | DB + Supabase Storage | Upload/list/xoá ảnh thư viện; lưu và xác nhận ảnh khách đính vào đánh giá |
 | [site-config](modules/site-config.md) | `src/modules/site-config` | `/api/site-config`, `/api/admin/site-config` | DB | Cấu hình theo key: banner nội dung trang, phí ship (`SHIPPING_CONFIG`), tỷ giá VND/USD (`EXCHANGE_RATE`) |
 | [currency](modules/currency.md) | `src/modules/currency` | — (đổi tỷ giá qua `/api/admin/site-config`) | Config (site_configs) | Tiền gốc VND, USD suy ra theo tỷ giá: `CurrencyService`, quy ước field `...Vnd`/`...Usd` của mọi API có tiền |
@@ -51,8 +62,9 @@ order ──► shipping ──► site-config   (phí ship/ngưỡng miễn ph�
 currency ──► site-config   (tỷ giá VND/USD đọc từ dòng EXCHANGE_RATE)
 product, cart, wishlist, collection, shipping, order, payment ──► currency   (USD suy ra từ tiền VND; đơn chốt tỷ giá trong orders.exchange_rate)
 payment ──► order   (đọc/khoá/cập nhật `orders.payment_status` qua EntityManager)
-return ──► order, payment, shipping   (đọc đơn/dòng hàng qua EntityManager; `RefundService` tạo khoản hoàn; `returnPolicy.days` từ shipping)
-pending-count ──► order, payment, return, review   (gọi `countNeedsAction`/`countNeedsReview`/`countRequested`/`countAwaitingReply` của từng service)
-payment ──► return   (chỉ entity `ReturnRequest`/`ReturnRequestItem`: cập nhật trạng thái khi khoản hoàn xong hoặc bị từ chối)
+return ──► order, refund, shipping   (đọc đơn/dòng hàng qua EntityManager; `RefundService` tạo khoản hoàn; `returnPolicy.days` từ shipping)
+pending-count ──► order, payment, refund, return, review   (gọi `countNeedsAction`/`countNeedsReview`/`countRequested`/`countAwaitingReply` của từng service)
+refund ──► order, return, payment   (khoá đơn, `markOrderRefunded`; `markReturnRefunded`/`reopenReturnAfterRefundRejected`; chỉ đọc entity `PaymentAttempt`/`PaymentTransaction`)
+order ──► payment, refund   (huỷ đơn: `cancelPendingAttempts`, `createForCancelledOrder`; kèm phiên thanh toán và khoản hoàn khi xem đơn)
 media ──► Supabase Storage (độc lập, ảnh được tham chiếu bằng URL chuỗi ở product/collection/category/site-config)
 ```

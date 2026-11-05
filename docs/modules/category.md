@@ -1,6 +1,6 @@
 # category (`src/modules/category`)
 
-> Cập nhật lần cuối: 2026-10-12
+> Cập nhật lần cuối: 2026-10-24
 
 ## 1. Tổng quan
 
@@ -12,7 +12,7 @@ Module danh mục: quản lý `Category` và các `SubCategory` con, có thứ h
 | Route prefix | `/api/categories` (public), `/api/admin/categories` (admin) |
 | Bảng DB | `categories`, `subcategories` |
 | Module phụ thuộc | không (module `product` phụ thuộc vào module này) |
-| Export | `CategoryService` |
+| Export | `CategoryQueryService` |
 
 ## 2. Mục đích & nghiệp vụ phục vụ
 
@@ -113,7 +113,7 @@ Quan hệ: `Category.subcategories` là `OneToMany` với `eager: true, cascade:
 - **Service**:
   - `ensureSlugUnique` cho category.
   - `validateSubCategorySlugs`: slug subcategory không trùng nhau trong cùng payload.
-  - Lỗi DB `23505` khi create/update → `CATEGORY_SUBSLUG_DUPLICATE`.
+  - Lỗi DB `23505` khi create/update được ánh xạ theo tên constraint: `UQ_categories_slug` → `CATEGORY_SLUG_DUPLICATE (1102)`, `UQ_subcategories_category_slug` → `CATEGORY_SUBSLUG_DUPLICATE (1103)`.
   - `priority` phải nằm trong `1..max`.
   - `reorder` phải gửi đủ mọi category đúng 1 lần.
   - Xoá subcategory còn sản phẩm tham chiếu, hoặc xoá category còn sản phẩm: bắt lỗi FK `23503`.
@@ -152,18 +152,28 @@ Quan hệ: `Category.subcategories` là `OneToMany` với `eager: true, cascade:
 
 ### 4.6 Phụ thuộc & cấu hình
 
-- `TypeOrmModule.forFeature([Category, SubCategory])`.
+- `TypeOrmModule.forFeature([Category, SubCategory])`; `CategoryQueryService` và `CategoryService` đều chỉ inject `Repository<Category>`. Module export `CategoryQueryService`.
 - Dùng `pg_advisory_xact_lock` của PostgreSQL.
 - Không có biến môi trường riêng.
 
 ### 4.7 Test
 
-Chưa có spec riêng. `PublicCategoryQueryDto` và `AdminCategoryQueryDto` được `list-query.dto.spec.ts` kiểm tra tự động.
+Chưa có unit spec riêng. `PublicCategoryQueryDto` và `AdminCategoryQueryDto` được `list-query.dto.spec.ts` kiểm tra tự động.
+
+Flow test trên Postgres thật: `test/flows/category/category.flow.ts` (batch 15–16; dựng category qua API để `priority` là dãy 1..N) — danh sách công khai (đúng hình dạng, thứ hạng, tìm theo tên/slug/mô tả, sort, phân trang tính trên category chứ không trên dòng subcategory, tra theo `slug` bỏ qua tham số list, 404 / 1101, tham số sai); danh sách admin; tạo (xếp cuối, mặc định, hai category dùng chung slug subcategory, tạo đồng thời vẫn cho dãy thứ hạng duy nhất, chờ khoá advisory rồi lấy hạng kế tiếp, 1102/1103, validation, `priority` không nhận khi tạo); sửa (từng phần, đổi slug và nhận lại slug của chính mình, dịch chỗ lên/xuống, 1108, đồng bộ subcategory theo slug giữ nguyên id, bỏ subcategory còn sản phẩm → 1105 và không đổi gì, 1103, 404); xoá (dồn thứ hạng, xoá theo dây chuyền subcategory, còn sản phẩm → 1104, 404); reorder (thứ tự mới, 1106/1101/1107, chờ khoá advisory, validation).
 
 ### 4.8 Lưu ý hiện trạng
 
+- `PATCH` dùng `Update*Dto = PartialType(Create*Dto, { skipNullProperties: false })`: mọi ràng buộc của create được kế thừa (chuỗi rỗng ở field bắt buộc → 400), `null` ở field bắt buộc → 400, `null` ở field tuỳ chọn được coi như không gửi (trừ `heroImage`, nơi `null` xoá ảnh). Response là bản ghi đầy đủ, không thiếu field chưa gửi (xem [common](common.md) 4.13).
 - `subcategories.count` là giá trị admin nhập, không được tự tính từ số sản phẩm.
-- Khi bắt lỗi `23505` ở create/update, mọi vi phạm UNIQUE đều được map sang `CATEGORY_SUBSLUG_DUPLICATE`.
-- `CategoryService.findAll()` (trả `{ data, total }` không phân trang) còn trong service nhưng không có nơi nào gọi.
 - `PublicCategoryQueryDto` có field `slug` nhưng controller đọc `slug` riêng bằng `@Query('slug')` để phân nhánh.
 - Subcategory được trả kèm trong cả list public lẫn admin; subcategory không có endpoint riêng.
+
+### 4.9 Thiết kế & pattern
+
+Spec: `docs/specs/category/0001` (kế hoạch flow test), `docs/specs/category/0002` (tách đọc/ghi).
+
+| Pattern / nguyên lý | Chỗ dùng | Vì sao |
+|---|---|---|
+| Tách command/query theo use case | `CategoryQueryService` (`findAllPublic`, `findBySlug`, `findAllAdmin`) và `CategoryService` (`create`, `update`, `reorder`, `delete`) | Luật ghi khó (priority UNIQUE DEFERRABLE, advisory lock, đồng bộ subcategory theo slug) tách khỏi truy vấn và map response; hai nhóm không gọi nhau |
+| Thứ tự khoá cố định | `lockPriorities` (advisory lock) trước mọi thay đổi `priority` | Tạo, sửa, xoá, reorder đồng thời luôn tuần tự, `priority` luôn là dãy 1..N |

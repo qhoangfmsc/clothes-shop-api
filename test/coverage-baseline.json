@@ -1,0 +1,53 @@
+{
+  "exempt": {
+    "GET /": {
+      "error": "Không có input nên không có ca lỗi nghiệp vụ"
+    },
+    "GET /health": {
+      "error": "Không có input nên không có ca lỗi nghiệp vụ"
+    },
+    "GET /api/cart": {
+      "error": "Không có input; chưa có giỏ thì trả giỏ rỗng nên không có ca lỗi nghiệp vụ"
+    },
+    "DELETE /api/cart/clear": {
+      "error": "Không có input; xoá sạch idempotent (giỏ rỗng hoặc chưa có vẫn trả giỏ rỗng) nên không có ca lỗi nghiệp vụ"
+    },
+    "GET /api/reviews/:productId/summary": {
+      "error": "Chỉ có productId trong đường dẫn; id không tồn tại trả bản tổng hợp rỗng nên không có ca lỗi nghiệp vụ"
+    },
+    "GET /api/addresses": {
+      "error": "Không có input; chưa có địa chỉ thì trả danh sách rỗng nên không có ca lỗi nghiệp vụ"
+    },
+    "GET /api/wishlist": {
+      "error": "Không có input; chưa có sản phẩm yêu thích thì trả danh sách rỗng nên không có ca lỗi nghiệp vụ"
+    },
+    "DELETE /api/wishlist/:productId": {
+      "error": "Idempotent: bỏ thứ không có trong wishlist (kể cả productId lạ) vẫn trả success nên không có ca lỗi nghiệp vụ"
+    },
+    "GET /api/wishlist/check/:productId": {
+      "error": "Chỉ trả có/không; productId lạ trả inWishlist false nên không có ca lỗi nghiệp vụ"
+    },
+    "GET /api/auth/me": {
+      "error": "Chỉ có lỗi của guard (401/403, ma trận auth đã kiểm); 2201 không đến được qua HTTP vì JwtStrategy đã chặn user không tồn tại"
+    },
+    "GET /api/auth/permissions": {
+      "error": "Không có input; chỉ có lỗi của guard (401/403, ma trận auth đã kiểm)"
+    },
+    "GET /api/admin/site-config": {
+      "error": "Không có input; chưa có cấu hình nào thì trả danh sách rỗng nên không có ca lỗi nghiệp vụ"
+    },
+    "GET /api/admin/site-config/keys": {
+      "error": "Không có input; danh sách key lấy từ registry cố định nên không có ca lỗi nghiệp vụ"
+    },
+    "GET /api/shipping": {
+      "error": "Không có input; thiếu hoặc hỏng cấu hình thì dùng giá trị mặc định nên không có ca lỗi nghiệp vụ"
+    },
+    "GET /api/size-guides/:category": {
+      "error": "Nhóm không có trả 200 với data null (docs 4.1) nên không có ca lỗi nghiệp vụ"
+    },
+    "GET /api/admin/pending-counts": {
+      "error": "Không có input; chỉ có lỗi của guard (401/403, ma trận auth đã kiểm), thiếu quyền một mục thì bỏ key chứ không lỗi"
+    }
+  },
+  "missing": {}
+}

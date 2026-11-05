@@ -1,15 +1,18 @@
-import { getPaging, paginated } from '@common/base/pagination.util';
-import { parseSort } from '@common/base/sort.util';
+import { isDbError, PG_FOREIGN_KEY_VIOLATION, throwOnConstraint } from '@common/base/db-error.util';
+import { pickProvided } from '@common/base/provided-fields.util';
 import { throwAppError } from '@common/exceptions/app.exception';
 import { ECategoryErrorCode } from '@common/exceptions/error-codes';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, FindOptionsOrder, FindOptionsWhere, ILike, In, Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { Category } from './category.entity';
-import { AdminCategoryQueryDto } from './dtos/admin-category-query.dto';
 import { CreateCategoryDto, CreateSubCategoryDto, ReorderCategoriesDto, UpdateCategoryDto } from './dtos/category.dto';
-import { PublicCategoryQueryDto } from './dtos/public-category-query.dto';
 import { SubCategory } from './sub-category.entity';
+
+const CATEGORY_UNIQUE_ERRORS = {
+  UQ_categories_slug: ECategoryErrorCode.CATEGORY_SLUG_DUPLICATE,
+  UQ_subcategories_category_slug: ECategoryErrorCode.CATEGORY_SUBSLUG_DUPLICATE,
+};
 
 @Injectable()
 export class CategoryService {
@@ -17,136 +20,6 @@ export class CategoryService {
     @InjectRepository(Category)
     private readonly categoryRepo: Repository<Category>,
   ) {}
-
-  async findAll() {
-    const categories = await this.categoryRepo.find({
-      order: { priority: 'ASC' },
-    });
-
-    const data = categories.map((cat) => ({
-      id: cat.id,
-      slug: cat.slug,
-      title: cat.title,
-      description: cat.description,
-      heroImage: cat.heroImage,
-      priority: cat.priority,
-      subcategories: (cat.subcategories || []).map((sub) => ({
-        id: sub.id,
-        slug: sub.slug,
-        label: sub.label,
-        description: sub.description,
-        count: sub.count,
-      })),
-    }));
-
-    return { data, total: data.length };
-  }
-
-  async findAllPublic(query: PublicCategoryQueryDto) {
-    const { search, sort } = query;
-    const { page, limit } = getPaging(query);
-
-    // Không join "subcategories" (1-nhiều) ở đây: join + skip/take sẽ áp LIMIT/OFFSET
-    // lên các dòng SQL đã bị nhân theo subcategory, làm sai lệch cả `total` lẫn số
-    // category thực trả về mỗi trang. Paginate trước trên "categories" thuần, xong
-    // load subcategories riêng cho đúng tập id đã phân trang (bên dưới).
-    const qb = this.categoryRepo.createQueryBuilder('c');
-
-    // Search
-    if (search) {
-      qb.andWhere('(c.title ILIKE :q OR c.slug ILIKE :q OR c.description ILIKE :q)', { q: `%${search}%` });
-    }
-
-    // Sort: `field` = ASC, `-field` = DESC (mặc định priority: 1 = ưu tiên cao nhất)
-    const { field, direction } = parseSort(sort, 'priority');
-    qb.orderBy(`c.${field}`, direction);
-
-    qb.skip((page - 1) * limit).take(limit);
-
-    const [categories, total] = await qb.getManyAndCount();
-
-    if (categories.length > 0) {
-      // eager: true trên Category.subcategories tự load kèm qua .find() (không cần khai relations)
-      const withSubs = await this.categoryRepo.find({ where: { id: In(categories.map((c) => c.id)) } });
-      const subsById = new Map(withSubs.map((c) => [c.id, c.subcategories]));
-      for (const cat of categories) {
-        cat.subcategories = subsById.get(cat.id) ?? [];
-      }
-    }
-
-    // Map to same shape as findAll for consistency
-    const data = categories.map((cat) => ({
-      id: cat.id,
-      slug: cat.slug,
-      title: cat.title,
-      description: cat.description,
-      heroImage: cat.heroImage,
-      priority: cat.priority,
-      subcategories: (cat.subcategories || []).map((sub) => ({
-        id: sub.id,
-        slug: sub.slug,
-        label: sub.label,
-        description: sub.description,
-        count: sub.count,
-      })),
-    }));
-
-    return paginated(data, total, page, limit);
-  }
-
-  async findBySlug(slug: string) {
-    const category = await this.categoryRepo.findOne({ where: { slug } });
-    if (!category) {
-      throwAppError(ECategoryErrorCode.CATEGORY_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
-    }
-
-    return {
-      data: {
-        id: category.id,
-        slug: category.slug,
-        title: category.title,
-        description: category.description,
-        heroImage: category.heroImage,
-        priority: category.priority,
-        subcategories: (category.subcategories || []).map((sub) => ({
-          id: sub.id,
-          slug: sub.slug,
-          label: sub.label,
-          description: sub.description,
-          count: sub.count,
-        })),
-      },
-    };
-  }
-
-  // ============================================
-  // ADMIN METHODS
-  // ============================================
-
-  async findAllAdmin(query: AdminCategoryQueryDto) {
-    const { search, sort } = query;
-    const { page, limit } = getPaging(query);
-
-    // Build where: search creates OR conditions
-    let where: FindOptionsWhere<Category> | FindOptionsWhere<Category>[] | undefined;
-    if (search) {
-      const like = ILike(`%${search}%`);
-      where = [{ slug: like }, { title: like }, { description: like }];
-    }
-
-    // Sort: `field` = ASC, `-field` = DESC
-    const { field, direction } = parseSort(sort, 'priority');
-    const order: FindOptionsOrder<Category> = { [field]: direction };
-
-    const [data, total] = await this.categoryRepo.findAndCount({
-      where,
-      order,
-      skip: (page - 1) * limit,
-      take: limit,
-    });
-
-    return paginated(data, total, page, limit);
-  }
 
   async create(dto: CreateCategoryDto) {
     await this.ensureSlugUnique(dto.slug);
@@ -158,14 +31,11 @@ export class CategoryService {
         // Danh mục mới luôn xếp cuối (priority thấp nhất); muốn đổi vị trí thì update priority / reorder
         await this.lockPriorities(manager);
         const priority = (await this.maxPriority(manager)) + 1;
-        const category = manager.create(Category, { ...dto, priority });
+        const category = manager.create(Category, { subcategories: [], ...pickProvided(dto, ['heroImage']), priority });
         return { data: await manager.save(category) };
       });
-    } catch (err: any) {
-      // Catch UQ_subcategories_category_slug collision (DB unique constraint)
-      if (err.code === '23505') {
-        throwAppError(ECategoryErrorCode.CATEGORY_SUBSLUG_DUPLICATE);
-      }
+    } catch (err) {
+      throwOnConstraint(err, CATEGORY_UNIQUE_ERRORS);
       throw err;
     }
   }
@@ -176,7 +46,7 @@ export class CategoryService {
       throwAppError(ECategoryErrorCode.CATEGORY_NOT_FOUND, undefined, HttpStatus.NOT_FOUND);
     }
 
-    const { subcategories, priority, ...rest } = dto;
+    const { subcategories, priority, ...rest } = pickProvided(dto, ['heroImage']);
 
     // Check slug uniqueness nếu slug được thay đổi
     if (dto.slug) {
@@ -212,10 +82,8 @@ export class CategoryService {
         Object.assign(category, rest);
         return { data: await manager.save(category) };
       });
-    } catch (err: any) {
-      if (err.code === '23505') {
-        throwAppError(ECategoryErrorCode.CATEGORY_SUBSLUG_DUPLICATE);
-      }
+    } catch (err) {
+      throwOnConstraint(err, CATEGORY_UNIQUE_ERRORS);
       throw err;
     }
   }
@@ -251,10 +119,6 @@ export class CategoryService {
 
     return { data: ids.map((id, index) => ({ id, priority: index + 1 })) };
   }
-
-  // ============================================
-  // PRIVATE HELPERS
-  // ============================================
 
   private async ensureSlugUnique(slug: string) {
     const existing = await this.categoryRepo.findOne({ where: { slug } });
@@ -339,8 +203,8 @@ export class CategoryService {
     if (removed.length > 0) {
       try {
         await manager.remove(removed);
-      } catch (err: any) {
-        if (err.code === '23503') {
+      } catch (err) {
+        if (isDbError(err, PG_FOREIGN_KEY_VIOLATION)) {
           throwAppError(
             ECategoryErrorCode.CATEGORY_SUBCATEGORY_HAS_PRODUCTS,
             `Không thể xoá subcategory đang có sản phẩm tham chiếu: ${removed.map((s) => s.slug).join(', ')}`,
@@ -370,9 +234,9 @@ export class CategoryService {
           .execute();
       });
       return { message: 'Category deleted successfully' };
-    } catch (err: any) {
+    } catch (err) {
       // Catch FK RESTRICT error từ DB (còn products tham chiếu)
-      if (err.code === '23503') {
+      if (isDbError(err, PG_FOREIGN_KEY_VIOLATION)) {
         throwAppError(ECategoryErrorCode.CATEGORY_HAS_PRODUCTS);
       }
       throw err;

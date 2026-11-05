@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { CurrencyModule } from '../currency/currency.module';
-import { Product } from '../product/product.entity';
+import { Product } from '../product/shared/product.entity';
 import { WishlistController } from './wishlist.controller';
 import { Wishlist } from './wishlist.entity';
 import { WishlistService } from './wishlist.service';

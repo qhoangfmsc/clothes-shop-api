@@ -1,8 +1,13 @@
 /** Giá trị enum dùng chung giữa DTO create/update và query filter — khai báo 1 chỗ, không lặp literal */
 export const ACTIVE_STATUSES = ['active', 'disabled'] as const;
+export type ActiveStatus = (typeof ACTIVE_STATUSES)[number];
 export const USER_ROLES = ['user', 'admin'] as const;
 /** Trạng thái thanh toán của đơn (`orders.payment_status`) — tách khỏi `orders.status` (luồng giao hàng) */
 export const ORDER_PAYMENT_STATUSES = ['unpaid', 'paid', 'refunded'] as const;
+export type OrderPaymentStatus = (typeof ORDER_PAYMENT_STATUSES)[number];
+/** Trạng thái giao hàng của đơn (`orders.status`) */
+export const ORDER_STATUSES = ['pending', 'confirmed', 'shipping', 'delivered', 'completed', 'cancelled'] as const;
+export type OrderStatus = (typeof ORDER_STATUSES)[number];
 /** Badge của product: new, sale, bestseller + trạng thái bán: sold_out (hết hàng), limited, custom_order (đặt thiết kế) */
 export const PRODUCT_BADGES = ['new', 'sale', 'bestseller', 'sold_out', 'limited', 'custom_order'] as const;
 
