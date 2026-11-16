@@ -2,5 +2,6 @@ services:
   - type: web
     name: clothes-shop-api
     runtime: node
-    buildCommand: yarn install --frozen-lockfile && yarn build
+    # --production=false: NODE_ENV=production mặc định bỏ devDependencies, mà build cần @types/* và start:prod cần ts-node
+    buildCommand: yarn install --frozen-lockfile --production=false && yarn build
     startCommand: yarn start:prod
